@@ -328,6 +328,9 @@ int fs_ml_video_create_window(const char *title) {
     }
 
     set_video_mode();
+
+    SDL_WM_SetCaption(g_window_title, g_get_application_name());
+
 #ifdef HAVE_GLES
     EGL_Init();
 #endif
@@ -337,10 +340,6 @@ int fs_ml_video_create_window(const char *title) {
     glClear(GL_COLOR_BUFFER_BIT);
     SDL_GL_SwapBuffers();
     fs_gl_finish();
-
-#ifndef HAVE_GLES
-    SDL_WM_SetCaption(g_window_title, g_get_application_name());
-#endif
 
     g_fs_ml_automatic_input_grab = fs_config_get_boolean(
             "automatic_input_grab");
