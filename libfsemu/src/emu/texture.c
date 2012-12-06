@@ -497,8 +497,8 @@ void fs_emu_render_texture_with_size(fs_emu_texture *texture, int x, int y,
     GLfloat tex[] = {
         0.0, 1.0,
         1.0, 1.0,
-        1.0, 1.0,
-        1.0, 0.0
+        1.0, 0.0,
+        0.0, 0.0
     };
     GLfloat vert[] = {
         x, y,

@@ -1282,7 +1282,7 @@ static void render_glow(double opacity) {
     glEnableClientState(GL_VERTEX_ARRAY);
     glEnableClientState(GL_TEXTURE_COORD_ARRAY);
 
-    glVertexPointer(2, GL_FLOAT, 0, vert2);
+    glVertexPointer(3, GL_FLOAT, 0, vert2);
     glTexCoordPointer(2, GL_FLOAT, 0, tex2);
     glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
     glDrawArrays(GL_TRIANGLE_FAN, 4, 4);
