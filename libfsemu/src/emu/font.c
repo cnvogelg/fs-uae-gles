@@ -310,13 +310,23 @@ int fs_emu_font_render(fs_emu_font *font, const char *text, float x, float y,
     int position = last_item->position;
 
     fs_gl_bind_texture(g_text_texture);
-    fs_gl_unpack_row_length(TEXTURE_WIDTH);
     int gl_buffer_format = GL_RGBA;
     if (fs_emu_get_video_format() == FS_EMU_VIDEO_FORMAT_BGRA) {
         gl_buffer_format = GL_BGRA;
     }
+#ifdef HAVE_GLES
+    /* GLES does not support unpack padding of buffer. we have to update line-wise (or create a new one) */
+    uint8_t *buf = g_buffer;
+    for(int y=0;y<required_height;y++) {
+        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, position * 32 + y, required_width,
+                1, gl_buffer_format, GL_UNSIGNED_BYTE, buf);
+        buf += TEXTURE_WIDTH * 4;
+    }
+#else
+    fs_gl_unpack_row_length(TEXTURE_WIDTH);
     glTexSubImage2D(GL_TEXTURE_2D, 0, 0, position * 32, required_width,
             required_height, gl_buffer_format, GL_UNSIGNED_BYTE, g_buffer);
+#endif
 
     cache_item *item = g_malloc(sizeof(cache_item));
     item->font = font;

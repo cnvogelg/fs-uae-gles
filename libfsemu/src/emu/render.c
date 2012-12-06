@@ -482,10 +482,16 @@ static void update_texture() {
     fs_gl_bind_texture(g_frame_texture);
 
     uint8_t *gl_buffer_start = frame + ((upload_y * width) + upload_x) * bpp;
-    fs_gl_unpack_row_length(width);
 
+#ifdef HAVE_GLES
+    /* we don't have unpack padding in GLES. uploading full width lines instead */
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, upload_h,
+            gl_buffer_format, gl_buffer_type, gl_buffer_start);
+#else
+    fs_gl_unpack_row_length(width);
     glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, upload_w, upload_h,
             gl_buffer_format, gl_buffer_type, gl_buffer_start);
+#endif
     CHECK_GL_ERROR();
 
     int update_black_border = 1;
@@ -1168,10 +1174,10 @@ static void render_frame(double alpha, int perspective) {
 
 #ifdef HAVE_GLES
         GLfloat tex[] = {
-            0.0, 1.0,
-            1.0, 1.0,
+            0.0, 0.0,
             1.0, 0.0,
-            0.0, 0.0
+            1.0, 1.0,
+            0.0, 1.0
         };
         GLfloat vert[] = {
             x1, y1,
@@ -1278,7 +1284,8 @@ static void render_glow(double opacity) {
 
     glVertexPointer(2, GL_FLOAT, 0, vert2);
     glTexCoordPointer(2, GL_FLOAT, 0, tex2);
-    glDrawArrays(GL_TRIANGLE_FAN, 0, 8);
+    glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+    glDrawArrays(GL_TRIANGLE_FAN, 4, 4);
 
     glDisableClientState(GL_VERTEX_ARRAY);
     glDisableClientState(GL_TEXTURE_COORD_ARRAY);
@@ -1375,7 +1382,10 @@ static void render_glow(double opacity) {
     glColorPointer(4, GL_FLOAT, 0, color3);
     glVertexPointer(3, GL_FLOAT, 0, vert3);
     glTexCoordPointer(2, GL_FLOAT, 0, tex3);
-    glDrawArrays(GL_TRIANGLE_FAN, 0, 16);
+    glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+    glDrawArrays(GL_TRIANGLE_FAN, 4, 4);
+    glDrawArrays(GL_TRIANGLE_FAN, 8, 4);
+    glDrawArrays(GL_TRIANGLE_FAN, 12, 4);
 
     glDisableClientState(GL_VERTEX_ARRAY);
     glDisableClientState(GL_TEXTURE_COORD_ARRAY);
@@ -1562,31 +1572,40 @@ void fs_emu_video_render_function() {
 
 #ifdef HAVE_GLES
         GLfloat vert[] = {
+            // q1
             0, splt, -0.9,
             1920, splt, -0.9,
             1920, 1020, -0.9,
-            0, 1020, -0.9
+            0, 1020, -0.9,
+            // q2
+            0, 1020, -0.9,
+            1920, 1020, -0.9,
+            1920, 1080, -0.9,
+            0, 1080, -0.9,
+            // q3
+            0, 0, -0.9,
+            1920, 0, -0.9,
+            1920, splt, -0.9,
+            0, splt, -0.9
         };
+        GLfloat *wc1 = g_fs_emu_theme.wall_color_1;
+        GLfloat *wc2 = g_fs_emu_theme.wall_color_2;
         GLfloat color[] = {
-            g_fs_emu_theme.wall_color_2[0],
-            g_fs_emu_theme.wall_color_2[1],
-            g_fs_emu_theme.wall_color_2[2],
-            g_fs_emu_theme.wall_color_2[3],
-                
-            g_fs_emu_theme.wall_color_2[0],
-            g_fs_emu_theme.wall_color_2[1],
-            g_fs_emu_theme.wall_color_2[2],
-            g_fs_emu_theme.wall_color_2[3],
-                
-            g_fs_emu_theme.wall_color_1[0],
-            g_fs_emu_theme.wall_color_1[1],
-            g_fs_emu_theme.wall_color_1[2],
-            g_fs_emu_theme.wall_color_1[3],
-                
-            g_fs_emu_theme.wall_color_1[0],
-            g_fs_emu_theme.wall_color_1[1],
-            g_fs_emu_theme.wall_color_1[2],
-            g_fs_emu_theme.wall_color_1[3],            
+            // q1
+            wc2[0], wc2[1], wc2[2], wc2[3],
+            wc2[0], wc2[1], wc2[2], wc2[3],
+            wc1[0], wc1[1], wc1[2], wc1[3],
+            wc1[0], wc1[1], wc1[2], wc1[3],
+            // q2
+            wc1[0], wc1[1], wc1[2], wc1[3],
+            wc1[0], wc1[1], wc1[2], wc1[3],
+            wc1[0], wc1[1], wc1[2], wc1[3],
+            wc1[0], wc1[1], wc1[2], wc1[3],
+            // q3
+            wc2[0], wc2[1], wc2[2], wc2[3],
+            wc2[0], wc2[1], wc2[2], wc2[3],
+            wc1[0], wc1[1], wc1[2], wc1[3],
+            wc1[0], wc1[1], wc1[2], wc1[3],    
         };
     
         glEnableClientState(GL_VERTEX_ARRAY);
@@ -1595,8 +1614,8 @@ void fs_emu_video_render_function() {
         glVertexPointer(3, GL_FLOAT, 0, vert);
         glColorPointer(4, GL_FLOAT, 0, color);
         glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
-    
-        // TODO CV: missing quad2, quad3
+        glDrawArrays(GL_TRIANGLE_FAN, 4, 4);
+        glDrawArrays(GL_TRIANGLE_FAN, 8, 4);
     
         glDisableClientState(GL_VERTEX_ARRAY);
         glDisableClientState(GL_COLOR_ARRAY);
