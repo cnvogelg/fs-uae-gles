@@ -594,22 +594,73 @@ static void render_quad(float s2, float t1, float t2, int first, int last) {
         if (g_render_textured_side) {
             fs_gl_color4f(0.33 * g_alpha, 0.33 * g_alpha, 0.33 * g_alpha,
                     g_alpha);
+
+#ifdef HAVE_GLES
+            GLfloat tex[] = {
+                0.0, t1,
+                0.0, t1,
+                0.0, t2,
+                0.0, t2
+            };
+            GLfloat vert[] = {
+                -1.0, g_y1, -0.1,
+                -1.0, g_y1, 0.0,
+                -1.0, g_y2, 0.0,
+                -1.0, g_y2, -0.1
+            };
+    
+            glEnableClientState(GL_VERTEX_ARRAY);
+            glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+    
+            glVertexPointer(3, GL_FLOAT, 0, vert);
+            glTexCoordPointer(2, GL_FLOAT, 0, tex);
+            glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+    
+            glDisableClientState(GL_VERTEX_ARRAY);
+            glDisableClientState(GL_TEXTURE_COORD_ARRAY);        
+#else        
             glBegin(GL_QUADS);
             glTexCoord2f(0.0, t1); glVertex3f(-1.0, g_y1, -0.1);
             glTexCoord2f(0.0, t1); glVertex3f(-1.0, g_y1,  0.0);
             glTexCoord2f(0.0, t2); glVertex3f(-1.0, g_y2,  0.0);
             glTexCoord2f(0.0, t2); glVertex3f(-1.0, g_y2, -0.1);
             glEnd();
+#endif
         }
         fs_gl_color4f(g_alpha, g_alpha, g_alpha, g_alpha);
     }
 
+#ifdef HAVE_GLES
+    GLfloat tex[] = {
+        0.0, t1,
+        s2, t1,
+        s2, t2,
+        0.0, t2
+    };
+    GLfloat vert[] = {
+        x1, y1,
+        x2, y1,
+        x2, y2,
+        x1, y2 
+    };
+    
+    glEnableClientState(GL_VERTEX_ARRAY);
+    glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+    
+    glVertexPointer(2, GL_FLOAT, 0, vert);
+    glTexCoordPointer(2, GL_FLOAT, 0, tex);
+    glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+    
+    glDisableClientState(GL_VERTEX_ARRAY);
+    glDisableClientState(GL_TEXTURE_COORD_ARRAY);        
+#else        
     glBegin(GL_QUADS);
     glTexCoord2f(0.0, t1); glVertex2f(x1, y1);
     glTexCoord2f( s2, t1); glVertex2f(x2, y1);
     glTexCoord2f( s2, t2); glVertex2f(x2, y2);
     glTexCoord2f(0.0, t2); glVertex2f(x1, y2);
     glEnd();
+#endif
 }
 
 static void render_pass(shader_pass *pass, int first, int last) {

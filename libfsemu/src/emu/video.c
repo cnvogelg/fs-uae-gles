@@ -580,6 +580,7 @@ void fs_emu_video_init() {
             g_fs_emu_video_format = FS_EMU_VIDEO_FORMAT_RGB;
             g_fs_emu_video_bpp = 3;
         }
+#ifndef HAVE_GLES
         else if (g_ascii_strcasecmp(s, "rgb565") == 0) {
             fs_log("using video format RGB565\n");
             g_fs_emu_video_format = FS_EMU_VIDEO_FORMAT_R5G6B5;
@@ -592,6 +593,7 @@ void fs_emu_video_init() {
             g_fs_emu_video_bpp = 2;
             g_fs_emu_texture_format = GL_RGB5_A1;
         }
+#endif /* HAVE_GLES */
         else {
             fs_emu_warning("Unknown video format");
         }
@@ -608,14 +610,17 @@ void fs_emu_video_init() {
             fs_log("using texture format RGB\n");
             g_fs_emu_texture_format = GL_RGB;
         }
+#ifndef HAVE_GLES
         else if (g_ascii_strcasecmp(s, "rgb8") == 0) {
             fs_log("using texture format RGB8\n");
             g_fs_emu_texture_format = GL_RGB8;
         }
+#endif
         else if (g_ascii_strcasecmp(s, "rgba") == 0) {
             fs_log("using texture format RGBA\n");
             g_fs_emu_texture_format = GL_RGBA;
         }
+#ifndef HAVE_GLES
         else if (g_ascii_strcasecmp(s, "rgba8") == 0) {
             fs_log("using texture format RGBA8\n");
             g_fs_emu_texture_format = GL_RGBA8;
@@ -628,6 +633,7 @@ void fs_emu_video_init() {
             fs_log("using texture format RGB5_A1\n");
             g_fs_emu_texture_format = GL_RGB5_A1;
         }
+#endif
         else {
             fs_emu_warning("Unknown texture format (using default)");
         }

@@ -8,6 +8,10 @@
 #include "video.h"
 #include "font.h"
 
+#ifdef HAVE_GLES
+#define glTranslated glTranslatef
+#endif
+
 static fs_emu_font *g_font_title = NULL;
 static fs_emu_font *g_font_menu = NULL;
 

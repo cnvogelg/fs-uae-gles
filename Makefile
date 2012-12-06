@@ -53,14 +53,14 @@ warnings = -Wno-unused-variable -Wno-unused-function
 errors = -Werror=implicit-function-declaration -Werror=return-type
 cxxflags = $(warnings) $(errors) -Isrc/od-fs -Isrc/od-fs/include \
 		-Isrc/include -Igen -Isrc -Isrc/od-win32/caps \
-		`pkg-config --cflags glib-2.0` -I$(libfsemu_dir)/include \
+		`$(pkg_config) --cflags glib-2.0` -I$(libfsemu_dir)/include \
 		-Wno-write-strings `sdl-config --cflags` \
 		-fpermissive \
 		$(CXXFLAGS)
 cflags = -std=c99 $(CFLAGS) $(cxxflags)
 ldflags = $(LDFLAGS)
 libs = -L$(libfsemu_dir)/out -lfsemu `sdl-config --libs` \
-		`pkg-config --libs glib-2.0 gthread-2.0` -lpng -lz
+		`$(pkg_config) --libs glib-2.0 gthread-2.0` -lpng -lz
 endif
 
 profile_generate := 0
@@ -101,6 +101,19 @@ ifeq ($(os), android)
   cppflags += -DANDROID
   cxxflags += 
   libs +=
+else ifeq($(os), pandora)
+  OPENAL_DIR = $(HOME)/pandora/openal
+  # special pandora flags
+  cppflags += -march=armv7-a -mcpu=cortex-a8 -mfpu=neon -mfloat-abi=softfp
+  cppflags += -msoft-float -ffast-math -fomit-frame-pointer -fstrict-aliasing
+  cppflags += -mstructure-size-boundary=32 -fexpensive-optimizations 
+  cppflags += -fweb -frename-registers -falign-functions=16 -falign-loops -falign-labels -falign-jumps
+  cppflags += -finline -finline-functions -fno-common -fno-builtin -fsingle-precision-constant
+  # common flags
+  cppflags += -DHAVE_GLES -DPANDORA 
+  cxxflags += -I$(PNDSDK)/usr/include -g
+  libs += -L$(OPENAL_DIR)/lib -L$(PNDSDK)/usr/lib -lopenal -ldl -lX11 -lEGL -lGLES_CM -lGLUES_CM
+  uae_warnings += -Wno-attributes -Wno-unused-variable -Wno-unused-but-set-variable
 else ifeq ($(os), windows)
   cppflags += -DWINDOWS
   cxxflags += -U_WIN32 -UWIN32
@@ -342,7 +355,7 @@ sed -e "s/^[0-9]*//" -e s"/ \([0-9a-f][0-9a-f]\)/0x\1,/g" -e"\$$d") > $@
 	echo ";" >> $@
 
 obj/gen-%.o: gen/%.cpp
-	$(cxx) $(cppflags) $(cxxflags) -c $< -o $@
+	$(cxx) $(cppflags) $(cxxflags) $(uae_warnings) -c $< -o $@
 
 obj/%.o: src/%.cpp
 	$(cxx) $(cppflags) $(cxxflags) $(uae_warnings) -c $< -o $@

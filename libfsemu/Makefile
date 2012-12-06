@@ -8,12 +8,21 @@ else
 endif
 
 android := 0
+pandora := 1
+pkg_config = pkg-config
 
 ifeq ($(android), 1)
 os = android
 cc = arm-linux-androideabi-gcc
 cxx = arm-linux-androideabi-g++
 ar = arm-linux-androideabi-ar
+else ifeq ($(pandora), 1)
+os = pandora
+cc = pandora-gcc
+cxx = pandora-g++
+ar = pandora-ar
+pkg_config = pandora-pkg-config
+EXTRA_OBJ = obj/eglport.o
 else ifeq ($(os), windows)
 cc = gcc
 cxx = g++
@@ -36,7 +45,7 @@ warnings = -Wall
 errors = -Werror=implicit-function-declaration
 cppflags = $(CXXFLAGS)
 cflags = -std=c99 $(warnings) $(errors) -Iinclude \
-		`sdl-config --cflags` `pkg-config --cflags glib-2.0` \
+		`sdl-config --cflags` `$(pkg_config) --cflags glib-2.0` \
 		$(CFLAGS) -D_FILE_OFFSET_BITS=64
 objects = obj/emu_emu.o obj/emu_video.o obj/emu_audio.o obj/emu_input.o \
 		obj/emu_menu.o obj/emu_texture.o obj/emu_font.o \
@@ -46,6 +55,7 @@ objects = obj/emu_emu.o obj/emu_video.o obj/emu_audio.o obj/emu_input.o \
 		\
 		obj/ml_ml.o obj/ml_windows.o obj/ml_linux.o obj/ml_render.o \
 		obj/ml_sdl.o obj/ml_rawinput.o obj/ml_macosx.o \
+		$(EXTRA_OBJ) \
 		\
 		obj/base.o obj/log.o obj/config.o obj/image.o obj/ref.o \
 		obj/glee.o obj/opengl.o obj/thread.o obj/string.o obj/filesys.o \
@@ -85,6 +95,26 @@ cppflags += -I/System/Library/Frameworks/OpenAL.framework/Headers
 cppflags += -DWITH_SDL_VIDEO -DWITH_SDL_INPUT -DWITH_OPENAL
 library = libfsemu.a
 
+# ----- pandora -----
+else ifeq ($(os), pandora)
+OPENAL_DIR=$(HOME)/pandora/openal
+CC = pandora-gcc
+# special pandora flags
+cppflags += -march=armv7-a -mcpu=cortex-a8 -mfpu=neon -mfloat-abi=softfp
+cppflags += -msoft-float -ffast-math -fomit-frame-pointer -fstrict-aliasing
+cppflags += -mstructure-size-boundary=32 -fexpensive-optimizations 
+cppflags += -fweb -frename-registers -falign-functions=16 -falign-loops -falign-labels -falign-jumps
+cppflags += -finline -finline-functions -fno-common -fno-builtin -fsingle-precision-constant
+# common flags
+cppflags += -DLINUX -I$(PNDSDK)/usr/include -I$(OPENAL_DIR)/include
+cppflags += -DHAVE_GLES -DPANDORA
+cppflags += -DWITH_SDL_VIDEO -DWITH_SDL_INPUT -DWITH_OPENAL -g
+library = libfsemu.a
+shared = libfsemu.so.1.0
+shared_soname = libfsemu.so.1
+shared_linkname = libfsemu.so
+shared_ldflags += -shared -Wl,--as-needed -Wl,-soname=$(library_soname)
+#libs += `sdl-config --libs` `pkg-config --libs glib-2.0` -lGL
 else
 
 cppflags += -DLINUX
