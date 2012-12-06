@@ -837,7 +837,7 @@ void do_leave_program (void)
 	if (! no_gui)
 		gui_exit ();
 #ifdef HAVE_GLES
-    EGL_Destroy();
+    EGL_Close();
 #endif
 #ifdef USE_SDL
 	SDL_Quit ();

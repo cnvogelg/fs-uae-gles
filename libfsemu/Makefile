@@ -107,7 +107,7 @@ cppflags += -fweb -frename-registers -falign-functions=16 -falign-loops -falign-
 cppflags += -finline -finline-functions -fno-common -fno-builtin -fsingle-precision-constant
 # common flags
 cppflags += -DLINUX -I$(PNDSDK)/usr/include -I$(OPENAL_DIR)/include
-cppflags += -DHAVE_GLES -DPANDORA
+cppflags += -DHAVE_GLES -DPANDORA -DUSE_EGL_SDL -DUSE_GLES1
 cppflags += -DWITH_SDL_VIDEO -DWITH_SDL_INPUT -DWITH_OPENAL -g
 library = libfsemu.a
 shared = libfsemu.so.1.0

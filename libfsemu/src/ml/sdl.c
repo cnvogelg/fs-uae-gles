@@ -256,8 +256,10 @@ int fs_ml_video_create_window(const char *title) {
     static int initialized = 0;
     SDL_Init(SDL_INIT_VIDEO);
 #ifdef HAVE_GLES
-    if (!EGL_Open())
+    if (EGL_Open()) {
+        puts("FATAL: EGL_Open failed!");
         exit(1);
+    }
 #endif
 
     if (!initialized) {
