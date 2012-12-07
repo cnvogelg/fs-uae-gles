@@ -46,7 +46,7 @@ $(SQUASH_FS): gather genpxml
 	$(MKSQUASHFS) $(BUILD_DIR) $(SQUASH_FS)
 
 $(PND_OUT): $(SQUASH_FS)
-	cat $(SQUASH_FS) PXML.xml $(ICON_FILE) > $(PND_OUT)
+	cat $(SQUASH_FS) $(BUILD_DIR)/PXML.xml $(ICON_FILE) > $(PND_OUT)
 
 clean:
 	rm -rf $(BUILD_DIR)
