@@ -95,7 +95,7 @@ extern FILE *g_fs_uae_sync_debug_file;
 #define FPU_UAE
 #define GFXFILTER
 
-#if defined(__x86_64__) || defined(__ppc__)
+#if defined(__x86_64__) || defined(__ppc__) || defined(PANDORA)
 // no JIT for these architectures
 #elif defined(OPENBSD)
 // no sys/ucontext.h header

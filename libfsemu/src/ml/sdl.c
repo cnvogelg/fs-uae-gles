@@ -16,6 +16,11 @@
 // FIXME: make libfsml independent of libfsmeu
 #include "../emu/video.h"
 
+#ifdef HAVE_GLES
+#include "eglport.h"
+#define SDL_GL_SwapBuffers EGL_SwapBuffers
+#endif
+
 static GQueue *g_video_event_queue = NULL;
 static GMutex *g_video_event_mutex = NULL;
 
@@ -106,7 +111,9 @@ int fs_ml_has_automatic_input_grab() {
 void fs_ml_grab_input(int grab, int immediate) {
     //printf("fs_ml_grab_input %d %d\n", grab, immediate);
     if (immediate) {
+#ifndef HAVE_GLES
         SDL_WM_GrabInput(grab ? SDL_GRAB_ON : SDL_GRAB_OFF);
+#endif
         fs_ml_show_cursor(!grab, 1);
     }
     else {
@@ -122,7 +129,9 @@ void fs_ml_set_video_fsaa(int fsaa) {
 
 void fs_ml_show_cursor(int show, int immediate) {
     if (immediate) {
+#ifndef HAVE_GLES
         SDL_ShowCursor(show);
+#endif
     }
     else {
         post_video_event(show ? FS_ML_VIDEO_EVENT_SHOW_CURSOR :
@@ -165,8 +174,10 @@ static void log_opengl_information() {
 
 static void set_video_mode() {
     int flags = 0;
+#ifndef HAVE_GLES
     flags |= SDL_DOUBLEBUF;
     flags |= SDL_OPENGL;
+#endif
     if (g_fs_emu_video_fullscreen == 1) {
         g_fs_ml_video_width = g_fullscreen_width;
         g_fs_ml_video_height = g_fullscreen_height;
@@ -244,6 +255,13 @@ int fs_ml_video_create_window(const char *title) {
 
     static int initialized = 0;
     SDL_Init(SDL_INIT_VIDEO);
+#ifdef HAVE_GLES
+    if (EGL_Open()) {
+        puts("FATAL: EGL_Open failed!");
+        exit(1);
+    }
+#endif
+
     if (!initialized) {
         const SDL_VideoInfo* info = SDL_GetVideoInfo();
         g_fullscreen_width = fs_config_get_int("fullscreen_width");
@@ -280,6 +298,7 @@ int fs_ml_video_create_window(const char *title) {
         g_fs_ml_vblank_sync = 1;
     }
 
+#ifndef HAVE_GLES
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
     if (g_fs_ml_vblank_sync) {
         fs_emu_log("*** SDL_GL_SWAP_CONTROL is enabled ***\n");
@@ -295,6 +314,7 @@ int fs_ml_video_create_window(const char *title) {
         SDL_GL_SetAttribute(SDL_GL_MULTISAMPLEBUFFERS, 1);
         SDL_GL_SetAttribute(SDL_GL_MULTISAMPLESAMPLES, g_fsaa);
     }
+#endif
 
     g_window_width = fs_config_get_int("window_width");
     if (g_window_width == FS_CONFIG_NONE) {
@@ -311,13 +331,17 @@ int fs_ml_video_create_window(const char *title) {
 
     set_video_mode();
 
+    SDL_WM_SetCaption(g_window_title, g_get_application_name());
+
+#ifdef HAVE_GLES
+    EGL_Init();
+#endif
+
     // we display a black frame as soon as possible (to reduce flickering on
     // startup)
     glClear(GL_COLOR_BUFFER_BIT);
     SDL_GL_SwapBuffers();
     fs_gl_finish();
-
-    SDL_WM_SetCaption(g_window_title, g_get_application_name());
 
     g_fs_ml_automatic_input_grab = fs_config_get_boolean(
             "automatic_input_grab");

@@ -134,6 +134,7 @@ void fs_gl_bind_texture(int texture) {
 }
 
 void fs_gl_unpack_row_length(int length) {
+#ifndef HAVE_GLES
     if (g_unpack_row_length == length) {
         return;
     }
@@ -143,6 +144,7 @@ void fs_gl_unpack_row_length(int length) {
     glPixelStorei(GL_UNPACK_ROW_LENGTH, length);
     CHECK_GL_ERROR();
     g_unpack_row_length = length;
+#endif
 }
 
 void fs_gl_viewport(int x, int y, int w, int h) {

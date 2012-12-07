@@ -3,12 +3,21 @@ arch :=
 
 android := 0
 
+pkg_config = pkg-config
 ifeq ($(android), 1)
 
 os = android
 cc = arm-linux-androideabi-gcc
 cxx = arm-linux-androideabi-g++
 ar = arm-linux-androideabi-ar
+make = make
+
+else ifeq ($(pandora), 1)
+os = pandora
+cc = pandora-gcc
+cxx = pandora-g++
+ar = pandora-ar
+pkg_config = pandora-pkg-config
 make = make
 
 else ifneq ($(findstring Msys,$(uname)),)

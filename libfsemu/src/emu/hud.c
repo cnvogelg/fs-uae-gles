@@ -212,12 +212,27 @@ void fs_emu_render_chat() {
         fs_gl_blending(1);
         fs_gl_texturing(0);
         fs_gl_color4f(0.0, 0.3, 0.5, 0.75);
+
+#ifdef HAVE_GLES
+        GLfloat vert[] = {
+            0, 0,
+            1920, 0,
+            1920, 60,
+            0, 60
+        };
+
+        glEnableClientState(GL_VERTEX_ARRAY);
+        glVertexPointer(2, GL_FLOAT, 0, vert);
+        glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+        glDisableClientState(GL_VERTEX_ARRAY);
+#else
         glBegin(GL_QUADS);
         glVertex2f(0, 0);
         glVertex2f(1920, 0);
         glVertex2f(1920, 60);
         glVertex2f(0, 60);
         glEnd();
+#endif
     }
 
     fs_emu_font *font = fs_emu_font_get_menu();

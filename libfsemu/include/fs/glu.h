@@ -3,6 +3,8 @@
 
 #ifdef MACOSX
 #include <OpenGL/glu.h>
+#elif defined(HAVE_GLES)
+#include <GLES/glu.h>
 #else
 #include <GL/glu.h>
 #endif

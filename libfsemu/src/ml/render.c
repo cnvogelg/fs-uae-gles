@@ -11,6 +11,11 @@
 //#include "fs/emu.h"
 #include "ml_internal.h"
 
+#ifdef HAVE_GLES
+#include "eglport.h"
+#define SDL_GL_SwapBuffers EGL_SwapBuffers
+#endif
+
 #include <fs/thread.h>
 // FIXME: make libfsml independent of libfsmeu
 #include "../emu/util.h"

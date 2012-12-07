@@ -59,6 +59,9 @@
 #elif defined(__APPLE__) || defined(__APPLE_CC__)
     #define GL_GLEXT_LEGACY
     #include <OpenGL/gl.h>
+#elif defined(HAVE_GLES)
+	#include <GLES/gl.h>
+	#define GLdouble GLfloat
 #else // GLX
     #define __glext_h_  /* prevent glext.h from being included  */
     #define __glxext_h_ /* prevent glxext.h from being included */
@@ -748,8 +751,10 @@ GLEE_EXTERN GLboolean _GLEE_SGIX_texture_range;
 #include <stddef.h>
 
 #ifndef GL_VERSION_1_5
+#ifndef HAVE_GLES
     typedef ptrdiff_t GLintptr;
     typedef ptrdiff_t GLsizeiptr;
+#endif /* HAVE_GLES */
 #endif
 
 #ifndef GL_NV_half_float
@@ -809,6 +814,10 @@ GLEE_EXTERN GLboolean _GLEE_SGIX_texture_range;
 #elif defined(__APPLE__) || defined(__APPLE_CC__)
 
     /* Mac OS X */
+		
+#elif defined( HAVE_GLES )
+		
+	/* OpenGL ES */
 
 #else
 
@@ -2001,12 +2010,15 @@ GLEE_EXTERN GLboolean _GLEE_SGIX_texture_range;
 #define GL_FOG_COORD_ARRAY_POINTER                         GL_FOG_COORDINATE_ARRAY_POINTER
 #define GL_FOG_COORD_ARRAY                                 GL_FOG_COORDINATE_ARRAY
 #define GL_FOG_COORD_ARRAY_BUFFER_BINDING                  GL_FOG_COORDINATE_ARRAY_BUFFER_BINDING
+#ifndef HAVE_GLES
 #define GL_SRC0_RGB                                        GL_SOURCE0_RGB
 #define GL_SRC1_RGB                                        GL_SOURCE1_RGB
 #define GL_SRC2_RGB                                        GL_SOURCE2_RGB
 #define GL_SRC0_ALPHA                                      GL_SOURCE0_ALPHA
 #define GL_SRC1_ALPHA                                      GL_SOURCE1_ALPHA
 #define GL_SRC2_ALPHA                                      GL_SOURCE2_ALPHA
+#endif /* HAVE_GLES */
+
 #ifndef GLEE_H_DEFINED_glGenQueries
 #define GLEE_H_DEFINED_glGenQueries
   typedef void (APIENTRYP GLEEPFNGLGENQUERIESPROC) (GLsizei n, GLuint * ids);
@@ -12333,6 +12345,7 @@ GLEE_EXTERN GLboolean _GLEE_SGIX_texture_range;
 
 /* GL_EXT_depth_bounds_test */
 
+#ifndef HAVE_GLES
 #ifndef GL_EXT_depth_bounds_test
 #define GL_EXT_depth_bounds_test 1
 #define __GLEE_GL_EXT_depth_bounds_test 1
@@ -12346,6 +12359,7 @@ GLEE_EXTERN GLboolean _GLEE_SGIX_texture_range;
   #define glDepthBoundsEXT GLeeFuncPtr_glDepthBoundsEXT
 #endif
 #endif
+#endif /* HAVE_GLES */
 
 /* GL_EXT_texture_mirror_clamp */
 
@@ -15293,9 +15307,12 @@ GLEE_EXTERN GLboolean _GLEE_SGIX_texture_range;
 
 /* GL_OES_single_precision */
 
+#ifndef HAVE_GLES
 #ifndef GL_OES_single_precision
 #define GL_OES_single_precision 1
 #define __GLEE_GL_OES_single_precision 1
+#endif /* HAVE_GLES */
+
 /* Constants */
 #ifndef GLEE_H_DEFINED_glDepthRangefOES
 #define GLEE_H_DEFINED_glDepthRangefOES
@@ -15382,6 +15399,7 @@ GLEE_EXTERN GLboolean _GLEE_SGIX_texture_range;
 /* WGL  */
 
 #ifdef WIN32
+#error
 
 /* Extension querying variables */
 
@@ -16546,6 +16564,8 @@ GLEE_EXTERN GLboolean _GLEE_WGL_NV_video_output;
 #endif
 #endif
 #elif defined(__APPLE__) || defined(__APPLE_CC__)
+#elif defined(HAVE_GLES)
+/* nothing for GLES */
 #else /* GLX */
 
 /* Extension querying variables */
