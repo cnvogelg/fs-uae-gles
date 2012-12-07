@@ -2,7 +2,6 @@ uname := $(shell uname -a)
 arch :=
 
 android := 0
-pandora := 1
 
 pkg_config = pkg-config
 ifeq ($(android), 1)

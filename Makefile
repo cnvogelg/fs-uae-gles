@@ -101,8 +101,7 @@ ifeq ($(os), android)
   cppflags += -DANDROID
   cxxflags += 
   libs +=
-else ifeq($(os), pandora)
-  OPENAL_DIR = $(HOME)/pandora/openal
+else ifeq ($(os), pandora)
   # special pandora flags
   cppflags += -march=armv7-a -mcpu=cortex-a8 -mfpu=neon -mfloat-abi=softfp
   cppflags += -msoft-float -ffast-math -fomit-frame-pointer -fstrict-aliasing
@@ -112,7 +111,7 @@ else ifeq($(os), pandora)
   # common flags
   cppflags += -DHAVE_GLES -DPANDORA -DUSE_EGL_SDL -DUSE_GLES1
   cxxflags += -I$(PNDSDK)/usr/include -g
-  libs += -L$(OPENAL_DIR)/lib -L$(PNDSDK)/usr/lib -lopenal -ldl -lX11 -lEGL -lGLES_CM -lGLUES_CM
+  libs += -L$(PNDSDK)/usr/lib -lopenal -ldl -lX11 -lEGL -lGLES_CM -lGLUES_CM
   uae_warnings += -Wno-attributes -Wno-unused-variable -Wno-unused-but-set-variable
 else ifeq ($(os), windows)
   cppflags += -DWINDOWS

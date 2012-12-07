@@ -8,7 +8,6 @@ else
 endif
 
 android := 0
-pandora := 1
 pkg_config = pkg-config
 
 ifeq ($(android), 1)
@@ -97,7 +96,6 @@ library = libfsemu.a
 
 # ----- pandora -----
 else ifeq ($(os), pandora)
-OPENAL_DIR=$(HOME)/pandora/openal
 CC = pandora-gcc
 # special pandora flags
 cppflags += -march=armv7-a -mcpu=cortex-a8 -mfpu=neon -mfloat-abi=softfp
@@ -106,7 +104,7 @@ cppflags += -mstructure-size-boundary=32 -fexpensive-optimizations
 cppflags += -fweb -frename-registers -falign-functions=16 -falign-loops -falign-labels -falign-jumps
 cppflags += -finline -finline-functions -fno-common -fno-builtin -fsingle-precision-constant
 # common flags
-cppflags += -DLINUX -I$(PNDSDK)/usr/include -I$(OPENAL_DIR)/include
+cppflags += -DLINUX -I$(PNDSDK)/usr/include
 cppflags += -DHAVE_GLES -DPANDORA -DUSE_EGL_SDL -DUSE_GLES1
 cppflags += -DWITH_SDL_VIDEO -DWITH_SDL_INPUT -DWITH_OPENAL -g
 library = libfsemu.a
