@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <PXML xmlns="http://openpandora.org/namespaces/PXML" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="PXML_schema.xsd">
   <application id="fs-uae-@VERSION-p@PATCHLEVEL" appdata="fs-uae">
-    <title lang="en_US">FS-UAE</title>
+    <title lang="en_US">FS-UAE @VERSION</title>
     <description lang="en_US">FS-UAE Amiga Emulator</description>
     <!-- <info name="FS-UAE Documentation" type="text/html" src="info.html"/> -->
     
