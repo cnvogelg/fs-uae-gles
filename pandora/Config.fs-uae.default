@@ -1,8 +1,0 @@
-[config]
-amiga_model = A500
-#floppy_drive_0 = dprint2a.adf
-#floppy_drive_1 = dprint2b.adf
-#hard_drive_0 = ~/amiga/chris/a500/wb13boot.hdf
-#hard_drive_1 = ~/amiga/chris/a500/shared
-
-fullscreen = 1
