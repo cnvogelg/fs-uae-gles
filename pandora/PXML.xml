@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <PXML xmlns="http://openpandora.org/namespaces/PXML" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="PXML_schema.xsd">
-  <application id="fs-uae-2.0.1-pnd1" appdata="fs-uae">
+  <application id="fs-uae-@VERSION-p@PATCHLEVEL" appdata="fs-uae">
     <title lang="en_US">FS-UAE</title>
     <description lang="en_US">FS-UAE Amiga Emulator</description>
     <!-- <info name="FS-UAE Documentation" type="text/html" src="info.html"/> -->
     
     <exec command="run.sh"/>
-    <version major="2" minor="0" release="1" build="1"/>
+    <version major="@VER_MAJ" minor="@VER_MIN" release="@VER_REL" build="@PATCHLEVEL"/>
     
     <icon src="fs-uae.png"/>
     <!--

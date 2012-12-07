@@ -1,19 +1,24 @@
 # Makefile for FS-UAE on Open Pandora platform
 
+PATCHLEVEL=1
 VERSION=$(strip $(shell cat ../VERSION))
+VER_MAJ=$(strip $(shell cat ../VERSION | cut -f1 -d.))
+VER_MIN=$(strip $(shell cat ../VERSION | cut -f2 -d.))
+VER_REL=$(strip $(shell cat ../VERSION | cut -f3 -d.))
+
 MKSQUASHFS=mksquashfs
 NAME=fs-uae
 SRC_BIN=../out/$(NAME)
-PND_FILES=PXML.xml run.sh Default.fs-uae.templ
+PND_FILES=run.sh Default.fs-uae.templ
 EXTRA_LIBS=$(PNDSDK)/usr/lib/libGLUES_CM.so.0 $(PNDSDK)/usr/lib/libopenal.so.1
 EXTRA_DIR=../share
 ICON_FILE=../share/icons/hicolor/64x64/apps/fs-uae.png
-PND_OUT=fs-uae_$(VERSION).pnd
+PND_OUT=fs-uae_$(VERSION)_p$(PATCHLEVEL).pnd
 SQUASH_FS=build.squash
 BUILD_DIR=build
 STRIP=pandora-strip
 
-.phony: all gather clean clean-all
+.phony: all gather genpxml clean clean-all
 
 all: $(PND_OUT)
 
@@ -28,7 +33,15 @@ gather: $(BUILD_DIR) $(PND_FILES) $(ICON_FILE) $(SRC_BIN)
 	cp -r $(EXTRA_DIR) $(BUILD_DIR)/
 	$(STRIP) $(BUILD_DIR)/$(NAME)
 
-$(SQUASH_FS): gather
+genpxml: PXML.xml $(BUILD_DIR)
+	sed -e 's/@VERSION/$(VERSION)/' \
+		-e 's/@PATCHLEVEL/$(PATCHLEVEL)/' \
+		-e 's/@VER_MAJ/$(VER_MAJ)/' \
+		-e 's/@VER_MIN/$(VER_MIN)/' \
+		-e 's/@VER_REL/$(VER_REL)/' \
+		< PXML.xml > $(BUILD_DIR)/PXML.xml
+
+$(SQUASH_FS): gather genpxml
 	rm -f $(SQUASH_FS)
 	$(MKSQUASHFS) $(BUILD_DIR) $(SQUASH_FS)
 
@@ -42,5 +55,5 @@ clean:
 clean-all: clean
 	$(MAKE) -C .. pandora=1 clean
 
-$(FS_UAE_BIN):
+$(SRC_BIN):
 	$(MAKE) -C .. pandora=1
