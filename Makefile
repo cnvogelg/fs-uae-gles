@@ -115,7 +115,7 @@ else ifeq ($(os), pandora)
   cppflags += -fweb -frename-registers -falign-functions=16 -falign-loops -falign-labels -falign-jumps
   cppflags += -finline -finline-functions -fno-common -fno-builtin -fsingle-precision-constant
   # common flags
-  cppflags += -DHAVE_GLES -DPANDORA -DUSE_EGL_SDL -DUSE_GLES1
+  cppflags += -DHAVE_GLES -DPANDORA -DUSE_EGL_SDL -DUSE_GLES1 -DLINUX
   cxxflags += -I$(PNDSDK)/usr/include -g
   libs += -L$(PNDSDK)/usr/lib -lopenal -ldl -lX11 -lEGL -lGLES_CM -lGLUES_CM
   uae_warnings += -Wno-attributes -Wno-unused-variable -Wno-unused-but-set-variable

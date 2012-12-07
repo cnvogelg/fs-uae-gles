@@ -46,7 +46,7 @@ noflags := 0
 
 cppflags = $(CXXFLAGS)
 cflags = -std=c99 -Iinclude `sdl-config --cflags` \
-		`pkg-config --cflags glib-2.0 gthread-2.0 libpng` \
+		`$(pkg_config) --cflags glib-2.0 gthread-2.0 libpng` \
 		$(CFLAGS) -D_FILE_OFFSET_BITS=64
 objects = obj/emu_emu.o obj/emu_video.o obj/emu_audio.o obj/emu_input.o \
 		obj/emu_menu.o obj/emu_texture.o obj/emu_font.o \
@@ -110,7 +110,7 @@ cppflags += -mstructure-size-boundary=32 -fexpensive-optimizations
 cppflags += -fweb -frename-registers -falign-functions=16 -falign-loops -falign-labels -falign-jumps
 cppflags += -finline -finline-functions -fno-common -fno-builtin -fsingle-precision-constant
 # common flags
-cppflags += -DLINUX -I$(PNDSDK)/usr/include
+cppflags += -DLINUX -DWITH_X11 -I$(PNDSDK)/usr/include
 cppflags += -DHAVE_GLES -DPANDORA -DUSE_EGL_SDL -DUSE_GLES1
 cppflags += -DWITH_SDL_VIDEO -DWITH_SDL_INPUT -DWITH_OPENAL -g
 library = libfsemu.a

@@ -872,6 +872,9 @@ STATIC_INLINE uae_key_t find_shmkey (uae_key_t key)
 }
 
 int mprotect (void *addr, size_t len, int prot)
+#ifdef PANDORA    
+    __THROW
+#endif
 {
     int result = 0;
     return result;
