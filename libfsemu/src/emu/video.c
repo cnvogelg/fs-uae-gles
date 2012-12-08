@@ -580,13 +580,18 @@ void fs_emu_video_init() {
             g_fs_emu_video_format = FS_EMU_VIDEO_FORMAT_RGB;
             g_fs_emu_video_bpp = 3;
         }
-#ifndef HAVE_GLES
         else if (g_ascii_strcasecmp(s, "rgb565") == 0) {
             fs_log("using video format RGB565\n");
             g_fs_emu_video_format = FS_EMU_VIDEO_FORMAT_R5G6B5;
             g_fs_emu_video_bpp = 2;
+#ifdef HAVE_GLES
+            /* OpenGL ES allows to load RGB textures with RGB565 */
+            g_fs_emu_texture_format = GL_RGB;
+#else
             g_fs_emu_texture_format = GL_RGB5;
+#endif
         }
+#ifndef HAVE_GLES
         else if (g_ascii_strcasecmp(s, "rgba5551") == 0) {
             fs_log("using video format RGBA5551\n");
             g_fs_emu_video_format = FS_EMU_VIDEO_FORMAT_R5G5B5A1;
