@@ -18,20 +18,19 @@ SQUASH_FS=build.squash
 BUILD_DIR=build
 STRIP=pandora-strip
 
-.phony: all gather genpxml clean clean-all
+.phony: all gather genpxml clean clean-all fs-uae strip
 
 all: $(PND_OUT)
 
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
 
-gather: $(BUILD_DIR) $(PND_FILES) $(ICON_FILE) $(SRC_BIN)
+gather: strip $(BUILD_DIR) $(PND_FILES) $(ICON_FILE) $(SRC_BIN)
 	cp $(SRC_BIN) $(BUILD_DIR)/
 	cp -a $(PND_FILES) $(BUILD_DIR)/
 	cp $(ICON_FILE) $(BUILD_DIR)/
 	cp $(EXTRA_LIBS) $(BUILD_DIR)/
 	cp -r $(EXTRA_DIR) $(BUILD_DIR)/
-	$(STRIP) $(BUILD_DIR)/$(NAME)
 
 genpxml: PXML.xml $(BUILD_DIR)
 	sed -e 's/@VERSION/$(VERSION)/' \
@@ -55,5 +54,9 @@ clean:
 clean-all: clean
 	$(MAKE) -C .. pandora=1 clean
 
-$(SRC_BIN):
+strip: fs-uae
+	$(STRIP) $(SRC_BIN)
+	
+fs-uae:
 	$(MAKE) -C .. pandora=1
+
