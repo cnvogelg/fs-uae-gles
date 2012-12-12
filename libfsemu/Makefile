@@ -19,6 +19,8 @@ os = android
 cc = arm-linux-androideabi-gcc
 cxx = arm-linux-androideabi-g++
 ar = arm-linux-androideabi-ar
+
+# ----- pandora -----
 else ifeq ($(pandora), 1)
 os = pandora
 cc = pandora-gcc
@@ -26,6 +28,16 @@ cxx = pandora-g++
 ar = pandora-ar
 pkg_config = pandora-pkg-config
 EXTRA_OBJ = obj/eglport.o
+
+# ----- raspberry pi -----
+else ifeq ($(raspi), 1)
+os = raspi
+cc = $(COMPILER_PREFIX)gcc
+cxx = $(COMPILER_PREFIX)g++
+ar = $(COMPILER_PREFIX)ar
+EXTRA_OBJ = obj/eglport.o
+
+# ----- windows -----
 else ifeq ($(os), windows)
 cc = gcc
 cxx = g++
@@ -45,7 +57,7 @@ debug := 0
 noflags := 0
 
 cppflags = $(CXXFLAGS)
-cflags = -std=c99 -Iinclude `sdl-config --cflags` \
+cflags = -std=c99 -Iinclude `$(sdl_config) --cflags` \
 		`$(pkg_config) --cflags glib-2.0 gthread-2.0 libpng` \
 		$(CFLAGS) -D_FILE_OFFSET_BITS=64
 objects = obj/emu_emu.o obj/emu_video.o obj/emu_audio.o obj/emu_input.o \
@@ -102,7 +114,6 @@ library = libfsemu.a
 
 # ----- pandora -----
 else ifeq ($(os), pandora)
-CC = pandora-gcc
 # special pandora flags
 cppflags += -march=armv7-a -mcpu=cortex-a8 -mfpu=neon -mfloat-abi=softfp
 cppflags += -msoft-float -ffast-math -fomit-frame-pointer -fstrict-aliasing
@@ -119,6 +130,25 @@ shared_soname = libfsemu.so.1
 shared_linkname = libfsemu.so
 shared_ldflags += -shared -Wl,--as-needed -Wl,-soname=$(library_soname)
 #libs += `sdl-config --libs` `pkg-config --libs glib-2.0` -lGL
+
+# ----- raspberry pi -----
+else ifeq ($(os), raspi)
+# flags for raspbian hard-float
+cppflags += -march=armv6 -mfloat-abi=hard -mfpu=vfp 
+# common flags
+cppflags += -DLINUX
+cppflags += -I$(RASPI_ROOT)/opt/vc/include -I$(RASPI_ROOT)/opt/vc/include/interface/vcos/pthreads/ 
+cppflags += -I$(RASPI_ROOT)/opt/glues/include
+cppflags += -DHAVE_GLES -DRASPI -DUSE_EGL_RAW -DUSE_GLES1 -DRPI
+cppflags += -DWITH_SDL_VIDEO -DWITH_SDL_INPUT -DWITH_OPENAL -DWITH_X11 -g
+library = libfsemu.a
+shared = libfsemu.so.1.0
+shared_soname = libfsemu.so.1
+shared_linkname = libfsemu.so
+shared_ldflags += -shared -Wl,--as-needed -Wl,-soname=$(library_soname)
+#libs += `sdl-config --libs` `pkg-config --libs glib-2.0` -lGL
+sdl_config = $(RASPI_ROOT)/usr/bin/sdl-config
+pkg_config = $(RASPI_ROOT)/usr/bin/pkg-config
 else
 
 ifeq ($(os), linux)

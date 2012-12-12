@@ -24,6 +24,9 @@ Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.  */
 #ifdef HAVE_SYS_STAT_H
 #include <sys/stat.h>
 #endif
+#ifdef HAVE_SYS_STATVFS_H
+#include <sys/statfs.h>
+#endif
 
 #include "fsusage.h"
 
