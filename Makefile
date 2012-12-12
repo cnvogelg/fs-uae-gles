@@ -54,7 +54,7 @@ errors = -Werror=implicit-function-declaration -Werror=return-type
 cxxflags = $(warnings) $(errors) -Isrc/od-fs -Isrc/od-fs/include \
 		-Isrc/include -Igen -Isrc -Isrc/od-win32/caps \
 		`$(pkg_config) --cflags glib-2.0` -I$(libfsemu_dir)/include \
-		-Wno-write-strings `sdl-config --cflags` \
+		-Wno-write-strings `$(sdl_config) --cflags` \
 		-fpermissive \
 		$(CXXFLAGS)
 cflags = -std=c99 $(CFLAGS) $(cxxflags)
@@ -101,6 +101,7 @@ ifeq ($(os), android)
   cppflags += -DANDROID
   cxxflags += 
   libs +=
+# ----- open pandora -----
 else ifeq ($(os), pandora)
   # special pandora flags
   cppflags += -march=armv7-a -mcpu=cortex-a8 -mfpu=neon -mfloat-abi=softfp
@@ -113,6 +114,18 @@ else ifeq ($(os), pandora)
   cxxflags += -I$(PNDSDK)/usr/include -g
   libs += -L$(PNDSDK)/usr/lib -lopenal -ldl -lX11 -lEGL -lGLES_CM -lGLUES_CM
   uae_warnings += -Wno-attributes -Wno-unused-variable -Wno-unused-but-set-variable
+# ----- raspberry pi -----
+else ifeq ($(raspi),1)
+  # flags for raspbian hard-float
+  cppflags += -march=armv6 -mfloat-abi=hard -mfpu=vfp 
+  # common flags
+  cppflags += -DHAVE_GLES -DRASPI -DUSE_EGL_SDL -DUSE_GLES1
+  cppflags += -I$(RASPI_ROOT)/opt/vc/include -I$(RASPI_ROOT)/opt/vc/include/interface/vcos/pthreads/ 
+  cppflags += -I$(RASPI_ROOT)/opt/glues/include
+  libs += -L$(RASPI_ROOT)/opt/vc/lib -L$(RASPI_ROOT)/opt/glues/lib
+  libs += -lopenal -ldl -lGLUES -lEGL -lGLESv1_CM -lXext -lX11
+	
+# ----- windows -----
 else ifeq ($(os), windows)
   cppflags += -DWINDOWS
   cxxflags += -U_WIN32 -UWIN32

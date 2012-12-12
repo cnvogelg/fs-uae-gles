@@ -93,7 +93,7 @@ extern FILE *g_fs_uae_sync_debug_file;
 #define FPU_UAE
 #define GFXFILTER
 
-#if defined(__x86_64__) || defined(__ppc__) || defined(PANDORA)
+#if defined(__x86_64__) || defined(__ppc__) || defined(PANDORA) || defined(RASPI)
 // no JIT for these architectures
 #else
 #define JIT
@@ -243,7 +243,7 @@ typedef int BOOL;
 #define __STDC_FORMAT_MACROS
 #include <inttypes.h>
 
-#ifdef __ppc__
+#if defined(__ppc__) || defined(RASPI) || defined(PANDORA)
 // REGPARAM are used in JIT code, so for PPC (which does not have JIT) this
 // can be set to nothing
 #define REGPARAM

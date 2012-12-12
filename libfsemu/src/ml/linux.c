@@ -159,7 +159,7 @@ void fs_ml_set_fullscreen_extra() {
 }
 
 int fs_ml_video_mode_get_current(fs_ml_video_mode *mode) {
-#ifdef PANDORA
+#if defined(PANDORA) || defined(RASPI)
     mode->width = 800;
     mode->height = 480;
     mode->fps = 60;
@@ -167,6 +167,7 @@ int fs_ml_video_mode_get_current(fs_ml_video_mode *mode) {
     mode->flags = 0;
     return 0;
 #endif
+    
     mode->width = 0;
     mode->height = 0;
     mode->fps = 0;

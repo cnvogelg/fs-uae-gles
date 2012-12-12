@@ -396,7 +396,7 @@ int8_t GetNativeWindow( void )
         return 1;
     }
 #elif defined(RPI)
-	uint16_t screen_width, screen_height;
+	uint32_t screen_width, screen_height;
 	static EGL_DISPMANX_WINDOW_T nativewindow;
 	DISPMANX_ELEMENT_HANDLE_T dispman_element;
 	DISPMANX_DISPLAY_HANDLE_T dispman_display;
@@ -405,7 +405,7 @@ int8_t GetNativeWindow( void )
 	VC_RECT_T src_rect;
 
 	// create an EGL window surface
-	result = graphics_get_display_size(0 /* LCD */, &screen_width, &screen_height);
+	int result = graphics_get_display_size(0 /* LCD */, &screen_width, &screen_height);
     if(result < 0) {
         printf( "EGL ERROR: RPi graphics_get_display_size failed\n" );
         return 1;
@@ -432,7 +432,7 @@ int8_t GetNativeWindow( void )
 	nativewindow.height = screen_height;
 	vc_dispmanx_update_submit_sync( dispman_update );
 
-	g_nativeWindow = (NativeWindowType)nativewindow;
+	g_nativeWindow = (NativeWindowType)&nativewindow;
 #elif defined(USE_EGL_SDL)
     // Get the SDL window handle
     SDL_SysWMinfo sysInfo; //Will hold our Window information
