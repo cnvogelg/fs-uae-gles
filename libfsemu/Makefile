@@ -13,6 +13,7 @@ endif
 
 android := 0
 pkg_config = pkg-config
+sdl_config = sdl-config
 
 ifeq ($(android), 1)
 os = android
