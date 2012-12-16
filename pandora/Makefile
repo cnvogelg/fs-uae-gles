@@ -18,7 +18,13 @@ SQUASH_FS=build.squash
 BUILD_DIR=build
 STRIP=pandora-strip
 
-.phony: all gather genpxml clean clean-all fs-uae strip
+PANDORA_CFLAGS := -march=armv7-a -mcpu=cortex-a8 -mfpu=neon -mfloat-abi=softfp
+PANDORA_CFLAGS += -msoft-float -ffast-math -fomit-frame-pointer -fstrict-aliasing
+PANDORA_CFLAGS += -mstructure-size-boundary=32 -fexpensive-optimizations 
+PANDORA_CFLAGS += -fweb -frename-registers -falign-functions=16 -falign-loops -falign-labels -falign-jumps
+PANDORA_CFLAGS += -finline -finline-functions -fno-common -fno-builtin -fsingle-precision-constant
+
+.phony: all gather genpxml clean clean-all fs-uae strip run
 
 all: $(PND_OUT)
 
@@ -52,11 +58,19 @@ clean:
 	rm -f $(SQUASH_FS) $(PND_OUT)
 
 clean-all: clean
-	$(MAKE) -C .. pandora=1 clean
+	$(MAKE) -C .. clean
 
 strip: fs-uae
 	$(STRIP) $(SRC_BIN)
 	
 fs-uae:
-	$(MAKE) -C .. pandora=1
+	$(MAKE) -C .. gles=1 \
+		CC=pandora-gcc CXX=pandora-g++ AR=pandora-ar \
+		pkg_config=pandora-pkg-config \
+		sdl_config=$(PNDSDK)/usr/bin/sdl-config \
+		EXTRA_CPPFLAGS="$(PANDORA_CFLAGS) -DUSE_EGL_SDL -DUSE_GLES1 -DPANDORA" \
+		GLES_INCLUDES=-I$(PNDSDK)/usr/include \
+		GLES_LIBS="-lEGL -lGLES_CM" GLUES_LIBS=-lGLUES_CM \
+		SYS_INCLUDES=-I$(PNDSDK)/usr/include
 
+	
