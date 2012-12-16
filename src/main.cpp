@@ -59,9 +59,6 @@
 #ifdef USE_SDL
 #include "SDL.h"
 #endif
-#ifdef HAVE_GLES
-#include "eglport.h"
-#endif
 
 long int version = 256 * 65536L * UAEMAJOR + 65536L * UAEMINOR + UAESUBREV;
 
@@ -858,12 +855,6 @@ void do_leave_program (void)
 #endif
 	if (! no_gui)
 		gui_exit ();
-#ifdef HAVE_GLES
-    EGL_Close();
-#endif
-#ifdef USE_SDL
-	SDL_Quit ();
-#endif
 #ifdef AUTOCONFIG
 	expansion_cleanup ();
 #endif

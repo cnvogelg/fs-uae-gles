@@ -11,6 +11,10 @@
 #include "audio.h"
 #include "libfsemu.h"
 
+#ifdef HAVE_GLES
+#include "eglport.h"
+#endif
+
 //char *g_fs_emu_application_title = NULL;
 // FIXME: REMOVE
 char *g_fs_emu_window_title = NULL;
@@ -670,6 +674,13 @@ int fs_emu_run(fs_emu_main_function function) {
 #endif
 
     fs_emu_audio_shutdown();
+
+#ifdef HAVE_GLES
+    EGL_Close();
+#endif
+
+    SDL_Quit();
+
     fs_emu_log("fs_emu_run: returning\n");
     return result;
 }
