@@ -53,8 +53,8 @@ common_flags = -Isrc/od-fs -Isrc/od-fs/include \
 		`$(pkg_config) --cflags glib-2.0 gthread-2.0 libpng` \
 		-I$(libfsemu_dir)/include \
 		`$(sdl_config) --cflags`
-cflags = $(common_flags) -std=c99 $(CFLAGS)
-cxxflags = $(common_flags) -fpermissive $(CXXFLAGS)
+cflags = $(common_flags) -std=c99 $(CFLAGS) $(EXTRA_CPPFLAGS) $(SYS_INCLUDES)
+cxxflags = $(common_flags) -fpermissive $(CXXFLAGS) $(EXTRA_CPPFLAGS) $(SYS_INCLUDES)
 ldflags = $(LDFLAGS)
 libs = -L$(libfsemu_dir)/out -lfsemu `sdl-config --libs` \
 		`$(pkg_config) --libs glib-2.0 gthread-2.0 libpng` -lpng -lz
@@ -107,31 +107,6 @@ ifeq ($(os), android)
   cppflags += -DANDROID
   cxxflags += 
   libs +=
-# ----- open pandora -----
-else ifeq ($(os), pandora)
-  # special pandora flags
-  cppflags += -march=armv7-a -mcpu=cortex-a8 -mfpu=neon -mfloat-abi=softfp
-  cppflags += -msoft-float -ffast-math -fomit-frame-pointer -fstrict-aliasing
-  cppflags += -mstructure-size-boundary=32 -fexpensive-optimizations 
-  cppflags += -fweb -frename-registers -falign-functions=16 -falign-loops -falign-labels -falign-jumps
-  cppflags += -finline -finline-functions -fno-common -fno-builtin -fsingle-precision-constant
-  # common flags
-  cppflags += -DHAVE_GLES -DPANDORA -DUSE_EGL_SDL -DUSE_GLES1 -DLINUX
-  cxxflags += -I$(PNDSDK)/usr/include -g
-  libs += -L$(PNDSDK)/usr/lib -lopenal -ldl -lX11 -lEGL -lGLES_CM -lGLUES_CM
-  uae_warnings += -Wno-attributes -Wno-unused-variable -Wno-unused-but-set-variable
-# ----- raspberry pi -----
-else ifeq ($(raspi),1)
-  # flags for raspbian hard-float
-  cppflags += -march=armv6 -mfloat-abi=hard -mfpu=vfp 
-  # common flags
-  cppflags += -DHAVE_GLES -DRASPI -DUSE_EGL_SDL -DUSE_GLES1
-  cppflags += -I$(RASPI_ROOT)/opt/vc/include -I$(RASPI_ROOT)/opt/vc/include/interface/vcos/pthreads/ 
-  cppflags += -I$(RASPI_ROOT)/opt/glues/include
-  libs += -L$(RASPI_ROOT)/opt/vc/lib -L$(RASPI_ROOT)/opt/glues/lib
-  libs += -lopenal -ldl -lGLUES -lEGL -lGLESv1_CM -lXext -lX11
-	
-# ----- windows -----
 else ifeq ($(os), windows)
   cppflags += -DWINDOWS
   cxxflags += -U_WIN32 -UWIN32
@@ -166,7 +141,12 @@ else ifeq ($(os), openbsd)
 else
   cppflags += -DLINUX
   ldflags += -Wa,--execstack
-  libs += -lGL -lGLU -lopenal -ldl -lX11
+ifeq ($(gles),1)  
+  libs += $(GLES_LIBS) $(GLUES_LIBS)
+else
+  libs += -lGL -lGLU
+endif
+  libs += -lopenal -ldl -lX11
   generate = 0
 endif
 

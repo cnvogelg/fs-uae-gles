@@ -20,25 +20,6 @@ os = android
 cc = arm-linux-androideabi-gcc
 cxx = arm-linux-androideabi-g++
 ar = arm-linux-androideabi-ar
-
-# ----- pandora -----
-else ifeq ($(pandora), 1)
-os = pandora
-cc = pandora-gcc
-cxx = pandora-g++
-ar = pandora-ar
-pkg_config = pandora-pkg-config
-EXTRA_OBJ = obj/eglport.o
-
-# ----- raspberry pi -----
-else ifeq ($(raspi), 1)
-os = raspi
-cc = $(COMPILER_PREFIX)gcc
-cxx = $(COMPILER_PREFIX)g++
-ar = $(COMPILER_PREFIX)ar
-EXTRA_OBJ = obj/eglport.o
-
-# ----- windows -----
 else ifeq ($(os), windows)
 cc = gcc
 cxx = g++
@@ -51,6 +32,11 @@ else
 cc = $(CC)
 cxx = $(CXX)
 ar = $(AR)
+endif
+
+# ----- GLES -----
+ifeq ($(gles),1)
+EXTRA_OBJ = obj/eglport.o
 endif
 
 arch :=
@@ -113,43 +99,6 @@ cppflags += -I/System/Library/Frameworks/OpenAL.framework/Headers
 cppflags += -DWITH_SDL_VIDEO -DWITH_SDL_INPUT -DWITH_OPENAL
 library = libfsemu.a
 
-# ----- pandora -----
-else ifeq ($(os), pandora)
-# special pandora flags
-cppflags += -march=armv7-a -mcpu=cortex-a8 -mfpu=neon -mfloat-abi=softfp
-cppflags += -msoft-float -ffast-math -fomit-frame-pointer -fstrict-aliasing
-cppflags += -mstructure-size-boundary=32 -fexpensive-optimizations 
-cppflags += -fweb -frename-registers -falign-functions=16 -falign-loops -falign-labels -falign-jumps
-cppflags += -finline -finline-functions -fno-common -fno-builtin -fsingle-precision-constant
-# common flags
-cppflags += -DLINUX -DWITH_X11 -I$(PNDSDK)/usr/include
-cppflags += -DHAVE_GLES -DPANDORA -DUSE_EGL_SDL -DUSE_GLES1
-cppflags += -DWITH_SDL_VIDEO -DWITH_SDL_INPUT -DWITH_OPENAL -g
-library = libfsemu.a
-shared = libfsemu.so.1.0
-shared_soname = libfsemu.so.1
-shared_linkname = libfsemu.so
-shared_ldflags += -shared -Wl,--as-needed -Wl,-soname=$(library_soname)
-#libs += `sdl-config --libs` `pkg-config --libs glib-2.0` -lGL
-
-# ----- raspberry pi -----
-else ifeq ($(os), raspi)
-# flags for raspbian hard-float
-cppflags += -march=armv6 -mfloat-abi=hard -mfpu=vfp 
-# common flags
-cppflags += -DLINUX
-cppflags += -I$(RASPI_ROOT)/opt/vc/include -I$(RASPI_ROOT)/opt/vc/include/interface/vcos/pthreads/ 
-cppflags += -I$(RASPI_ROOT)/opt/glues/include
-cppflags += -DHAVE_GLES -DRASPI -DUSE_EGL_RAW -DUSE_GLES1 -DRPI
-cppflags += -DWITH_SDL_VIDEO -DWITH_SDL_INPUT -DWITH_OPENAL -DWITH_X11 -g
-library = libfsemu.a
-shared = libfsemu.so.1.0
-shared_soname = libfsemu.so.1
-shared_linkname = libfsemu.so
-shared_ldflags += -shared -Wl,--as-needed -Wl,-soname=$(library_soname)
-#libs += `sdl-config --libs` `pkg-config --libs glib-2.0` -lGL
-sdl_config = $(RASPI_ROOT)/usr/bin/sdl-config
-pkg_config = $(RASPI_ROOT)/usr/bin/pkg-config
 else
 
 ifeq ($(os), linux)
@@ -161,12 +110,18 @@ cppflags += -DOPENBSD
 endif
 
 cppflags += -DWITH_X11 -DWITH_SDL_VIDEO -DWITH_SDL_INPUT -DWITH_OPENAL
+cppflags += $(EXTRA_CPPFLAGS)
 library = libfsemu.a
 shared = libfsemu.so.1.0
 shared_soname = libfsemu.so.1
 shared_linkname = libfsemu.so
 shared_ldflags += -shared -Wl,--as-needed -Wl,-soname=$(library_soname)
 #libs += `sdl-config --libs` `pkg-config --libs glib-2.0` -lGL
+
+# ----- GLES -----
+ifeq ($(gles),1)
+cppflags += -DHAVE_GLES $(GLES_INCLUDES) $(GLUES_INCLUDES)
+endif
 
 endif
 
