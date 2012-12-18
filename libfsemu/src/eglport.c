@@ -444,6 +444,8 @@ int8_t GetNativeWindow( void )
         return 1;
     }
     g_nativeWindow = sysInfo.info.x11.window;
+#else
+#error no window defined!
 #endif /* WIZ / CAANOO */
 
 	return 0;

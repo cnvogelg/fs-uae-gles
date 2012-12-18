@@ -43,7 +43,7 @@ fs-uae:
 		CC=$(COMPILER_PREFIX)gcc CXX=$(COMPILER_PREFIX)g++ AR=$(COMPILER_PREFIX)ar \
 		sdl_config=$(RASPI_ROOT)/usr/bin/sdl-config \
 		pkg_config=$(RASPI_ROOT)/usr/bin/pkg-config \
-		EXTRA_CPPFLAGS=\"$(RASPI_CFLAGS) -DUSE_EGL_RAW -DUSE_GLES1 -DRASPI\" \
+		EXTRA_CPPFLAGS=\"$(RASPI_CFLAGS) -DUSE_EGL_RAW -DUSE_GLES1 -DRPI\" \
 		GLES_INCLUDES=\"-I$(RASPI_ROOT)/opt/vc/include -I$(RASPI_ROOT)/opt/vc/include/interface/vcos/pthreads\" \
 		GLES_LIBS=\"-L$(RASPI_ROOT)/opt/vc/lib -lEGL -lGLESv1_CM\" \
 		GLUES_INCLUDES=-I$(RASPI_ROOT)/opt/glues/include \
