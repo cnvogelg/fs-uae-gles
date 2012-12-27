@@ -111,7 +111,7 @@ int fs_ml_has_automatic_input_grab() {
 void fs_ml_grab_input(int grab, int immediate) {
     //printf("fs_ml_grab_input %d %d\n", grab, immediate);
     if (immediate) {
-#ifndef HAVE_GLES
+#ifndef PANDORA
         SDL_WM_GrabInput(grab ? SDL_GRAB_ON : SDL_GRAB_OFF);
 #endif
         fs_ml_show_cursor(!grab, 1);
@@ -129,7 +129,7 @@ void fs_ml_set_video_fsaa(int fsaa) {
 
 void fs_ml_show_cursor(int show, int immediate) {
     if (immediate) {
-#ifndef HAVE_GLES
+#ifndef PANDORA
         SDL_ShowCursor(show);
 #endif
     }
