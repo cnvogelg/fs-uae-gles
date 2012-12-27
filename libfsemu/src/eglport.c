@@ -66,7 +66,7 @@ EGLConfig   g_allConfigs[g_totalConfigsIn];	/** Structure containing references 
 
 /** Private API */
 int8_t  ConfigureEGL                ( EGLConfig config );
-int8_t  FindAppropriateEGLConfigs   ( void );
+int8_t  FindAppropriateEGLConfigs   ( int *picked_config );
 int8_t  CheckEGLErrors              ( const char* file, uint16_t line );
 
 int8_t	GetNativeDisplay			( void );
@@ -114,7 +114,7 @@ int8_t EGL_Init( void )
 {
     int configIndex = 0;
 
-    if (FindAppropriateEGLConfigs() != 0)
+    if (FindAppropriateEGLConfigs(&configIndex) != 0)
     {
         printf( "EGL ERROR: Unable to configure EGL. See previous error.\n" );
         return 1;
@@ -269,10 +269,23 @@ int8_t ConfigureEGL( EGLConfig config )
     return 0;
 }
 
+void showConfig(int i, EGLConfig config)
+{
+    EGLint r,g,b,a,d,l;
+    
+    eglGetConfigAttrib( g_eglDisplay, config, EGL_RED_SIZE, &r);
+    eglGetConfigAttrib( g_eglDisplay, config, EGL_GREEN_SIZE, &g);
+    eglGetConfigAttrib( g_eglDisplay, config, EGL_BLUE_SIZE, &b);
+    eglGetConfigAttrib( g_eglDisplay, config, EGL_ALPHA_SIZE, &a);
+    eglGetConfigAttrib( g_eglDisplay, config, EGL_DEPTH_SIZE, &d);
+    eglGetConfigAttrib( g_eglDisplay, config, EGL_LEVEL, &l);
+    printf("EGL config #%d: r=%d g=%d b=%d a=%d d=%d  l=%d\n", i, r, g, b, a, d, l);
+}
+
 /** @brief Find a EGL configuration tht matches the defined attributes
  * @return : 0 if the function passed, else 1
  */
-int8_t FindAppropriateEGLConfigs( void )
+int8_t FindAppropriateEGLConfigs( int *picked_config )
 {
     EGLBoolean result;
     int attrib = 0;
@@ -315,6 +328,17 @@ int8_t FindAppropriateEGLConfigs( void )
     }
     printf( "EGL Found %d available configs\n", g_totalConfigsFound );
 
+    /* show configs */
+    for(int i=0;i<g_totalConfigsFound;i++) {
+        showConfig(i, g_allConfigs[i]);
+    }
+    
+    /* pick config */
+    *picked_config = 0;
+    const char *user_cfg = getenv("EGLPORT_CONFIG");
+    if(user_cfg != NULL) {
+        *picked_config = atoi(user_cfg);
+    }
     return 0;
 }
 
@@ -404,6 +428,13 @@ int8_t GetNativeWindow( void )
 	VC_RECT_T dst_rect;
 	VC_RECT_T src_rect;
 
+    // CV: have to set alpha to opaque otherwise screen is dimmed
+    VC_DISPMANX_ALPHA_T         dispman_alpha;
+
+    dispman_alpha.flags = DISPMANX_FLAGS_ALPHA_FIXED_ALL_PIXELS;
+    dispman_alpha.opacity = 0xFF;
+    dispman_alpha.mask = NULL; 
+    
 	// create an EGL window surface
 	int result = graphics_get_display_size(0 /* LCD */, &screen_width, &screen_height);
     if(result < 0) {
@@ -425,7 +456,7 @@ int8_t GetNativeWindow( void )
 	dispman_update  = vc_dispmanx_update_start( 0 );
 	dispman_element = vc_dispmanx_element_add ( dispman_update, dispman_display,
 	  0 /*layer*/, &dst_rect, 0 /*src*/,
-	  &src_rect, DISPMANX_PROTECTION_NONE, 0 /*alpha*/, 0 /*clamp*/, 0 /*transform*/);
+	  &src_rect, DISPMANX_PROTECTION_NONE, &dispman_alpha /*alpha*/, 0 /*clamp*/, 0 /*transform*/);
 
 	nativewindow.element = dispman_element;
 	nativewindow.width = screen_width;
