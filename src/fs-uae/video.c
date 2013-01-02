@@ -88,7 +88,7 @@ int read_window_override(const char* s, int* pos) {
     if (!read_window_override_int(s, pos, &sh)) return 0;
     while(s[*pos] == ' ') ++(*pos);
     if (!s[(*pos)++] == '=') return 0;
-    if (!s[(*pos)++] == '>') return 0;
+    if (s[(*pos)++] == '>') ++(*pos);
     if (!read_window_override_int(s, pos, &dx)) return 0;
     if (!read_window_override_int(s, pos, &dy)) return 0;
     if (!read_window_override_int(s, pos, &dw)) return 0;
@@ -150,7 +150,7 @@ void init_window_overrides() {
 static int ucx = 0, ucy = 0, ucw = 0, uch = 0;
 static int rd_width, rd_height;
 
-static void modify_coordinates(int *cx, int *cy, int *cw, int *ch) {
+static int modify_coordinates(int *cx, int *cy, int *cw, int *ch) {
     int changed = 0;
     int ocx = *cx;
     int ocy = *cy;
@@ -182,17 +182,35 @@ static void modify_coordinates(int *cx, int *cy, int *cw, int *ch) {
     }
     else if (*cx == 10 && *cy == 7 && *cw == 716 && *ch == 566) {
         fs_log("* amiga cd32 boot screen?\n");
-        *cx = 10; *cy = 7; *cw = 704; *ch = 562; changed = 1;
+        *cx = 16; *cy = 6; *cw = 704; *ch = 566; changed = 1;
     }
-    else if (*cx == 6 && *cy == 96 && *cw == 724 && *ch == 478) {
-        fs_log("* amiga cd32 boot screen (booting cd)?\n");
-        *cx = 10; *cy = 7; *cw = 704; *ch = 562; changed = 1;
+    else if (*cx == 10 && *cy == 6 && *cw == 716 && *ch == 566) {
+        fs_log("* amiga cd32 boot screen?\n");
+        *cx = 16; *cy = 6; *cw = 704; *ch = 566; changed = 1;
+    }
+    else if (*cx == 6 && *cy == 96 && *cw == 724 && *ch == 476) {
+        fs_log("* amiga cd32 boot screen (booting CD)\n");
+        *cx = 16; *cy = 6; *cw = 704; *ch = 566; changed = 1;
+    }
+    else if (*cx == 10 && *cy == 96 && *cw == 716 && *ch == 476) {
+        fs_log("* amiga cd32 boot screen (booting CD)\n");
+        *cx = 16; *cy = 6; *cw = 704; *ch = 566; changed = 1;
+    }
+    else if (*cx == 6 && *cy == 82 && *cw == 724 && *ch == 490) {
+        fs_log("* amiga cd32 boot screen (booting Arcade Pool CD)\n");
+        *cx = 16; *cy = 6; *cw = 704; *ch = 566; changed = 1;
+    }
+    else if (*cx + *cw == 698 && *cy == 6 && *ch == 566) {
+        fs_log("* amiga cd32 menu\n");
+        *cx = 16; *cy = 6; *cw = 704; *ch = 566; changed = 1;
     }
     if (changed) {
-        fs_log("* %3d %3d %3d %3d [ %3d %3d %3d %3d ]\n", *cx, *cy, *cw, *ch,
-                ocx, ocy, ocw, och);
+        fs_log("* %3d %3d %3d %3d [ %3d %3d %3d %3d ]\n",
+                *cx, *cy, *cw, *ch, ocx, ocy, ocw, och);
+        printf("* %3d %3d %3d %3d [ %3d %3d %3d %3d ]\n",
+                *cx, *cy, *cw, *ch, ocx, ocy, ocw, och);
     }
-    return;
+    return changed;
 }
 
 static void render_screen(RenderData* rd) {
@@ -235,24 +253,27 @@ static void render_screen(RenderData* rd) {
         lastcy = cy;
         lastcw = cw;
         lastch = ch;
-        modify_coordinates(&cx, &cy, &cw, &ch);
-        struct WindowOverride* wo = g_window_override;
-        while (wo != NULL) {
-            if ((wo->sx == -1 || wo->sx == cx) &&
-                    (wo->sy == -1 || wo->sy == cy) &&
-                    (wo->sw == -1 || wo->sw == cw) &&
-                    (wo->sh == -1 || wo->sh == ch)) {
-                ucx = wo->dx == -1 ? cx : wo->dx;
-                ucy = wo->dy == -1 ? cy : wo->dy;
-                ucw = wo->dw == -1 ? cw : wo->dw;
-                uch = wo->dh == -1 ? ch : wo->dh;
-                fs_emu_log("> %3d %3d %3d %3d [ %3d %3d %3d %3d ]\n",
-                        ucx, ucy, ucw, uch, cx, cy, cw, ch);
-                printf("> %3d %3d %3d %3d [ %3d %3d %3d %3d ]\n",
-                        ucx, ucy, ucw, uch, cx, cy, cw, ch);
-                break;
+        struct WindowOverride* wo = NULL;
+
+        if (!modify_coordinates(&cx, &cy, &cw, &ch)) {
+            wo = g_window_override;
+            while (wo != NULL) {
+                if ((wo->sx == -1 || wo->sx == cx) &&
+                        (wo->sy == -1 || wo->sy == cy) &&
+                        (wo->sw == -1 || wo->sw == cw) &&
+                        (wo->sh == -1 || wo->sh == ch)) {
+                    ucx = wo->dx == -1 ? cx : wo->dx;
+                    ucy = wo->dy == -1 ? cy : wo->dy;
+                    ucw = wo->dw == -1 ? cw : wo->dw;
+                    uch = wo->dh == -1 ? ch : wo->dh;
+                    fs_emu_log("> %3d %3d %3d %3d [ %3d %3d %3d %3d ]\n",
+                            ucx, ucy, ucw, uch, cx, cy, cw, ch);
+                    printf("> %3d %3d %3d %3d [ %3d %3d %3d %3d ]\n",
+                            ucx, ucy, ucw, uch, cx, cy, cw, ch);
+                    break;
+                }
+                wo = wo->next;
             }
-            wo = wo->next;
         }
         if (wo == NULL) {
             ucx = cx;

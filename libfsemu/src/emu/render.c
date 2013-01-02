@@ -361,7 +361,7 @@ static void save_screenshot(const char *type, int cx, int cy, int cw, int ch,
     g_free(path);
 }
 
-static void update_texture() {
+static int update_texture() {
     fs_emu_video_buffer *buffer = fs_emu_lock_video_buffer();
 #ifdef DEBUG_VIDEO_SYNC
     printf("u %p\n", buffer);
@@ -370,7 +370,7 @@ static void update_texture() {
 
     uint8_t *frame = buffer->data;
     if (frame == NULL) {
-        return;
+        return -1;
     }
     int is_new_frame = 1;
     static int last_seq_no = -1;
@@ -611,6 +611,7 @@ static void update_texture() {
     }
 #endif
 #endif
+    return last_seq_no;
 }
 
 static void render_gloss(double alpha) {
@@ -1484,8 +1485,8 @@ static void handle_quit_sequence() {
     CHECK_GL_ERROR();
 }
 
-void fs_emu_video_update_function() {
-    update_texture();
+int fs_emu_video_update_function() {
+    return update_texture();
 }
 
 void fs_emu_video_render_function() {
