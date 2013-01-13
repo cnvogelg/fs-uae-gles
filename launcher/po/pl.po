@@ -7,8 +7,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: fs-uae-launcher\n"
 "Report-Msgid-Bugs-To: fs-uae@fengestad.no\n"
-"POT-Creation-Date: 2012-11-27 16:41+0100\n"
-"PO-Revision-Date: 2012-11-27 17:21+0100\n"
+"POT-Creation-Date: 2013-01-10 19:17+0100\n"
+"PO-Revision-Date: 2013-01-11 20:44+0100\n"
 "Last-Translator: grimi <grimi at poczta dot fm>\n"
 "Language-Team: Polish\n"
 "Language: pl\n"
@@ -17,6 +17,7 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=3; plural=(n==1 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 "
 "|| n%100>=20) ? 1 : 2);\n"
+"X-Generator: Poedit 1.5.4\n"
 
 msgid "16-bit"
 msgstr "16-bit"
@@ -159,6 +160,9 @@ msgstr "Konfiguracje"
 msgid "Configure Joystick Buttons"
 msgstr "Konfigurowanie joysticka"
 
+msgid "Connect"
+msgstr "Połącz"
+
 msgid ""
 "Copy {0}\n"
 "to {1}"
@@ -186,6 +190,9 @@ msgstr "Domyślnie"
 
 msgid "Default ({0})"
 msgstr "Domyślnie ({0})"
+
+msgid "Disconnect"
+msgstr "Rozłącz"
 
 msgid "Downloading {0}..."
 msgstr "Pobieram {0}..."
@@ -219,6 +226,12 @@ msgstr "Fast RAM"
 
 msgid "Fetching database entries ({0})"
 msgstr "Pobieranie wpisów bazy danych ({0})"
+
+msgid "Fetching game ratings ({0})"
+msgstr "Pobieranie wpisów bazy danych ({0})"
+
+msgid "Fetching user game ratings ({0})"
+msgstr "Pobieranie ocen gier użytkownika ({0})"
 
 msgid "Filters"
 msgstr "Filtry"
@@ -385,6 +398,9 @@ msgstr "Oznaczenie gry sieciowej (maks 3 znaki)"
 msgid "New Configuration"
 msgstr "Nowa konfiguracja"
 
+msgid "Nick:"
+msgstr "Pseudonim:"
+
 msgid "No Device"
 msgstr "Brak urządzenia"
 
@@ -420,11 +436,26 @@ msgstr "Nie"
 msgid "On"
 msgstr "Tak"
 
+msgid "Open Game Database Entry"
+msgstr "Otwórz wpis z bazy danych gier"
+
+msgid "Open Hall of Light Entry"
+msgstr "Otwórz wpis na Hall of Light"
+
+msgid "Open LemonAmiga Entry"
+msgstr "Otwórz wpis na LemonAmiga"
+
+msgid "Open MobyGames Entry"
+msgstr "Otwórz wpis na MobyGames"
+
 msgid "Open Scan Dialog"
 msgstr "Otwórz okno skanowania"
 
 msgid "Open Tool to Configure Button Mapping"
 msgstr "Otwórz narzędzie konfiguracji/mapowania przycisków"
+
+msgid "Open Wikipedia Entry"
+msgstr "Otwórz wpis na Wikipedii"
 
 msgid "OpenGL Settings"
 msgstr "Ustawienia OpenGL"
@@ -576,8 +607,14 @@ msgstr "Synchronizacja Vblank"
 msgid "Synchronizing database..."
 msgstr "Synchronizacja bazy danych..."
 
+msgid "Synchronizing personal ratings..."
+msgstr "Synchronizowanie ocen osobistych..."
+
 msgid "Texture filter"
 msgstr "Filtr teksturowania"
+
+msgid "Toggle Between Windowed and Full-Screen Mode"
+msgstr "Przełącz między trybem okna a pełnym ekranem"
 
 msgid "Ungrab mouse and keyboard on middle mouse click"
 msgstr "Zwolnij myszkę i klawiaturę po kliku środkowego przycisku"

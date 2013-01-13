@@ -1,18 +1,35 @@
-#include <stdio.h>
-#include <string.h>
-#include <fs/ml.h>
-#include <fs/thread.h>
-#include <fs/string.h>
 #include "render.h"
-#include "libfsemu.h"
-#include "video.h"
-#include "texture.h"
-#include "util.h"
-#include "menu.h"
-#include "audio.h"
-#include "font.h"
 
-#ifdef HAVE_GLES
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include <fs/ml.h>
+#include <fs/filesys.h>
+#include <fs/queue.h>
+#include <fs/string.h>
+#include <fs/thread.h>
+
+#include "libfsemu.h"
+#include "audio.h"
+#include "dialog.h"
+#include "font.h"
+#include "hud.h"
+#include "menu.h"
+#include "scanlines.h"
+#include "texture.h"
+#include "theme.h"
+#include "util.h"
+#include "video.h"
+#include "video_buffer.h"
+#include "xml_shader.h"
+
+#ifdef USE_OPENGL
+#include <fs/ml/opengl.h>
+#include <fs/glu.h>
+#endif
+
+#ifdef USE_GLES
 #define glScaled glScalef
 #define glTranslated glTranslatef
 #define glRotated glRotatef
@@ -173,7 +190,7 @@ static void create_texture_if_needed(int width, int height) {
     // with high quality borders, there should be no reason to initialize
     // the texture to black
     void *data = NULL;
-    //void *data = g_malloc0(g_frame_texture_width * g_frame_texture_height * 4);
+    //void *data = fs_malloc0(g_frame_texture_width * g_frame_texture_height * 4);
     fs_gl_unpack_row_length(0);
     int gl_buffer_format = 0;
     int gl_buffer_type = 0;
@@ -183,7 +200,7 @@ static void create_texture_if_needed(int width, int height) {
             gl_buffer_format, gl_buffer_type, data);
     CHECK_GL_ERROR();
     if (data) {
-        g_free(data);
+        free(data);
     }
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, g_texture_filter);
     CHECK_GL_ERROR();
@@ -193,10 +210,14 @@ static void create_texture_if_needed(int width, int height) {
     //CHECK_GL_ERROR();
     //glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     //CHECK_GL_ERROR();
+#ifdef USE_GLES
+
+#else
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
     CHECK_GL_ERROR();
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
     CHECK_GL_ERROR();
+#endif
 
     // texture contains no data now, so we ensure that the upload routine
     // blanks the border if necessary
@@ -283,15 +304,13 @@ static void fix_border(fs_emu_video_buffer *buffer, int *upload_x,
 static void save_screenshot(const char *type, int cx, int cy, int cw, int ch,
         int count, uint8_t *frame, int frame_width, int frame_height,
         int frame_bpp) {
-    gchar *name, *path;
+    char *name, *path;
     time_t t = time(NULL);
     struct tm *tm_struct = localtime(&t);
     char strbuf[20];
     strftime(strbuf, 20, "%Y-%m-%d-%H-%M", tm_struct);
-    name = g_strdup_printf("fs-uae-%s-%s-%d.png", type, strbuf, count);
-    path = g_build_filename(
-            g_get_user_special_dir(G_USER_DIRECTORY_DESKTOP),
-            name, NULL);
+    name = fs_strdup_printf("fs-uae-%s-%s-%d.png", type, strbuf, count);
+    path = fs_path_join(fs_get_desktop_dir(), name, NULL);
     fs_log("writing screenshot to %s\n", path);
 
     uint8_t *out_data = malloc(cw * ch * 3);
@@ -356,13 +375,13 @@ static void save_screenshot(const char *type, int cx, int cy, int cw, int ch,
     else {
         fs_log("error saving screenshot\n");
     }
-    g_free(out_data);
-    g_free(name);
-    g_free(path);
+    free(out_data);
+    free(name);
+    free(path);
 }
 
 static int update_texture() {
-    fs_emu_video_buffer *buffer = fs_emu_lock_video_buffer();
+    fs_emu_video_buffer *buffer = fs_emu_video_buffer_lock();
 #ifdef DEBUG_VIDEO_SYNC
     printf("u %p\n", buffer);
 #endif
@@ -483,7 +502,7 @@ static int update_texture() {
 
     uint8_t *gl_buffer_start = frame + ((upload_y * width) + upload_x) * bpp;
 
-#ifdef HAVE_GLES
+#ifdef USE_GLES
     /* we don't have unpack padding in GLES. uploading full width lines instead */
     glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, upload_h,
             gl_buffer_format, gl_buffer_type, gl_buffer_start);
@@ -786,7 +805,7 @@ static void render_frame(double alpha, int perspective) {
         }
 
         if (x1 > -1.0) {
-#ifdef HAVE_GLES
+#ifdef USE_GLES
             GLfloat vert[] = {
                    -1.0, -1.0,
                    x1, -1.0,
@@ -808,7 +827,7 @@ static void render_frame(double alpha, int perspective) {
             CHECK_GL_ERROR();
         }
         if (x2 < 1.0) {
-#ifdef HAVE_GLES
+#ifdef USE_GLES
             GLfloat vert[] = {
                     x2, -1.0,
                    1.0, -1.0,
@@ -830,7 +849,7 @@ static void render_frame(double alpha, int perspective) {
             CHECK_GL_ERROR();
         }
         if (y1 > -1.0) {
-#ifdef HAVE_GLES
+#ifdef USE_GLES
             GLfloat vert[] = {
                    x1, -1.0,
                    x2, -1.0,
@@ -850,7 +869,7 @@ static void render_frame(double alpha, int perspective) {
             glEnd();
 #endif
             // left side (3D)
-#ifdef HAVE_GLES
+#ifdef USE_GLES
             GLfloat vert2[] = {
                    -1.0, -1.0, -0.1,
                    -1.0, -1.0,  0.0,
@@ -872,7 +891,7 @@ static void render_frame(double alpha, int perspective) {
             CHECK_GL_ERROR();
         }
         if (y2 < 1.0) {
-#ifdef HAVE_GLES
+#ifdef USE_GLES
             GLfloat vert[] = {
                 x1, y2,
                 x2, y2,
@@ -892,7 +911,7 @@ static void render_frame(double alpha, int perspective) {
             glEnd();
 #endif
             // left side (3D)
-#ifdef HAVE_GLES
+#ifdef USE_GLES
             GLfloat vert2[] = {
                    -1.0,   y2, -0.1,
                    -1.0,   y2,  0.0,
@@ -944,8 +963,12 @@ static void render_frame(double alpha, int perspective) {
             fs_gl_color4f(0.33 * alpha, 0.33 * alpha, 0.33 * alpha, alpha);
         }
 
-        if (render_textured_side == 0 || !fs_emu_using_shader()) {
-#ifdef HAVE_GLES
+        if (render_textured_side == 0
+#ifdef WITH_XML_SHADER
+                || !fs_emu_xml_shader_is_enabled()
+#endif
+        ) {
+#ifdef USE_GLES
             GLfloat tex[] = {
                 s1, t2,
                 s1, t2,
@@ -1000,17 +1023,17 @@ static void render_frame(double alpha, int perspective) {
     }
 
     int shader_result = 0;
-
+#ifdef WITH_XML_SHADER
     if (g_frame_texture) {
         // only try to render with shader passes if we have a valid texture
-        shader_result = fs_emu_render_with_shader(g_frame_texture,
+        shader_result = fs_emu_xml_shader_render(g_frame_texture,
                 g_frame_texture_width, g_frame_texture_height,
                 g_crop.w, g_crop.h, output_w, output_h,
                 x1, y1, x2, y2, render_textured_side, alpha);
     }
-
+#endif
     if (!shader_result) {
-#ifdef HAVE_GLES
+#ifdef USE_GLES
         GLfloat tex[] = {
             s1, t2,
             s2, t2,
@@ -1048,7 +1071,7 @@ static void render_frame(double alpha, int perspective) {
     if (repeat_right_border > 0.0) {
         s1 = s2 = (double) (g_frame_width - 1) / g_frame_texture_width;
 
-#ifdef HAVE_GLES
+#ifdef USE_GLES
         GLfloat tex[] = {
             s1, t2,
             s2, t2,
@@ -1093,7 +1116,7 @@ static void render_frame(double alpha, int perspective) {
         //fs_gl_bind_texture(g_fs_emu_overlay_texture->texture);
         fs_emu_set_texture(g_fs_emu_overlay_texture);
         
-#ifdef HAVE_GLES
+#ifdef USE_GLES
         GLfloat tex[] = {
             0.0, 1.0,
             1.0, 1.0,
@@ -1173,7 +1196,7 @@ static void render_frame(double alpha, int perspective) {
         fs_gl_color4f(1.0, 1.0, 1.0, 1.0);
         fs_emu_set_texture(g_fs_emu_theme.overlay_textures[i]);
 
-#ifdef HAVE_GLES
+#ifdef USE_GLES
         GLfloat tex[] = {
             0.0, 0.0,
             1.0, 0.0,
@@ -1220,7 +1243,7 @@ static void render_glow(double opacity) {
     //fs_emu_set_texture(g_tex_glow_top);
     fs_emu_prepare_texture(TEXTURE_GLOW_TOP, &tx1, &ty1, &tx2, &ty2);
     // render top edge
-#ifdef HAVE_GLES
+#ifdef USE_GLES
     GLfloat tex[] = {
         tx1, ty2,
         tx2, ty2,
@@ -1254,7 +1277,7 @@ static void render_glow(double opacity) {
     CHECK_GL_ERROR();
     // render corners
     fs_emu_prepare_texture(TEXTURE_GLOW_TOP_LEFT, &tx1, &ty1, &tx2, &ty2);
-#ifdef HAVE_GLES
+#ifdef USE_GLES
     GLfloat tex2[] = {
         // top left corner
         tx1, ty2,
@@ -1308,7 +1331,7 @@ static void render_glow(double opacity) {
     // render left and right edge
     fs_emu_prepare_texture(TEXTURE_GLOW_LEFT, &tx1, &ty1, &tx2, &ty2);
     //fs_emu_set_texture(g_tex_glow_left);
-#ifdef HAVE_GLES
+#ifdef USE_GLES
     GLfloat color3[] = {
         // left edge
         s, s, s, s,
@@ -1459,7 +1482,7 @@ static void handle_quit_sequence() {
             g_fs_emu_theme.fade_color[1] * fade,
             g_fs_emu_theme.fade_color[2] * fade, fade);
 
-#ifdef HAVE_GLES
+#ifdef USE_GLES
     GLfloat vert[] = {
         0, 0,
         1920, 0,
@@ -1495,7 +1518,7 @@ void fs_emu_video_render_function() {
         // render menu once (without really showing it, so all menu
         // resources are initialized and loaded, -prevents flickering
         // when really opening the menu later
-        fs_emu_render_menu(g_menu_transition);
+        fs_emu_menu_render(g_menu_transition);
         initialized_menu = 1;
     }
 
@@ -1571,7 +1594,7 @@ void fs_emu_video_render_function() {
         fs_gl_blending(FALSE);
         fs_gl_texturing(FALSE);
 
-#ifdef HAVE_GLES
+#ifdef USE_GLES
         GLfloat vert[] = {
             // q1
             0, splt, -0.9,
@@ -1699,22 +1722,23 @@ void fs_emu_video_render_function() {
     }
 
     fs_emu_acquire_gui_lock();
-    fs_emu_render_chat();
+    fs_emu_hud_render_chat();
 
     //if (fs_emu_menu_is_active()) {
     if (g_menu_transition > 0.0) {
-        fs_emu_render_menu(g_menu_transition);
+        fs_emu_menu_render(g_menu_transition);
     }
 
-    fs_emu_render_dialog();
+    fs_emu_dialog_render();
     fs_emu_release_gui_lock();
 
+#ifdef WITH_NETPLAY
     if (g_fs_emu_hud_mode && fs_emu_netplay_enabled()) {
         fs_gl_ortho_hd();
         fs_gl_texturing(0);
         fs_gl_blending(1);
         fs_gl_color4f(0.0, 0.0, 0.0, 0.5);
-#ifdef HAVE_GLES
+#ifdef USE_GLES
         GLfloat vert[] = {
             0, 1030,
             1920, 1030,
@@ -1753,28 +1777,30 @@ void fs_emu_video_render_function() {
 
             int rendered_tag = 0;
             if (player->tag && player->tag[0]) {
-                str = g_strdup_printf("%s", player->tag);
+                str = fs_strdup_printf("%s", player->tag);
                 fs_emu_font_render(menu_font, str, x, y,
                         1.0, 1.0, 1.0, 1.0);
-                g_free(str);
+                free(str);
                 rendered_tag = 1;
             }
             if (rendered_tag || player->ping) {
-                str = g_strdup_printf("%03d", player->ping);
+                str = fs_strdup_printf("%03d", player->ping);
                 fs_emu_font_render(menu_font, str, x + 100, y,
                         1.0, 1.0, 1.0, 1.0);
-                g_free(str);
+                free(str);
             }
             /*
             if (rendered_tag || player->lag) {
-                str = g_strdup_printf("%03d", player->lag);
+                str = fs_strdup_printf("%03d", player->lag);
                 fs_emu_font_render(menu_font, str, x + 200, y,
                         1.0, 1.0, 1.0, 1.0);
-                g_free(str);
+                free(str);
             }
             */
         }
     }
+#endif
+
 #if 1
     if (fs_emu_is_paused()) {
         fs_gl_ortho_hd();
@@ -1794,7 +1820,7 @@ void fs_emu_video_render_function() {
         static GLuint debug_texture = 0;
         static uint32_t *debug_texture_data = NULL;
         if (debug_texture == 0) {
-            debug_texture_data = g_malloc0(256 * 256 * 4);
+            debug_texture_data = fs_malloc0(256 * 256 * 4);
             glGenTextures(1, &debug_texture);
             CHECK_GL_ERROR();
             fs_gl_bind_texture(debug_texture);
@@ -1831,7 +1857,7 @@ void fs_emu_video_render_function() {
         fs_gl_texturing(1);
         fs_gl_blending(0);
         fs_gl_color4f(1.0, 1.0, 1.0, 1.0);
-#ifdef HAVE_GLES
+#ifdef USE_GLES
         GLfloat tex[] = {
             0.0, 0.0,
             1.0, 0.0,
@@ -1875,40 +1901,40 @@ void fs_emu_video_render_function() {
         char *str;
 
         /*
-        str = g_strdup_printf("%d", fs_emu_get_audio_frequency());
+        str = fs_strdup_printf("%d", fs_emu_get_audio_frequency());
         fs_emu_font_render(menu_font, str, 1920 / 2 + 20, 3,
                 1.0, 1.0, 1.0, 1.0);
-        g_free(str);
+        free(str);
         */
 
-        str = g_strdup_printf("%0.1f",
+        str = fs_strdup_printf("%0.1f",
                 fs_emu_audio_get_measured_avg_buffer_fill(0) / 1000.0);
         fs_emu_font_render(menu_font, str, 1920 / 2 + 220, 3,
                 1.0, 1.0, 1.0, 1.0);
-        g_free(str);
-        str = g_strdup_printf("%d", g_fs_emu_audio_buffer_underruns);
+        free(str);
+        str = fs_strdup_printf("%d", g_fs_emu_audio_buffer_underruns);
         fs_emu_font_render(menu_font, str, 1920 / 2 + 420, 3,
                 1.0, 1.0, 1.0, 1.0);
-        g_free(str);
+        free(str);
 
         fs_emu_font_render(menu_font, "EMU", 20, 3, 1.0, 1.0, 1.0, 1.0);
-        str = g_strdup_printf("%0.1f", fs_emu_get_average_emu_fps());
+        str = fs_strdup_printf("%0.1f", fs_emu_get_average_emu_fps());
         fs_emu_font_render(menu_font, str, 220, 3, 1.0, 1.0, 1.0, 1.0);
-        g_free(str);
-        str = g_strdup_printf("%d", g_fs_emu_lost_frames);
+        free(str);
+        str = fs_strdup_printf("%d", g_fs_emu_lost_frames);
         fs_emu_font_render(menu_font, str, 420, 3, 1.0, 1.0, 1.0, 1.0);
-        g_free(str);
-        str = g_strdup_printf("%d", g_fs_emu_repeated_frames);
+        free(str);
+        str = fs_strdup_printf("%d", g_fs_emu_repeated_frames);
         fs_emu_font_render(menu_font, str, 620, 3, 1.0, 1.0, 1.0, 1.0);
-        g_free(str);
+        free(str);
 
         fs_emu_font_render(menu_font, "SYS", 20, 140, 1.0, 1.0, 1.0, 1.0);
-        str = g_strdup_printf("%0.1f", fs_emu_get_average_sys_fps());
+        str = fs_strdup_printf("%0.1f", fs_emu_get_average_sys_fps());
         fs_emu_font_render(menu_font, str, 220, 140, 1.0, 1.0, 1.0, 1.0);
-        g_free(str);
-        str = g_strdup_printf("%d", g_fs_emu_lost_vblanks);
+        free(str);
+        str = fs_strdup_printf("%d", g_fs_emu_lost_vblanks);
         fs_emu_font_render(menu_font, str, 420, 140, 1.0, 1.0, 1.0, 1.0);
-        g_free(str);
+        free(str);
 
         glPopMatrix();
         CHECK_GL_ERROR();
@@ -1926,7 +1952,7 @@ void fs_emu_video_render_debug_info(uint32_t *texture) {
     int x;
     //, y;
     int y1;
-    GList *link;
+    fs_list *link;
     uint32_t color = 0x80404080;
     fs_gl_ortho_hd();
     fs_gl_blending(TRUE);
@@ -1951,9 +1977,9 @@ void fs_emu_video_render_debug_info(uint32_t *texture) {
     x = 127;
     y1 = 128;
     color = 0x80404080;
-    link = g_queue_peek_head_link(g_fs_emu_sys_frame_times.queue);
+    link = fs_queue_peek_head_link(g_fs_emu_sys_frame_times.queue);
     while (link) {
-        int val = GPOINTER_TO_INT(link->data);
+        int val = FS_POINTER_TO_INT(link->data);
         //int x2 = x - 8;
         int y2 = y1 + val * VIDEO_DEBUG_SCALE_TIMES;
         if (y2 > 256) {
@@ -1971,9 +1997,9 @@ void fs_emu_video_render_debug_info(uint32_t *texture) {
     x = 127;
     y1 = 0;
     color = 0x80205080;
-    link = g_queue_peek_head_link(g_fs_emu_emu_frame_times.queue);
+    link = fs_queue_peek_head_link(g_fs_emu_emu_frame_times.queue);
     while (link) {
-        int val = GPOINTER_TO_INT(link->data);
+        int val = FS_POINTER_TO_INT(link->data);
         //int x2 = x - 8;
         int y2 = y1 + val * VIDEO_DEBUG_SCALE_TIMES;
         if (y2 > 256) {
@@ -1991,9 +2017,9 @@ void fs_emu_video_render_debug_info(uint32_t *texture) {
     x = 127;
     y1 = 0;
     color = 0x80008080;
-    link = g_queue_peek_head_link(g_fs_emu_emu2_frame_times.queue);
+    link = fs_queue_peek_head_link(g_fs_emu_emu2_frame_times.queue);
     while (link) {
-        int val = GPOINTER_TO_INT(link->data);
+        int val = FS_POINTER_TO_INT(link->data);
         //int x2 = x - 8;
         int y2 = y1 + val * VIDEO_DEBUG_SCALE_TIMES;
         if (y2 > 256) {

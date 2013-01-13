@@ -81,6 +81,8 @@ cfg = [
     ("wikipedia_url",         "",                             "custom"),
     ("database_url",          "",                             "custom"),
     ("lemon_url",             "",                             "custom"),
+    ("mobygames_url",         "",                             "custom"),
+    ("__variant_rating",      "",                             "custom"),
 
 ]
 

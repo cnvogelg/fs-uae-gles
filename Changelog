@@ -1,3 +1,47 @@
+Version 2.1.17:
+
+* Autoselect device for port 0 when "fire" button of unmapped device is
+  pressed.
+* New options to specify alternative floppy drive sound sets
+  (floppy_drive_x_sounds).
+* Built-in floppy drive sounds are now loaded from disk.
+* Partially merged GLES support code [lunixbochs, lallafa].
+* Some code in libfsemu is restructured / cleaned up.
+* FS-UAE can be compiled without Glib (with a few caveats).
+* Compile-time option to use posix threads/mutex/semaphores.
+* Updated translations: it [Speedvicio].
+* (Launcher) Fixed display of variant user rating.
+* (Launcher) Updated translations: fr [Foul], sr [Milanchez],
+  de [nexusle], pl [grimi], it [Speedvicio].
+
+Version 2.1.16:
+
+* (Launcher) Only show variant name (without game name) in variant list.
+* (Launcher) New horizontal layout for game/variants lists.
+* (Launcher) Variant list now disappears when choosing a non-database entry.
+* (Launcher) Render square covers inside a portrait cover.
+* (Launcher) Better differentiation of game and variant info.
+* (Launcher) Adjusted screenshot sizes for 1920x1080 maximized.
+* (Launcher) You can click on the screenshot area to show the other
+  screenshots, if not all are shown.
+* (Launcher) Automatically extract SetPatch from WB disks for WHDLoad.
+* (Launcher) Copy WHDLoad.key from base dir (Documents/FS-UAE) if found.
+* (Launcher) Documents/FS-UAE/WHDLoad dir not needed/supported anymore, but
+  you can put files to merge in Documents/FS-UAE/Hard Drives/WHDLoad instead
+  if needed.
+* (Launcher) Updated translations: pl [grimi], de [nexusle].
+
+Version 2.1.15:
+
+* Determine the size of block devices on OS X, making it possible to
+  mount block devices as hard drives on OS X [lallafa].
+* Fixed source to remove some compiler warnings in hardfile_host.cpp.
+* (Launcher) Create "Devs/system-configuration" when running WHDLoad games.
+* (Launcher) Fixed initialization of (last used) game info on startup.
+* (Launcher) Added mobygames link button.
+* (Launcher) Use icon button to toggle fullscreen / windowed mode.
+* (Launcher) Updated translations: de [nexusle].
+
 Version 2.1.14:
 
 * Fixed return value in two stub functions.

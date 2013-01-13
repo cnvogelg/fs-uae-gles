@@ -1,21 +1,22 @@
 #include "texture.h"
 
-#include <fs/glee.h>
+#ifdef USE_OPENGL
+#include <fs/ml/opengl.h>
+
+#ifdef USE_SDL
 #include <SDL.h>
-#ifdef HAVE_GLES
-#include <GLES/gl.h>
-//#include <GLES/glues.h>
-#else
 #include <SDL_opengl.h>
 #endif
 
+#endif
+
 #include <fs/ml.h>
-
 #include "fs/image.h"
-#include "video.h"
-#include "render.h"
-#include "libfsemu.h"
 
+#include "libfsemu.h"
+#include "render.h"
+#include "theme.h"
+#include "video.h"
 static fs_emu_texture *g_atlas = NULL;
 fs_emu_texture *g_fs_emu_overlay_texture = NULL;
 
@@ -60,7 +61,7 @@ void fs_emu_draw_from_atlas(float dx, float dy, float dw, float dh,
     //printf("%f %f %f %f - %f %f %f %f\n", dx, dy, dw, dh, tx, ty, tw, th);
 
     fs_emu_set_texture(g_atlas);
-#ifdef HAVE_GLES
+#ifdef USE_GLES
     GLfloat tex[] = {
         tx, ty + th,
         tx + tw, ty + th,
@@ -148,7 +149,7 @@ static inline void copy_pixel(unsigned char **dst, unsigned char **src) {
 
 static void load_atlas_texture(fs_image *atlas_image,
         int texture_id, const char *name) {
-    char *path = fs_emu_get_theme_resource(name);
+    char *path = fs_emu_theme_get_resource(name);
     if (!path) {
         fs_emu_warning("Could not find resource %s\n", name);
         return;
@@ -359,7 +360,7 @@ void fs_emu_initialize_textures() {
     fs_gl_add_context_notification(context_notification_handler, g_atlas);
 
     if (g_fs_emu_theme.overlay_image[0]) {
-        char *path = fs_emu_get_theme_resource(g_fs_emu_theme.overlay_image);
+        char *path = fs_emu_theme_get_resource(g_fs_emu_theme.overlay_image);
         fs_log("g_fs_emu_theme.overlay_image %s => %s\n",
                 g_fs_emu_theme.overlay_image, path);
         if (path) {
@@ -370,7 +371,7 @@ void fs_emu_initialize_textures() {
     for (int i = 0; i < MAX_CUSTOM_OVERLAYS; i++) {
         char *name;
         name = fs_strdup_printf("custom_%d.png", i);
-        char *path = fs_emu_get_theme_resource(name);
+        char *path = fs_emu_theme_get_resource(name);
         if (path) {
             //printf("loading %s\n", path);
             g_fs_emu_theme.overlay_textures[i] =
@@ -493,7 +494,7 @@ void fs_emu_render_texture_with_size(fs_emu_texture *texture, int x, int y,
     //return;
     //fs_log("%d %d %d %d\n", x, y, x + w , y + h);
     fs_gl_color4f(1.0, 1.0, 1.0, 1.0);
-#ifdef HAVE_GLES
+#ifdef USE_GLES
     GLfloat tex[] = {
         0.0, 1.0,
         1.0, 1.0,

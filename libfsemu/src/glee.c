@@ -1,3 +1,5 @@
+#if !defined(USE_GLES) || defined(FAKE_GLES)
+
 /***************************************************************************
 *
 * GLee.c
@@ -46,10 +48,6 @@
     #include <Carbon/Carbon.h>
 #endif
 
-#ifdef HAVE_GLES
-        #include <EGL/egl.h>
-#endif
-
 typedef GLuint(*GLEE_LINK_FUNCTION)(void);
 
 GLboolean __GLeeInited=GL_FALSE;
@@ -80,8 +78,6 @@ void * __GLeeGetProcAddress(const char *extname)
     CFRelease(bundle);
 
     return function;
-#elif defined(HAVE_GLES)
-        return (void*)eglGetProcAddress(extname);
 #else
     return (void*)glXGetProcAddressARB((const GLubyte *)extname);
 #endif
@@ -15940,8 +15936,6 @@ const char *__GLeeGetExtStrPlat( void )
     if (wglGetExtensionsStringARB)
         return (const char *)wglGetExtensionsStringARB(wglGetCurrentDC());
 #elif defined(__APPLE__) || defined(__APPLE_CC__)
-#elif defined(HAVE_GLES)
-// TODO: egl
 #else
     Display *dpy=glXGetCurrentDisplay();
     if(dpy)
@@ -18176,3 +18170,5 @@ GLEE_EXTERN GLboolean GLeeInit( void )
     __GLeeExtList_clean(&extensionNames);
     return GL_TRUE;
 }
+
+#endif

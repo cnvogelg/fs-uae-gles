@@ -1,9 +1,11 @@
 #ifndef FS_GLU_H_
 #define FS_GLU_H_
 
-#ifdef MACOSX
+#if defined(USE_GLES) && !defined(FAKE_GLES)
+// no GLU
+#elif defined(MACOSX)
 #include <OpenGL/glu.h>
-#elif defined(HAVE_GLES)
+#elif defined(USE_GLES)
 #include <GLES/glu.h>
 #else
 #include <GL/glu.h>

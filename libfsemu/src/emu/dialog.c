@@ -16,22 +16,29 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
-#include <fs/emu.h>
-#include <glib.h>
-#include "render.h"
-#include "menu.h"
-#include "font.h"
+#include "dialog.h"
 
-static GList *g_dialog_stack = NULL;
+#include <stdlib.h>
+#include <fs/emu.h>
+#include <fs/list.h>
+#ifdef USE_OPENGL
+#include <fs/ml/opengl.h>
+#endif
+
+#include "font.h"
+#include "menu.h"
+#include "render.h"
+
+static fs_list *g_dialog_stack = NULL;
 int g_fs_emu_dialog_mode = 0;
 
-void fs_emu_initialize_dialog_module() {
+void fs_emu_dialog_init() {
     fs_log("initialize dialog module\n");
 }
 
 fs_emu_dialog* fs_emu_dialog_create(const char *title,
         const char *affirmative, const char *negative) {
-    fs_emu_dialog* dialog = g_malloc0(sizeof(fs_emu_dialog));
+    fs_emu_dialog* dialog = fs_malloc0(sizeof(fs_emu_dialog));
     if (title) {
         dialog->title = fs_strdup(title);
     }
@@ -81,7 +88,7 @@ void fs_emu_dialog_set_line(fs_emu_dialog *dialog, int line,
 
 void fs_emu_dialog_show(fs_emu_dialog *dialog) {
     fs_emu_assert_gui_lock();
-    g_dialog_stack = g_list_append(g_dialog_stack, dialog);
+    g_dialog_stack = fs_list_append(g_dialog_stack, dialog);
     g_fs_emu_dialog_mode = 1;
 }
 
@@ -91,10 +98,10 @@ int fs_emu_dialog_result(fs_emu_dialog *dialog) {
 
 void fs_emu_dialog_dismiss(fs_emu_dialog *dialog) {
     fs_emu_assert_gui_lock();
-    GList* link = g_dialog_stack;
+    fs_list* link = g_dialog_stack;
     while (link) {
         if (link->data == dialog) {
-            g_dialog_stack = g_list_delete_link(g_dialog_stack, link);
+            g_dialog_stack = fs_list_delete_link(g_dialog_stack, link);
             break;
         }
         link = link->next;
@@ -102,10 +109,10 @@ void fs_emu_dialog_dismiss(fs_emu_dialog *dialog) {
     g_fs_emu_dialog_mode = (g_dialog_stack != NULL);
 }
 
-fs_emu_dialog *fs_emu_get_current_dialog() {
+fs_emu_dialog *fs_emu_dialog_get_current() {
     fs_emu_assert_gui_lock();
     fs_emu_dialog *dialog = NULL;
-    GList* link = g_dialog_stack;
+    fs_list* link = g_dialog_stack;
     while (link) {
         dialog = link->data;
         link = link->next;
@@ -113,13 +120,13 @@ fs_emu_dialog *fs_emu_get_current_dialog() {
     return dialog;
 }
 
-void fs_emu_handle_dialog_action(int action, int state) {
+void fs_emu_dialog_handle_action(int action, int state) {
     //printf("dialog-action\n");
     if (state == 0) {
         return;
     }
     //printf("dialog-action\n");
-    fs_emu_dialog *dialog = fs_emu_get_current_dialog();
+    fs_emu_dialog *dialog = fs_emu_dialog_get_current();
     if (!dialog) {
         return;
     }
@@ -135,8 +142,8 @@ void fs_emu_handle_dialog_action(int action, int state) {
     }
 }
 
-void fs_emu_render_dialog() {
-    fs_emu_dialog *dialog = fs_emu_get_current_dialog();
+void fs_emu_dialog_render() {
+    fs_emu_dialog *dialog = fs_emu_dialog_get_current();
     if (!dialog) {
         return;
     }
@@ -146,7 +153,7 @@ void fs_emu_render_dialog() {
     fs_gl_texturing(0);
     fs_gl_color4f(0.0, 0.0, 0.0, 0.5);
     
-#ifdef HAVE_GLES    
+#ifdef USE_GLES    
     GLfloat vert[] = {
         0, 0,
         1920, 0,
@@ -175,7 +182,7 @@ void fs_emu_render_dialog() {
     float y1 = (1080 - height) / 2;
     float y2 = y1 + height;
 
-#ifdef HAVE_GLES
+#ifdef USE_GLES
     GLfloat color2[] = {
         0.0, 0.4, 0.75, 1.0,
         0.0, 0.4, 0.75, 1.0,
