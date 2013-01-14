@@ -323,6 +323,9 @@ static void decide_opengl_sync_method() {
 }
 
 static void check_opengl_sync_capabilities() {
+#ifdef USE_GLES
+
+#else
     fs_log("checking OpenGL capabilities\n");
     const char *ext = (const char *) glGetString(GL_EXTENSIONS);
     if (ext) {
@@ -347,6 +350,7 @@ static void check_opengl_sync_capabilities() {
             }
         }
     }
+#endif
 }
 
 static void initialize_opengl_sync() {

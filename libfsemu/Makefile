@@ -43,7 +43,7 @@ arch :=
 debug := 0
 noflags := 0
 
-cppflags = $(CXXFLAGS)
+cppflags = $(CXXFLAGS) $(EXTRA_CPPFLAGS)
 cflags = -std=c99 -Iinclude `$(sdl_config) --cflags` \
 		`$(pkg_config) --cflags glib-2.0 gthread-2.0 libpng` \
 		$(CFLAGS) -D_FILE_OFFSET_BITS=64
@@ -143,14 +143,16 @@ else
 	# ----- GLES -----
 ifeq ($(gles),1)
 	cppflags += -DUSE_GLES $(GLES_INCLUDES) $(GLUES_INCLUDES)
-else
-	cppflags += -DUSE_OPENGL	
 endif
+	cppflags += -DUSE_OPENGL	
 endif
 
 ifeq ($(os), android)
 else
-	cppflags += -DWITH_NETPLAY -DWITH_XML_SHADER
+	cppflags += -DWITH_NETPLAY 
+ifneq ($(gles),1)
+	cppflags += -DWITH_XML_SHADER
+endif
 	#cppflags += -DWITH_NETPLAY -DUSE_GLES -DFAKE_GLES
 endif
 

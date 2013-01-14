@@ -5,7 +5,9 @@
 
 #ifdef USE_SDL
 #include <SDL.h>
+#ifndef USE_GLES
 #include <SDL_opengl.h>
+#endif
 #endif
 
 #endif
