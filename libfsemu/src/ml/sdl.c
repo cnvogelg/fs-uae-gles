@@ -355,8 +355,8 @@ int fs_ml_video_create_window(const char *title) {
 
     set_video_mode();
 
-    SDL_WM_SetCaption(g_window_title, g_get_application_name());
-
+    // GLES seems to need this before init (at least on Pandora)
+    SDL_WM_SetCaption(g_window_title, fs_get_application_name());
 #ifdef USE_GLES
     EGL_Init();
 #endif
