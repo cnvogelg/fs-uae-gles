@@ -52,7 +52,7 @@ else
 use_glib := 1
 use_freetype := 1
 common_flags = -Isrc/od-fs -Isrc/od-fs/include \
-		-Isrc/include -Igen -Isrc -Isrc/od-win32/caps \
+		-Isrc/include -Igensrc -Isrc -Isrc/od-win32/caps \
 		`$(pkg_config) --cflags glib-2.0 gthread-2.0 libpng` \
 		-I$(libfsemu_dir)/include \
 		`$(sdl_config) --cflags`
