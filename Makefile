@@ -157,7 +157,7 @@ else
   cppflags += -DLINUX
   ldflags += -Wa,--execstack
 ifeq ($(gles),1)  
-  libs += $(GLES_LIBS) $(GLUES_LIBS)
+  libs += $(GLES_LIBS)
 else
   libs += -lGL -lGLU
 endif

@@ -180,7 +180,7 @@ else
 	shared_ldflags += -shared -Wl,--as-needed -Wl,-soname=$(library_soname)
 	# ----- GLES -----
 ifeq ($(gles),1)
-	cppflags += -DUSE_GLES $(GLES_INCLUDES) $(GLUES_INCLUDES)
+	cppflags += -DUSE_GLES $(GLES_INCLUDES)
 endif
 	cppflags += -DUSE_OPENGL	
 endif

@@ -15,9 +15,6 @@ all: fs-uae
 # It is assumed that on the chroot filesystem the following files are available:
 #
 # in $(CHROOT_DIR)/home/user:
-#   # fetch and build from https://github.com/cnvogelg/glues
-#   opt/glues/include/glu.h     
-#   opt/glues/lib/libGLUES.a
 #   opt/vc                  <- tree copy from /opt/vc (no link!)
 #   usr/bin/pkg-config      <- copy from /usr/bin (no link!)
 #   usr/bin/sdl-config      <- copy from /usr/bin (no link!)
@@ -45,9 +42,7 @@ fs-uae:
 		pkg_config=$(RASPI_ROOT)/usr/bin/pkg-config \
 		EXTRA_CPPFLAGS=\"$(RASPI_CFLAGS) -DUSE_EGL_RAW -DUSE_GLES1 -DRPI\" \
 		GLES_INCLUDES=\"-I$(RASPI_ROOT)/opt/vc/include -I$(RASPI_ROOT)/opt/vc/include/interface/vcos/pthreads\" \
-		GLES_LIBS=\"-L$(RASPI_ROOT)/opt/vc/lib -lEGL -lGLESv1_CM\" \
-		GLUES_INCLUDES=-I$(RASPI_ROOT)/opt/glues/include \
-		GLUES_LIBS=\"-L$(RASPI_ROOT)/opt/glues/lib -lGLUES\"
+		GLES_LIBS=\"-L$(RASPI_ROOT)/opt/vc/lib -lEGL -lGLESv1_CM\"
 
 clean:
 	$(MAKE) -C .. clean

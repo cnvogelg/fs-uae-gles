@@ -8,9 +8,9 @@ VER_REL=$(strip $(shell cat ../VERSION | cut -f3 -d.))
 
 MKSQUASHFS=mksquashfs
 NAME=fs-uae
-SRC_BIN=../out/$(NAME)
+SRC_BIN=../$(NAME)
 PND_FILES=run.sh Default.fs-uae.templ
-EXTRA_LIBS=$(PNDSDK)/usr/lib/libGLUES_CM.so.0 $(PNDSDK)/usr/lib/libopenal.so.1
+EXTRA_LIBS=$(PNDSDK)/usr/lib/libopenal.so.1
 EXTRA_DIR=../share
 ICON_FILE=../share/icons/hicolor/64x64/apps/fs-uae.png
 PND_OUT=fs-uae_$(VERSION)_p$(PATCHLEVEL).pnd
@@ -70,7 +70,7 @@ fs-uae:
 		sdl_config=$(PNDSDK)/usr/bin/sdl-config \
 		EXTRA_CPPFLAGS="$(PANDORA_CFLAGS) -DUSE_EGL_SDL -DUSE_GLES1 -DPANDORA" \
 		GLES_INCLUDES=-I$(PNDSDK)/usr/include \
-		GLES_LIBS="-lEGL -lGLES_CM" GLUES_LIBS=-lGLUES_CM \
+		GLES_LIBS="-lEGL -lGLES_CM" \
 		SYS_INCLUDES=-I$(PNDSDK)/usr/include
 
 	
