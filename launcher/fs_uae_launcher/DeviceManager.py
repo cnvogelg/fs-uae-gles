@@ -7,9 +7,10 @@ import re
 import traceback
 import subprocess
 from .Config import Config
-from .Settings import Settings
 from .FSUAE import FSUAE
 from .I18N import _
+from .Settings import Settings
+from .Signal import Signal
 
 def create_cmp_id(id):
     return id.lower().replace(" ", "")
@@ -26,17 +27,16 @@ class Device:
 class DeviceManager:
 
     initialized = False
-    device_ids = []
-    device_names = []
-    device_name_count = {}
-
-    devices = []
 
     @classmethod
     def init(cls):
         if cls.initialized:
             return
-        #cls.init_pygame()
+
+        cls.devices = []
+        cls.device_ids = []
+        cls.device_names = []
+        cls.device_name_count = {}
 
         cls.devices.append(Device("none", _("No Device"), "none"))
         cls.devices.append(Device("mouse", _("Mouse"), "mouse"))
@@ -46,6 +46,12 @@ class DeviceManager:
         cls.devices.append(Device("keyboard",
                 _("Cursor Keys and Right Ctrl/Alt"), "joystick"))
         cls.initialized = True
+
+    @classmethod
+    def refresh(cls):
+        cls.initialized = False
+        cls.init()
+        Signal.broadcast("device_list_updated")
 
     @classmethod
     def init_wx(cls):
@@ -106,6 +112,8 @@ class DeviceManager:
         joysticks = joysticks.decode("UTF-8", "replace")
         joysticks = [x.strip() for x in joysticks.split("\n") if x.strip()]
         for name in joysticks:
+            if name.startswith("#"):
+                continue
             name_count = cls.device_name_count.get(name, 0) + 1
             cls.device_name_count[name] = name_count
             if name_count > 1:
@@ -140,7 +148,7 @@ class DeviceManager:
     @classmethod
     def get_devices_for_ports(cls, config):
         cls.init()
-        ports = [cls.devices[0] for x in range(4)]
+        ports = [cls.devices[0] for x in range(5)]
         for device in cls.devices:
             device.port = None
         for p in range(4):

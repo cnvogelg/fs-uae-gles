@@ -48,6 +48,8 @@ void fs_emu_disable_throttling() {
 }
 
 void fs_emu_disallow_full_sync() {
+    // FIXME: can rename to client_inhibit_full_sync, and let it be turn
+    // on and off
     g_fs_emu_full_sync_allowed = 0;
 }
 
@@ -96,6 +98,36 @@ void fs_emu_warning(const char *format, ...) {
         buffer[len] = '\0';
     }
     fs_log("WARNING: %s\n", buffer);
+    fs_emu_hud_add_console_line(buffer, 0);
+    free(buffer);
+}
+
+void fs_emu_deprecated(const char *format, ...) {
+    va_list ap;
+    va_start(ap, format);
+    char *buffer = fs_strdup_vprintf(format, ap);
+    va_end(ap);
+    int len = strlen(buffer);
+    // strip trailing newline, of any
+    if (len > 0 && buffer[len] == '\n') {
+        buffer[len] = '\0';
+    }
+    fs_log("DEPRECATED: %s\n", buffer);
+    fs_emu_hud_add_console_line(buffer, 0);
+    free(buffer);
+}
+
+void fs_emu_notification(const char *format, ...) {
+    va_list ap;
+    va_start(ap, format);
+    char *buffer = fs_strdup_vprintf(format, ap);
+    va_end(ap);
+    int len = strlen(buffer);
+    // strip trailing newline, of any
+    if (len > 0 && buffer[len] == '\n') {
+        buffer[len] = '\0';
+    }
+    fs_log("NOTIFICATION: %s\n", buffer);
     fs_emu_hud_add_console_line(buffer, 0);
     free(buffer);
 }
@@ -244,6 +276,15 @@ void fs_emu_init_2(int options) {
     if (options & FS_EMU_INIT_VIDEO) {
         fs_emu_video_init();
     }
+
+    fs_emu_init_render();
+
+    // these must (currently) be called after renderer has been initialized,
+    // due to a mutex that must be initialized first
+    fs_emu_set_overlay_state(FS_EMU_TOP_LEFT_OVERLAY, 1);
+    fs_emu_set_overlay_state(FS_EMU_TOP_RIGHT_OVERLAY, 1);
+    fs_emu_set_overlay_state(FS_EMU_BOTTOM_RIGHT_OVERLAY, 1);
+    fs_emu_set_overlay_state(FS_EMU_BOTTOM_LEFT_OVERLAY, 1);
 
     fs_emu_log("calling fs_ml_init_2\n");
     fs_ml_init_2();
@@ -411,8 +452,15 @@ static int wait_for_frame_no_netplay() {
     static int64_t frame_time = 0;
     if (last_time == 0) {
         last_time = fs_emu_monotonic_time();
-        int frame_rate = fs_emu_get_video_frame_rate();
+    }
+
+    static int last_frame_rate = 0;
+    int frame_rate = fs_emu_get_video_frame_rate();
+    if (frame_rate != last_frame_rate) {
         frame_time = ((int64_t) 1000000) / frame_rate;
+        fs_log("wait_for_frame_no_netplay: new frame rate %d (time: %d)\n",
+                frame_rate, (int) frame_time);
+        last_frame_rate = frame_rate;
     }
 
     int64_t wait_until = last_time + frame_time;

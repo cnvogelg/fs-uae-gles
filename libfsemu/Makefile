@@ -46,8 +46,11 @@ noflags := 0
 cppflags = $(CXXFLAGS) $(EXTRA_CPPFLAGS)
 cflags = -std=c99 -Iinclude `$(sdl_config) --cflags` \
 		`$(pkg_config) --cflags glib-2.0 gthread-2.0 libpng` \
+		`$(pkg_config) --cflags freetype2` \
 		$(CFLAGS) -D_FILE_OFFSET_BITS=64
-objects = obj/emu_emu.o obj/emu_video.o obj/emu_audio.o obj/emu_input.o \
+objects = obj/emu_emu.o obj/emu_video.o obj/emu_audio_openal.o \
+		obj/emu_audio_common.o obj/emu_audio_dummy.o obj/emu_audio_sdl.o \
+		obj/emu_audio_debug.o obj/emu_input.o \
 		obj/emu_menu.o obj/emu_texture.o obj/emu_font.o \
 		obj/emu_render.o obj/emu_dialog.o obj/emu_hud.o obj/emu_actions.o \
 		obj/emu_xml_shader.o obj/emu_util.o obj/emu_netplay.o \
@@ -61,7 +64,39 @@ objects = obj/emu_emu.o obj/emu_video.o obj/emu_audio.o obj/emu_input.o \
 		obj/base.o obj/log.o obj/config.o obj/image.o obj/ref.o \
 		obj/glee.o obj/opengl.o obj/thread.o obj/string.o obj/filesys.o \
 		obj/unicode.o obj/init.o obj/random.o obj/list.o obj/eventlog.o \
-		obj/queue.o obj/hashtable.o obj/inifile.o
+		obj/queue.o obj/hashtable.o obj/inifile.o \
+		obj/lua_lapi.o \
+		obj/lua_lauxlib.o \
+		obj/lua_lbaselib.o \
+		obj/lua_lbitlib.o \
+		obj/lua_lcode.o \
+		obj/lua_lcorolib.o \
+		obj/lua_lctype.o \
+		obj/lua_ldblib.o \
+		obj/lua_ldebug.o \
+		obj/lua_ldo.o \
+		obj/lua_ldump.o \
+		obj/lua_lfunc.o \
+		obj/lua_lgc.o \
+		obj/lua_linit.o \
+		obj/lua_liolib.o \
+		obj/lua_llex.o \
+		obj/lua_lmathlib.o \
+		obj/lua_lmem.o \
+		obj/lua_loadlib.o \
+		obj/lua_lobject.o \
+		obj/lua_lopcodes.o \
+		obj/lua_loslib.o \
+		obj/lua_lparser.o \
+		obj/lua_lstate.o \
+		obj/lua_lstring.o \
+		obj/lua_lstrlib.o \
+		obj/lua_ltable.o \
+		obj/lua_ltablib.o \
+		obj/lua_ltm.o \
+		obj/lua_lundump.o \
+		obj/lua_lvm.o \
+		obj/lua_lzio.o
 
 ldflags = $(LDFLAGS)
 libs =
@@ -87,6 +122,7 @@ ifeq ($(os), windows)
 	cppflags += -DUSE_OPENGL
 	#cppflags += -DUSE_SDL_INPUT
 	cppflags += -DUSE_OPENAL
+	cppflags += -DUSE_FREETYPE
 	library = libfsemu.a
 
 else ifeq ($(android), 1)
@@ -118,6 +154,7 @@ else ifeq ($(os), macosx)
 	cppflags += -DUSE_OPENGL
 	cppflags += -DUSE_SDL_INPUT
 	cppflags += -DUSE_OPENAL
+	cppflags += -DUSE_FREETYPE
 	library = libfsemu.a
 
 else
@@ -135,6 +172,7 @@ else
 	cppflags += -DUSE_SDL_VIDEO
 	cppflags += -DUSE_SDL_INPUT
 	cppflags += -DUSE_OPENAL
+	cppflags += -DUSE_FREETYPE
 	library = libfsemu.a
 	shared = libfsemu.so.1.0
 	shared_soname = libfsemu.so.1
@@ -153,6 +191,7 @@ else
 ifneq ($(gles),1)
 	cppflags += -DWITH_XML_SHADER
 endif
+	cppflags += -DWITH_LUA
 	#cppflags += -DWITH_NETPLAY -DUSE_GLES -DFAKE_GLES
 endif
 
@@ -167,6 +206,9 @@ obj/emu_%.o: src/emu/%.c
 	$(cc) $(cppflags) $(cflags) -c $< -o $@
 
 obj/ml_%.o: src/ml/%.c
+	$(cc) $(cppflags) $(cflags) -c $< -o $@
+
+obj/lua_%.o: src/lua/%.c
 	$(cc) $(cppflags) $(cflags) -c $< -o $@
 
 out/$(library): $(objects)

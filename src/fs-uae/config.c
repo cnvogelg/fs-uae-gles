@@ -3,6 +3,7 @@
 
 #include <uae/uae.h>
 #include <fs/emu.h>
+#include <fs/i18n.h>
 #include "fs-uae.h"
 
 amiga_config g_fs_uae_amiga_configs[CONFIG_LAST + 1] = {};
@@ -129,6 +130,16 @@ void fs_uae_init_configs() {
     c->name = "Amiga 4000/040";
     c->quickstart_model = 6;
     c->quickstart_config = 1;
+    c->fast_on_accuracy_level = 1;
+    c->no_accuracy_adjustment = 1;
+    c->allow_z3_memory = 1;
+
+    c = g_fs_uae_amiga_configs + CONFIG_A3000;
+    c->id = "A3000";
+    c->model = MODEL_A3000;
+    c->name = "Amiga 3000";
+    c->quickstart_model = 5;
+    c->quickstart_config = 2;
     c->fast_on_accuracy_level = 1;
     c->no_accuracy_adjustment = 1;
     c->allow_z3_memory = 1;
@@ -284,7 +295,7 @@ static void configure_memory(amiga_config *c) {
             amiga_set_int_option("chipmem_size", chip_memory / 512);
         }
         else {
-            fs_emu_warning("chip_memory must be a multiple of 512");
+            fs_emu_warning(_("Option chip_memory must be a multiple of 512"));
             chip_memory = 0;
         }
     }
@@ -297,7 +308,7 @@ static void configure_memory(amiga_config *c) {
             amiga_set_int_option("bogomem_size", slow_memory / 256);
         }
         else {
-            fs_emu_warning("slow_memory must be a multiple of 256");
+            fs_emu_warning(_("Option slow_memory must be a multiple of 256"));
             slow_memory = 0;
         }
     }
@@ -310,7 +321,7 @@ static void configure_memory(amiga_config *c) {
             amiga_set_int_option("fastmem_size", fast_memory / 1024);
         }
         else {
-            fs_emu_warning("fast_memory must be a multiple of 1024");
+            fs_emu_warning(_("Option fast_memory must be a multiple of 1024"));
             fast_memory = 0;
         }
     }
@@ -320,15 +331,16 @@ static void configure_memory(amiga_config *c) {
     int z3_memory = fs_config_get_int("zorro_iii_memory");
     if (z3_memory != FS_CONFIG_NONE) {
         if (z3_memory && !c->allow_z3_memory) {
-            fs_emu_warning("Zorro III fast memory needs a CPU "
-                    "with 32-bit addressing");
+            fs_emu_warning(_("Options zorro_iii_memory needs a CPU "
+                    "with 32-bit addressing"));
             z3_memory = 0;
         }
         else if (z3_memory % 1024 == 0) {
             amiga_set_int_option("z3mem_size", z3_memory / 1024);
         }
         else {
-            fs_emu_warning("zorro_iii_memory must be a multiple of 1024");
+            fs_emu_warning(_("Option zorro_iii_memory must be a multiple "
+                    "of 1024"));
             z3_memory = 0;
         }
     }
@@ -426,7 +438,8 @@ void fs_uae_configure_amiga_hardware() {
     int uaegfx_card = fs_config_get_boolean("uaegfx_card");
     if (uaegfx_card == 1) {
         if (!c->allow_z3_memory) {
-            fs_emu_warning("uaegfx.card needs a CPU with 32-bit addressing");
+            fs_emu_warning(_("Option uaegfx.card needs a CPU with 32-bit "
+                    "addressing"));
         }
         else {
             amiga_set_option("gfxcard_size", "32");
@@ -528,7 +541,7 @@ void fs_uae_configure_cdrom() {
         }
     }
     else {
-        fs_emu_warning("Invalid number of CD-ROM drives");
+        fs_emu_warning(_("Invalid number of CD-ROM drives specified"));
     }
 }
 
@@ -596,6 +609,12 @@ static void configure_hard_drive_image (int index, const char *path,
         buffer[4] = '\0';
         if (read == 4) {
             if (strcmp(buffer, "RDSK") == 0) {
+                rdb_mode = 1;
+            }
+            else if (strcmp(buffer, "rdsk") == 0) {
+                // this is a unformatted disk file prepared by for example
+                // FS-UAE Launcher, using rdsk to indicate that the file
+                // is intended to be used as an RDB file
                 rdb_mode = 1;
             }
         }
@@ -686,13 +705,19 @@ void fs_uae_configure_hard_drives() {
         path = fs_uae_expand_path_and_free(path);
         path = fs_uae_resolve_path_and_free(path, FS_UAE_HD_PATHS);
         if (!fs_path_exists(path)) {
-            char *msg = fs_strdup_printf("HD path \"%s\" does not exist",
+            char *msg = fs_strdup_printf(_("HD not found: %s"),
                     path);
             fs_emu_warning(msg);
             free(msg);
             continue;
         }
-        int boot_priority = -i;
+        key = fs_strdup_printf("hard_drive_%d_priority", i);
+        int boot_priority = fs_config_get_int(key);
+        free(key);
+        if (boot_priority == FS_CONFIG_NONE) {
+            boot_priority = 0;
+        }
+
         char *device = fs_strdup_printf("DH%d", i);
 
         int read_only = 0;
@@ -717,14 +742,9 @@ void fs_uae_configure_hard_drives() {
             configure_hard_drive_directory(i, path, device, read_only,
                     boot_priority);
         }
-        else if (fs_path_exists(path)) {
+        else {
             configure_hard_drive_image(i, path, device, read_only,
                     boot_priority);
-        }
-        else {
-            // FIXME: GUI warning
-            fs_emu_warning("Hard drive path does not exist");
-            fs_emu_log("hard drive path does not exist: %s\n", path);
         }
 
         free(device);
@@ -763,9 +783,10 @@ void fs_uae_configure_floppies() {
             auto_num_drives = i + 1;
         }
         amiga_set_option(option_floppyx, path);
+        amiga_set_option(option_floppyxtype, "0");
         free(path);
 
-        char *floppy_sounds = fs_config_get_const_string(
+        const char *floppy_sounds = fs_config_get_const_string(
                 option_floppy_drive_x_sounds);
         if (floppy_sounds) {
             fs_log("custom floppy sounds for drive %d: %s\n", i,
@@ -795,8 +816,8 @@ void fs_uae_configure_floppies() {
     // set remaining floppy drive types to -1
     for (int i = num_drives; i < 4; i++) {
         option_floppyx[6] = '0' + i;
-        amiga_set_option(option_floppyx, "");
         option_floppyxtype[6] = '0' + i;
+        amiga_set_option(option_floppyx, "");
         amiga_set_option(option_floppyxtype, "-1");
     }
 

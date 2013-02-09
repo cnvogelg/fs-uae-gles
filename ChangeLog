@@ -1,3 +1,136 @@
+Version 2.1.27:
+
+* Added lua (sandboxed), (possibly) to be used as a scripting engine.
+* Added freetype as a build dependency, will be used for truetype fonts.
+* Some changes to the build system, fs-uae binary now linked in root dir.
+* Updated translations: fi [GoingDown].
+* (Launcher) Index content in .lha files if lhafile python module is found
+  (implemented earlier, but not announced).
+* (Launcher) Added lhafile module to Windows / OS X binary distributions.
+* (Launcher) Updated translations: it [Speedvicio], pl [grimi], de [nexusle],
+  fi [GoingDown].
+
+Version 2.1.26:
+
+* Implemented options hard_drive_x_priority.
+* Renamed FS-UAE.log to FS-UAE.log.txt for easier upload to EAB.
+* Better method to override directories (e.g. base_dir), old ones deprecated.
+* Added translations: cs [spajdr], fi [GoingDown].
+* Updated translations: it [Speedvicio].
+* (Launcher) Added refresh button to update list of connected joysticks.
+* (Launcher) Added support for the recently added A3000 FS-UAE Amiga model.
+* (Launcher) Improved memory widgets, you now see the current default value.
+* (Launcher) A new simple ADF & HDF Creator dialog is included.
+* (Launcher) Display name first, then directory in media selectors.
+* (Launcher) Fixed a bug where you could get an error message about missing
+  kickstart after just having imported kickstarts and tried to start the
+  emulation.
+* (Launcher) Do not expose database username/password in FS-UAE logs.
+* (Launcher) Added main menu button, moved scan and settings to this menu.
+* (Launcher) Also add menu entries to application menu on OS X.
+* (Launcher) Moved custom options and custom settings to new dialog
+  accessible from the new menu.
+* (Launcher) Moved kickstart import to new kickstart import dialog, removed
+  the "setup" / wizard tab.
+* (Launcher) New "kickstarts are missing" notification in the top tab area.
+* (Launcher) Marked some additional text for translation.
+* (Launcher) Added new about dialog.
+* (Launcher) Database: Game variants can specify that an empty HD or a HD with
+   Workbench must be added to the system.
+* (Launcher) Preselect variant with personal rating = 5, or else highest
+  rated game variant when selecting a game from the database.
+* (Launcher) Respect new base_dir override.
+* (Launcher) Updated GUI layout in several places, minor improvements here
+  and there.
+* (Launcher) Added translations: cs [spajdr], fi [GoingDown].
+
+Version 2.1.25:
+
+* Fixed startup when running under OS X (2.1.24).
+
+Version 2.1.24:
+
+* Screenshot function also saves a screenshot of the OpenGL frame buffer.
+* Support some RetroArch extensions to the XML shader spec, as a result,
+  the CRT-interlaced-halation shader works now.
+* Fixed zoom modes and viewport correction when disabling line doubling or
+  using low_resolution option.
+* Warn if OpenGL renderer is "GDI Generic" (no real driver installed).
+* Fixed problem loading state when using directory hard drives on case
+  sensitive file systems.
+* Don't warn (with LEDs) about missed frames / repeated frames when this is
+  normal (host frame rate != Amiga frame rate).
+* Blank sync leds a few seconds after startup until the statistics have
+  settled.
+* New option fade_out_duration (miliseconds).
+* Updated translations: fr [Foul], de [nexusle], pl [grimi].
+* (Launcher) Fixed problem initializing joystick device list on Windows.
+* (Launcher) Updated translations: fr [Foul], de [nexusle].
+
+Version 2.1.23:
+
+* New option save_states can be used to disable the save state feature.
+* Marked several warning messages for translation.
+* Updated translations: de [nexusle].
+* (Launcher) Disable the save state feature in cases were it is known to
+  not work (with temporarily created hard drives).
+* (Launcher) Updated translations: de [nexusle].
+
+Version 2.1.22:
+
+* Fixed a missing bit in the UTF-8 decoding (for text rendering).
+* Fixed a potential crash due to an uninitialized variable (2.1.21).
+* Generated source files were by mistake not updated.
+
+Version 2.1.21:
+
+* Added A3000 model (68030 + FPU, 2 MB chip + 8 MB fast, KS 3.1)
+* New aliases for theme overlays (power_led, df0_led, etc).
+* Theme coordinate system can be defined with theme_width, theme_height.
+* Old overlay option is deprecated, new overlay types available.
+* Audio led flashes red on buffer underruns, turns off when the Amiga is not
+  outputting audio data.
+* New theme_zoom option (preferred over viewport for theme purposes).
+* Updated translations: pl [grimi].
+* (Launcher) Updated translations: pl [grimi].
+
+Version 2.1.20:
+
+* Implemented bsdsocket_library support for Windows.
+* New LED/overlays: CDTV/32 memory access, vsync, fps, audio.
+* Flicker CD LED instead of HD LED when CDFS is used.
+* New modes for LED / overlays (overlays can have several states).
+* Improved scanline renderer (but also more resource hungry..), may become
+  optional or rewritten as a GPU shader.
+* Fixed bug selecting joystick port mode for port > 0 (2.1.19).
+* Fixed stuttering in RTG modes (2.1.19).
+* Fixed scanline rendering on bigendian computers (PPC).
+* Clear video buffer on target_graphics_buffer_update, e.g. when display
+  mode switches from PAL to NTSC. Fixes garbled graphics on bottom of
+  display.
+* Allow theme config to overwrite (default) values set by Launcher.
+* (Launcher) Removed unnused dependency on Python Imaging (PIL).
+
+Version 2.1.19:
+
+* Fix proper stereo audio output when using OpenAL soft implementation.
+* Automatically adjust to 50Hz / 60Hz Amiga mode change.
+* video_sync = full is deprecated (now handled as auto), will enable full
+  video sync only when host frame rate ~= Amiga frame rate.
+* Fixed a bug with the number of enabled floppy drives, introduced with
+  the support for custom floppy sounds.
+* Some minor source code and build improvements.
+* Experimental support for a "fifth joystick port", which can be mapped
+  to Amiga keyboard keys.
+
+Version 2.1.18:
+
+* Fixed overflow preventing alt/cmd modifier key from working.
+* Updated translations: es [albconde].
+* (Launcher) No floppy drive sounds when loading a WHDLoad variant from
+  the online database.
+* (Launcher) Updated translations: es [albconde].
+
 Version 2.1.17:
 
 * Autoselect device for port 0 when "fire" button of unmapped device is

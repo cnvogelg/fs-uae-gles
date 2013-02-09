@@ -8,6 +8,7 @@
 //#define MAX_ZOOM_MODES 5
 static int g_zoom_mode = 0;
 static int g_zoom_border = 0;
+static int g_last_refresh_rate = 0;
 
 typedef struct zoom_mode {
     char *name;
@@ -18,6 +19,8 @@ typedef struct zoom_mode {
     int h;
 } zoom_mode;
 
+#define CUSTOM_ZOOM_MODE 5
+
 static zoom_mode g_zoom_modes[] = {
     /// TRANSLATORS: In context "Zoom: Auto"
     { N_("Auto"), NULL, 0, 0, 0, 0 },
@@ -26,6 +29,7 @@ static zoom_mode g_zoom_modes[] = {
     { "640x512", NULL, 74, 36, 640, 512 },
     { "640x480", NULL, 74, 36, 640, 480 },
     { "640x400", NULL, 74, 36, 640, 400 },
+    { NULL, NULL, 0, 0, 0, 0 },
     { NULL, NULL, 0, 0, 0, 0 },
 };
 
@@ -140,7 +144,7 @@ void init_window_overrides() {
             break;
         }
         else {
-            fs_emu_warning("unexpected byte (%d) while parsing "
+            fs_emu_warning("Unexpected byte (%d) while parsing "
                     "viewport option\n", c);
             return;
         }
@@ -229,28 +233,27 @@ static void render_screen(RenderData* rd) {
     last_time = t;
 #endif
 
-#if 0
-    if (!rd->updated && !g_remember_last_screen) {
-        // video display was not updated, so we want to display the
-        // previous one more time
-        g_buffer = fs_emu_get_current_video_buffer();
-        return;
-    }
-#endif
-
     rd_width = rd->width;
     rd_height = rd->height;
     static int lastcx = 0, lastcy = 0, lastcw = 0, lastch = 0;
-    // crop rect (autoscale)
-    int cx = rd->limit_x, cy = rd->limit_y, cw = rd->limit_w, ch = rd->limit_h;
-    // FIXME: custom limits seems to overreport cy with one amiga
-    // pixel, at least sometimes.
-    /* FIXED?
-    if (ch == 510 || ch == 398) {
-        cy -= 2;
-        ch += 2;
-    }
-    */
+
+    // crop rectangle for autoscale
+    int cx = rd->limit_x;
+    int cy = rd->limit_y;
+    int cw = rd->limit_w;
+    int ch = rd->limit_h;
+
+    // normalize coordinates to high-resolution, interlaced pixels
+    // before viewport transformations are applied
+
+    int hshift = (rd->flags & AMIGA_VIDEO_LOW_RESOLUTION) ? 1 : 0;
+    int vshift = (!(rd->flags & AMIGA_VIDEO_LINE_DOUBLING)) ? 1 : 0;
+
+    cx <<= hshift;
+    cw <<= hshift;
+    cy <<= vshift;
+    ch <<= vshift;
+
     if (lastcx != cx || lastcy != cy || lastcw != cw || lastch != ch) {
         lastcx = cx;
         lastcy = cy;
@@ -258,7 +261,9 @@ static void render_screen(RenderData* rd) {
         lastch = ch;
         struct WindowOverride* wo = NULL;
 
-        if (!modify_coordinates(&cx, &cy, &cw, &ch)) {
+        modify_coordinates(&cx, &cy, &cw, &ch);
+        //if (!modify_coordinates(&cx, &cy, &cw, &ch)) {
+        if (1) {
             wo = g_window_override;
             while (wo != NULL) {
                 if ((wo->sx == -1 || wo->sx == cx) &&
@@ -288,34 +293,37 @@ static void render_screen(RenderData* rd) {
         }
     }
     float tx0, ty0, tx1, ty1; //source buffer coords
-    fs_emu_rect crop;
 
+    fs_emu_rect crop;
     crop.x = 0;
     crop.y = 0;
     crop.w = rd_width;
     crop.h = rd_height;
 
-    if (!(rd->flags & AMIGA_RTG_BUFFER_FLAG)) {
-
-        if (g_fs_uae_video_zoom && ucw > 0 && uch > 0) { // autoscale
+    if (rd->flags & AMIGA_VIDEO_RTG_MODE) {
+        // no cropping in RTG mode
+    }
+    else {
+        if (g_fs_uae_video_zoom && ucw > 0 && uch > 0) {
+            // autoscale
             if (g_zoom_mode == 0) {
-                crop.x = ucx;
-                crop.y = ucy;
-                crop.w = ucw;
-                crop.h = uch;
+                crop.x = ucx >> hshift;
+                crop.w = ucw >> hshift;
+                crop.y = ucy >> vshift;
+                crop.h = uch >> vshift;
             }
         }
         if (g_zoom_mode > 0) {
-            crop.x = g_zoom_modes[g_zoom_mode].x;
-            crop.y = g_zoom_modes[g_zoom_mode].y;
-            crop.w = g_zoom_modes[g_zoom_mode].w;
-            crop.h = g_zoom_modes[g_zoom_mode].h;
+            crop.x = g_zoom_modes[g_zoom_mode].x >> hshift;
+            crop.w = g_zoom_modes[g_zoom_mode].w >> hshift;
+            crop.y = g_zoom_modes[g_zoom_mode].y >> vshift;
+            crop.h = g_zoom_modes[g_zoom_mode].h >> vshift;
         }
         if (g_zoom_border) {
-            crop.x -= 10;
-            crop.y -= 10;
-            crop.w += 20;
-            crop.h += 20;
+            crop.x -= 10 >> hshift;
+            crop.w += 20 >> hshift;
+            crop.y -= 10 >> vshift;
+            crop.h += 20 >> vshift;
         }
         if (crop.x < 0) {
             crop.x = 0;
@@ -330,21 +338,21 @@ static void render_screen(RenderData* rd) {
             crop.h = rd_height - crop.y;
         }
     }
-    //fs_emu_update_video(rd->pixels, AMIGA_WIDTH, AMIGA_HEIGHT, 4, &crop);
 
     g_buffer->seq = g_frame_seq_no++;
     g_buffer->width = rd_width;
     g_buffer->height = rd_height;
     g_buffer->crop = crop;
     g_buffer->flags = 0;
-    if (rd->flags & AMIGA_RTG_BUFFER_FLAG) {
+    if (rd->flags & AMIGA_VIDEO_RTG_MODE) {
         g_buffer->flags = FS_EMU_FORCE_VIEWPORT_CROP_FLAG;
         if (g_use_rtg_scanlines == 0) {
             g_buffer->flags |= FS_EMU_NO_SCANLINES_FLAG;
         }
     }
-    g_last_seen_mode_rtg = rd->flags & AMIGA_RTG_BUFFER_FLAG;
+    g_last_seen_mode_rtg = rd->flags & AMIGA_VIDEO_RTG_MODE;
     memcpy(g_buffer->line, rd->line, AMIGA_MAX_LINES);
+    g_last_refresh_rate = rd->refresh_rate;
 }
 
 static void *grow_buffer(int width, int height) {
@@ -363,6 +371,7 @@ static void display_screen() {
     }
 
     fs_emu_video_buffer_set_current(g_buffer);
+    fs_emu_set_video_frame_rate(g_last_refresh_rate);
 
     g_buffer = fs_emu_video_buffer_get_available(g_remember_last_screen);
     //printf("new render buffer: %p\n", g_buffer->data);
@@ -444,7 +453,24 @@ void fs_uae_init_video(void) {
             k++;
             z++;
         }
-
         free(value);
+    }
+
+    const char* cvalue = fs_config_get_const_string("theme_zoom");
+    if (cvalue) {
+        zoom_mode *z = g_zoom_modes + CUSTOM_ZOOM_MODE;
+        //char *name = malloc(strlen(cvalue) + 1);
+        int x, y, w, h;
+        //printf("---------\n");
+        //if (sscanf(value, "%s,%d,%d,%d,%d", &name, &x, &y, &w, &h) == 5) {
+        //    printf("---------\n");
+        if (sscanf(cvalue, "%d,%d,%d,%d", &x, &y, &w, &h) == 4) {
+            z->name = fs_strdup("Theme");
+            z->x = x;
+            z->y = y;
+            z->w = w;
+            z->h = h;
+        }
+        g_zoom_mode = CUSTOM_ZOOM_MODE;
     }
 }

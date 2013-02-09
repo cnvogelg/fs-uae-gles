@@ -45,6 +45,7 @@ void fs_emu_set_controllers_dir(const char *path);
 
 // initialize libfsemu
 
+void fs_emu_init_overlays(const char **overlay_names);
 void fs_emu_init();
 
 #define FS_EMU_INIT_VIDEO 1
@@ -60,6 +61,9 @@ void fs_emu_set_toggle_zoom_function(fs_emu_zoom_function function);
 void fs_emu_toggle_zoom();
 
 void fs_emu_warning(const char *format, ...);
+void fs_emu_deprecated(const char *format, ...);
+void fs_emu_notification(const char *format, ...);
+
 //void fs_emu_warning(const char* warning);
 
 // FIXME: REMOVE
@@ -80,6 +84,8 @@ typedef struct fs_emu_action {
 } fs_emu_action;
 
 void fs_emu_set_actions(fs_emu_action *actions);
+int fs_emu_input_action_from_string(const char *value);
+
 void fs_emu_reset_input_mapping();
 void fs_emu_map_custom_actions();
 
@@ -108,7 +114,7 @@ typedef struct fs_emu_key_translation {
 int fs_emu_get_input_event();
 void fs_emu_queue_action(int action, int state);
 
-void fs_emu_enable_custom_overlay(int overlay, int enable);
+void fs_emu_set_custom_overlay_state(int overlay, int state);
 
 void fs_emu_set_keyboard_translation(fs_emu_key_translation *keymap);
 
@@ -366,6 +372,8 @@ typedef struct fs_emu_audio_stream_options {
 void fs_emu_init_audio_stream(int stream,
         fs_emu_audio_stream_options *options);
 void fs_emu_init_audio_stream_options(fs_emu_audio_stream_options *options);
+void fs_emu_audio_pause_stream(int stream);
+void fs_emu_audio_resume_stream(int stream);
 int fs_emu_queue_audio_buffer(int stream, int16_t* buffer, int size);
 int fs_emu_check_audio_buffer_done(int stream, int buffer);
 

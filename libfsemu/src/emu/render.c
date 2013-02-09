@@ -4,8 +4,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <fs/ml.h>
+#include <fs/config.h>
 #include <fs/filesys.h>
+#include <fs/i18n.h>
+#include <fs/ml.h>
 #include <fs/queue.h>
 #include <fs/string.h>
 #include <fs/thread.h>
@@ -77,27 +79,36 @@ static double g_align_x = 0.5;
 static double g_align_y = 0.5;
 
 struct overlay_status {
-    int current;
-    int was_enabled;
-    int was_disabled;
+    int state;
+    int render_state;
+    //int was_enabled;
+    //int was_disabled;
     int render_status;
 };
-static struct overlay_status g_overlay_status[MAX_CUSTOM_OVERLAYS];
+static struct overlay_status g_overlay_status[FS_EMU_MAX_OVERLAYS];
 static fs_mutex *g_overlay_mutex = NULL;
 
-void fs_emu_enable_custom_overlay(int overlay, int enable) {
-    if (overlay < 0 || overlay >= MAX_CUSTOM_OVERLAYS) {
+void fs_emu_set_custom_overlay_state(int overlay, int state) {
+    fs_emu_set_overlay_state(FS_EMU_FIRST_CUSTOM_OVERLAY + overlay, state);
+}
+
+void fs_emu_set_overlay_state(int overlay, int state) {
+    if (overlay < 0 || overlay >= FS_EMU_MAX_OVERLAYS) {
         return;
     }
     fs_mutex_lock(g_overlay_mutex);
-    if (enable) {
-        g_overlay_status[overlay].current = 1;
+    g_overlay_status[overlay].state = state;
+
+#if 0
+    if (state) {
+        g_overlay_status[overlay].state = 1;
         g_overlay_status[overlay].was_enabled = 1;
     }
     else {
-        g_overlay_status[overlay].current = 0;
+        g_overlay_status[overlay].state = 0;
         g_overlay_status[overlay].was_disabled = 1;
     }
+#endif
     fs_mutex_unlock(g_overlay_mutex);
 }
 
@@ -306,10 +317,16 @@ static void save_screenshot(const char *type, int cx, int cy, int cw, int ch,
         int frame_bpp) {
     char *name, *path;
     time_t t = time(NULL);
-    struct tm *tm_struct = localtime(&t);
+#ifdef WINDOWS
+    struct tm *tm_p = localtime(&t);
+#else
+    struct tm tm_struct;
+    struct tm *tm_p = &tm_struct;
+    localtime_r(&t, tm_p);
+#endif
     char strbuf[20];
-    strftime(strbuf, 20, "%Y-%m-%d-%H-%M", tm_struct);
-    name = fs_strdup_printf("fs-uae-%s-%s-%d.png", type, strbuf, count);
+    strftime(strbuf, 20, "%Y-%m-%d-%H-%M", tm_p);
+    name = fs_strdup_printf("fs-uae-%s-%s-%03d.png", type, strbuf, count);
     path = fs_path_join(fs_get_desktop_dir(), name, NULL);
     fs_log("writing screenshot to %s\n", path);
 
@@ -368,8 +385,6 @@ static void save_screenshot(const char *type, int cx, int cy, int cw, int ch,
 
     int result = fs_image_save_data(path, out_data, cw, ch, 3);
     if (result) {
-        // FIXME: not a warning
-        fs_emu_warning("Saved %s\n", name);
         fs_log("saved screenshot\n");
     }
     else {
@@ -387,6 +402,11 @@ static int update_texture() {
 #endif
     // unlocked in fs_emu_video_after_update
 
+    if (buffer->seq == 0) {
+        // we haven't received a video frame from the emulator yet
+        return -1;
+    }
+
     uint8_t *frame = buffer->data;
     if (frame == NULL) {
         return -1;
@@ -402,11 +422,13 @@ static int update_texture() {
         if (g_fs_emu_repeated_frames > 9999) {
             g_fs_emu_repeated_frames = 9999;
         }
+        g_fs_emu_repeated_frame_time = fs_get_monotonic_time();
         is_new_frame = 0;
     }
     else {
         int lost_frame_count = buffer->seq - last_seq_no - 1;
         g_fs_emu_lost_frames += lost_frame_count;
+        g_fs_emu_lost_frame_time = fs_get_monotonic_time();
         //fs_log("lost %d frame(s)\n", lost_frame_count);
     }
     last_seq_no = buffer->seq;
@@ -439,14 +461,27 @@ static int update_texture() {
     // g_fs_emu_screenshot is set to 1 when screenshot command is executed
     // (keyboard shortcut), but screenshot is saved here, as soon as possible.
 
-    if (g_fs_emu_screenshot) {
-        static int count = 1;
-        g_fs_emu_screenshot = 0;
-        save_screenshot("full", 0, 0, width, height,
-                count, frame, width, height, bpp);
-        save_screenshot("cropped", g_crop.x, g_crop.y, g_crop.w, g_crop.h,
-                count, frame, width, height, bpp);
-        count += 1;
+    if (g_fs_emu_screenshot > 0) {
+        printf("%d\n", g_fs_emu_screenshot);
+        static int count = 0;
+        if (g_fs_emu_screenshot == 1) {
+            count += 1;
+            save_screenshot("full", 0, 0, width, height,
+                    count, frame, width, height, bpp);
+            save_screenshot("cropped", g_crop.x, g_crop.y, g_crop.w, g_crop.h,
+                    count, frame, width, height, bpp);
+            g_fs_emu_screenshot++;
+            fs_ml_video_screenshot(count);
+        }
+        else if (g_fs_emu_screenshot > 4) {
+            // we wait a bit until printing the notification, so the OpenGL
+            // screenshot can be captured before the notification is shown
+            g_fs_emu_screenshot = 0;
+            fs_emu_warning(_("Saved screenshot %d"), count);
+        }
+        else {
+            g_fs_emu_screenshot++;
+        }
     }
 
     int upload_x, upload_y, upload_w, upload_h;
@@ -467,7 +502,8 @@ static int update_texture() {
 
     if (g_fs_emu_scanlines &&
             (buffer->flags & FS_EMU_NO_SCANLINES_FLAG) == 0) {
-        //printf("new frame? %d\n", is_new_frame);
+        //printf("w %d h %d new frame? %d\n", buffer->width, buffer->height,
+        //        is_new_frame);
         if (is_new_frame) {
             if (g_scanline_buffer_width != buffer->width ||
                     g_scanline_buffer_height != buffer->height) {
@@ -1150,8 +1186,8 @@ static void render_frame(double alpha, int perspective) {
     }
 
     fs_mutex_lock(g_overlay_mutex);
-    for (int i = 0; i < MAX_CUSTOM_OVERLAYS; i++) {
-        int show = g_overlay_status[i].current;
+    for (int i = 0; i < FS_EMU_MAX_OVERLAYS; i++) {
+        int state = g_overlay_status[i].state;
 #if 0
         if (g_overlay_status[i].render_status &&
                 g_overlay_status[i].was_disabled) {
@@ -1161,10 +1197,11 @@ static void render_frame(double alpha, int perspective) {
                 g_overlay_status[i].was_enabled) {
             show = 1;
         }
-#endif
         g_overlay_status[i].was_enabled = 0;
         g_overlay_status[i].was_disabled = 0;
-        if (show) {
+#endif
+        g_overlay_status[i].render_state = state;
+        if (state) {
             g_overlay_status[i].render_status++;
         }
         else {
@@ -1173,18 +1210,35 @@ static void render_frame(double alpha, int perspective) {
     }
     fs_mutex_unlock(g_overlay_mutex);
 
-    for (int i = 0; i < MAX_CUSTOM_OVERLAYS; i++) {
-        if (g_overlay_status[i].render_status < 2) {
-            continue;
+    for (int i = 0; i < FS_EMU_MAX_OVERLAYS; i++) {
+        //if (g_overlay_status[i].render_status < 1) {
+        //    continue;
+        //}
+        int state = g_overlay_status[i].render_state;
+        if (state < 0) state = 0;
+        if (state > FS_EMU_MAX_OVERLAY_STATES - 1) {
+            state = FS_EMU_MAX_OVERLAY_STATES - 1;
         }
-        if (!g_fs_emu_theme.overlay_textures[i]) {
+
+        fs_emu_texture *overlay_texture = \
+                g_fs_emu_theme.overlays[i].textures[state];
+        if (!overlay_texture) {
             continue;
         }
 
-        float x1 = g_fs_emu_theme.overlay_x[i] / 1920.0;
-        float y1 = g_fs_emu_theme.overlay_y[i] / 1080.0;
-        float x2 = x1 + g_fs_emu_theme.overlay_textures[i]->width / 1920.0;
-        float y2 = y1 + g_fs_emu_theme.overlay_textures[i]->height / 1080.0;
+        float w = g_fs_emu_theme.overlays[i].w;
+        float h = g_fs_emu_theme.overlays[i].h;
+        float x1 = g_fs_emu_theme.overlays[i].x;
+        if (g_fs_emu_theme.overlays[i].anchor & FS_EMU_ANCHOR_RIGHT_BIT) {
+            x1 = x1 + 1.0 - w;
+        }
+        float y1 = g_fs_emu_theme.overlays[i].y;
+        if (g_fs_emu_theme.overlays[i].anchor & FS_EMU_ANCHOR_BOTTOM_BIT) {
+            y1 = y1 + 1.0 - h;
+        }
+
+        float x2 = x1 + w;
+        float y2 = y1 + h;
 
         x1 = -1.0 + 2.0 * x1;
         x2 = -1.0 + 2.0 * x2;
@@ -1194,7 +1248,7 @@ static void render_frame(double alpha, int perspective) {
         fs_gl_blending(1);
         fs_gl_texturing(1);
         fs_gl_color4f(1.0, 1.0, 1.0, 1.0);
-        fs_emu_set_texture(g_fs_emu_theme.overlay_textures[i]);
+        fs_emu_set_texture(overlay_texture);
 
 #ifdef USE_GLES
         GLfloat tex[] = {
@@ -1450,7 +1504,11 @@ static void render_glow(double opacity) {
  * This function is called at the end of the frame rendering function
  */
 static void handle_quit_sequence() {
-    int fade_time = 750 * 1000;
+    int fade_time = fs_config_get_int_clamped("fade_out_duration", 0, 10000);
+    if (fade_time == FS_CONFIG_NONE) {
+        fade_time = 750;
+    }
+    fade_time = fade_time * 1000;
 
     int64_t dt = fs_emu_monotonic_time() - g_fs_emu_quit_time;
     if (dt > fade_time && g_fs_emu_emulation_thread_stopped) {

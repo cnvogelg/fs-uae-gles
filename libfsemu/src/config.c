@@ -48,7 +48,10 @@ char *fs_config_get_string(const char *key) {
 
 static void process_key_value(const char *key, char *value, int force) {
     char *key_lower = fs_ascii_strdown(key, -1);
-    if (!force && fs_hash_table_lookup(g_hash_table, key_lower)) {
+    // using fs_config_get_const_string here instead of just
+    // fs_hash_table_lookup, since that also checks for empty strings, which
+    // should be treated as non-existing keys
+    if (!force && fs_config_get_const_string(key_lower)) {
         fs_log("%s = %s (ignored)\n", key_lower, value);
         free(key_lower);
         free(value);
@@ -101,11 +104,17 @@ int fs_config_read_file(const char *path, int force) {
 
     char **groups = fs_ini_file_get_groups(ini_file, NULL);
     for (char **group = groups; *group; group++) {
+        const char *prefix = "";
+        if (strcmp(*group, "theme") == 0) {
+            prefix = "theme_";
+        }
         char **keys = fs_ini_file_get_keys(ini_file, *group, NULL);
         for (char **key = keys; *key; key++) {
             char *value = fs_ini_file_get_value(ini_file, *group, *key);
             if (value) {
-                process_key_value(*key, value, 0);
+                char *key2 = fs_strconcat(prefix, *key, NULL);
+                process_key_value(key2, value, 0);
+                free(key2);
             }
         }
         fs_strfreev(keys);

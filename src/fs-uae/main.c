@@ -1,9 +1,16 @@
 #include <uae/uae.h>
-#include <fs/thread.h>
+
+#ifdef USE_SDL
+// we must include SDL first before emu.h, so libfsemu's #definition of main
+// is the current one (on Windows) when main is encountered further down
+#include <SDL/SDL.h>
+#endif
+
 #include <fs/base.h>
 #include <fs/emu.h>
 #include <fs/i18n.h>
 #include <fs/string.h>
+#include <fs/thread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -172,16 +179,27 @@ char *g_fs_uae_config_file_path = NULL;
 char *g_fs_uae_config_dir_path = NULL;
 //GKeyFile *g_fs_uae_config = NULL;
 
-static int audio_callback_function (int16_t *buffer, int size) {
-    return fs_emu_queue_audio_buffer(0, buffer, size);
-}
-
-static int cd_audio_callback_function (int16_t *buffer, int size) {
-    if (buffer == NULL) {
-        // check status of buffer number given by size
-        return fs_emu_check_audio_buffer_done(1, size);
+static int audio_callback_function(int type, int16_t *buffer, int size) {
+    if (type == 0) {
+        return fs_emu_queue_audio_buffer(0, buffer, size);
     }
-    return fs_emu_queue_audio_buffer(1, buffer, size);
+    else if (type == 1) {
+        fs_emu_audio_pause_stream(0);
+        return 0;
+    }
+    else if (type == 2) {
+        fs_emu_audio_resume_stream(0);
+        return 0;
+    }
+    else if (type == 3) {
+        // cd audio stream
+        if (buffer == NULL) {
+            // check status of buffer number given by size
+            return fs_emu_check_audio_buffer_done(1, size);
+        }
+        return fs_emu_queue_audio_buffer(1, buffer, size);
+    }
+    return -1;
 }
 
 void fs_uae_load_rom_files(const char *path) {
@@ -267,7 +285,7 @@ static void on_init() {
     // with sound_auto set to true, UAE stops audio output if the amiga does
     // not produce sound, but this just confuses libfsemu which expects
     // continuous output
-    amiga_set_option("sound_auto", "false");
+    //amiga_set_option("sound_auto", "false");
     //amiga_set_audio_frequency(fs_emu_get_audio_frequency());
 
     //amiga_set_audio_frequency(22050);
@@ -284,8 +302,16 @@ static void on_init() {
 
     fs_uae_set_uae_paths();
     fs_uae_read_custom_uae_options(fs_uae_argc, fs_uae_argv);
-    char *uae_file = fs_path_join(fs_uae_logs_dir(), "LastConfig.uae",
-            NULL);
+
+    char *uae_file;
+
+    uae_file = fs_path_join(fs_uae_logs_dir(), "LastConfig.uae", NULL);
+    if (fs_path_exists(uae_file)) {
+        fs_unlink(uae_file);
+    }
+    free(uae_file);
+
+    uae_file = fs_path_join(fs_uae_logs_dir(), "DebugConfig.uae", NULL);
     amiga_write_uae_config(uae_file);
     free(uae_file);
 
@@ -448,25 +474,28 @@ void init_i18n() {
 #endif
 }
 
-static void led_function(int led, int on) {
+static void led_function(int led, int state) {
     // floppy led status is custom overlay 0..3
-    fs_emu_enable_custom_overlay(led, on);
+    //if (led >= 0) {
+    //    printf("led %d state %d\n", led, state);
+    //}
+    fs_emu_set_custom_overlay_state(led, state);
 }
 
 static void media_function(int drive, const char *path) {
     // media insertion status is custom overlay 4..7
-    fs_emu_enable_custom_overlay(4 + drive, path && path[0]);
+    fs_emu_set_custom_overlay_state(4 + drive, path && path[0]);
 }
 
-#ifdef USE_SDL
-#include <SDL/SDL.h>
-#endif
-
 void list_joysticks() {
+    printf("# FS-UAE VERSION %s\n", g_fs_uae_version);
+    printf("# listing joysticks\n");
 #ifdef USE_SDL
     if (SDL_Init(SDL_INIT_JOYSTICK ) < 0) {
+        printf("# SDL_Init(SDL_INIT_JOYSTICK ) < 0\n");
         return;
     }
+    printf("# SDL_NumJoysticks(): %d\n", SDL_NumJoysticks());
     for(int i = 0; i < SDL_NumJoysticks(); i++) {
         if (SDL_JoystickName(i)[0] == '\0') {
             printf("Unnamed\n");
@@ -475,19 +504,29 @@ void list_joysticks() {
             printf("%s\n", SDL_JoystickName(i));
         }
     }
+#else
+    printf("# USE_SDL is not defined\n");
 #endif
+    printf("# listing joysticks done\n");
 }
 
-int main(int argc, char* argv[]) {
-#ifdef USE_GLIB
-    GMemVTable vtable;
-    memset(&vtable, 0, sizeof(GMemVTable));
-    vtable.malloc = malloc;
-    vtable.realloc = realloc;
-    vtable.free = free;
-    g_mem_set_vtable(&vtable);
-#endif
+static const char *overlay_names[] = {
+    "df0_led",
+    "df1_led",
+    "df2_led",
+    "df3_led",
+    "df0_disk",
+    "df1_disk",
+    "df2_disk",
+    "df3_disk",
+    "power_led",
+    "hd_led",
+    "cd_led",
+    "md_led",
+    NULL,
+};
 
+int main(int argc, char* argv[]) {
     int result;
     fs_uae_argc = argc;
     fs_uae_argv = argv;
@@ -504,7 +543,6 @@ int main(int argc, char* argv[]) {
         arg++;
     }
 
-    //g_thread_init(NULL);
     fs_init();
 
     fs_set_prgname("fs-uae");
@@ -543,6 +581,7 @@ int main(int argc, char* argv[]) {
 
     init_i18n();
 
+    fs_emu_init_overlays(overlay_names);
     fs_emu_init();
 
     // then load the config file
@@ -572,7 +611,7 @@ int main(int argc, char* argv[]) {
         //fs_log("fastest possible mode - disabling frame throttling\n");
         //fs_emu_disable_throttling();
         fs_log("fastest possible mode - disallowing full sync\n");
-        fs_emu_disallow_full_sync();
+        //fs_emu_disallow_full_sync();
     }
 
     // force creation of state directories
@@ -587,7 +626,15 @@ int main(int argc, char* argv[]) {
     }
     const char *logs_dir = fs_uae_logs_dir();
     if (logs_dir) {
-        char *log_file = fs_path_join(logs_dir, "FS-UAE.log", NULL);
+        char *log_file;
+
+        log_file = fs_path_join(logs_dir, "FS-UAE.log", NULL);
+        if (fs_path_exists(log_file)) {
+            fs_unlink(log_file);
+        }
+        free(log_file);
+
+        log_file = fs_path_join(logs_dir, "FS-UAE.log.txt", NULL);
         fs_config_set_log_file(log_file);
         free(log_file);
     }
@@ -629,7 +676,7 @@ int main(int argc, char* argv[]) {
     fs_emu_init_audio_stream(1, &options);
 
     amiga_set_audio_callback(audio_callback_function);
-    amiga_set_cd_audio_callback(cd_audio_callback_function);
+    amiga_set_cd_audio_callback(audio_callback_function);
 
     //amiga_set_cd_audio_callback(audio_callback_function);
     amiga_set_event_function(event_handler);
@@ -650,8 +697,10 @@ int main(int argc, char* argv[]) {
         amiga_set_video_format(AMIGA_VIDEO_FORMAT_R5G5B5A1);
     }
     else {
-        fs_emu_warning("unsupported video format");
+        fs_emu_warning("Unsupported video format requested");
     }
+    amiga_add_rtg_resolution(672, 540);
+    amiga_add_rtg_resolution(672 * 2, 540 * 2);
     amiga_add_rtg_resolution(fs_emu_get_windowed_width(),
             fs_emu_get_windowed_height());
     amiga_add_rtg_resolution(fs_emu_get_fullscreen_width(),

@@ -85,7 +85,9 @@ void amiga_set_render_buffer(void *data, int size, int need_redraw,
 
 #define AMIGA_MAX_LINES 2048
 
-#define AMIGA_RTG_BUFFER_FLAG 1
+#define AMIGA_VIDEO_RTG_MODE 1
+#define AMIGA_VIDEO_LOW_RESOLUTION 2
+#define AMIGA_VIDEO_LINE_DOUBLING 4
 
 typedef struct _RenderData {
     unsigned char* pixels;
@@ -99,6 +101,7 @@ typedef struct _RenderData {
     char line[AMIGA_MAX_LINES];
     int flags;
     void *(*grow)(int width, int height);
+    int refresh_rate;
 } RenderData;
 
 typedef void (*event_function)(void);
@@ -118,7 +121,7 @@ void amiga_set_gui_message_function(log_function function);
 void amiga_set_led_function(amiga_led_function function);
 void amiga_set_media_function(amiga_media_function function);
 
-typedef int (*audio_callback)(int16_t *buffer, int size);
+typedef int (*audio_callback)(int type, int16_t *buffer, int size);
 int amiga_set_audio_callback(audio_callback func);
 int amiga_set_cd_audio_callback(audio_callback func);
 int amiga_set_audio_buffer_size(int size);

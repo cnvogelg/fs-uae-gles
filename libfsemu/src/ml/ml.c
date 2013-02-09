@@ -53,9 +53,14 @@ int g_fs_ml_input_device_count = 0;
 
 static int g_quit;
 static fs_ml_void_function g_quit_function = NULL;
+int g_fs_ml_video_screenshot = 0;
 
 void fs_ml_set_quit_function(fs_ml_void_function function) {
     g_quit_function = function;
+}
+
+void fs_ml_video_screenshot(int number) {
+    g_fs_ml_video_screenshot = number;
 }
 
 void fs_ml_quit() {
@@ -111,8 +116,9 @@ int fs_ml_get_vblank_sync() {
 int fs_ml_get_video_sync() {
     return g_fs_ml_video_sync;
 }
-void fs_ml_video_sync_enable() {
-    g_fs_ml_video_sync = 1;
+void fs_ml_video_sync_enable(int enable) {
+    fs_log("fs_ml_video_sync_enable(%d)\n", enable);
+    g_fs_ml_video_sync = enable;
 }
 
 void fs_ml_vblank_sync_enable() {

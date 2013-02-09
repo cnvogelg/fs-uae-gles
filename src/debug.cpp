@@ -2537,7 +2537,7 @@ static void memory_map_dump_2 (int log)
 			int k, mirrored, size, size_out;
 			TCHAR size_ext;
 			uae_u8 *caddr;
-			TCHAR *name;
+			const TCHAR *name;
 			TCHAR tmp[MAX_DPATH];
 
 			name = a1->name;
@@ -2577,12 +2577,12 @@ static void memory_map_dump_2 (int log)
 			}
 			_tcscat (txt, _T("\n"));
 			if (log)
-				write_log (txt);
+				write_log (_T("%s"),txt);
 			else
 				console_out (txt);
 			if (tmp[0]) {
 				if (log)
-					write_log (tmp);
+					write_log (_T("%s"),tmp);
 				else
 					console_out (tmp);
 			}

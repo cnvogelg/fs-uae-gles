@@ -2,11 +2,19 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <fs/i18n.h>
 #include <fs/list.h>
 #include <fs/string.h>
 
 #ifdef USE_OPENGL
 #include <fs/ml/opengl.h>
+#endif
+
+#ifdef USE_FREETYPE
+#include <ft2build.h>
+#include FT_FREETYPE_H
+
+FT_Library library;
 #endif
 
 #include "video.h"
@@ -98,11 +106,28 @@ static void context_notification_handler(int notification, void *data) {
     }
 }
 
+#ifdef USE_FREETYPE
+
+void init_freetype(void) {
+    int error = FT_Init_FreeType(&library);
+    if (error) {
+        fs_emu_warning("Could not initialize freetype");
+    }
+    else {
+        fs_emu_log("freetype initialized\n");
+    }
+}
+
+#endif
+
 void initialize() {
     initialize_cache();
     create_text_texture();
     fs_gl_add_context_notification(context_notification_handler, NULL);
     g_buffer = malloc(TEXTURE_WIDTH * 32 * 4);
+#ifdef USE_FREETYPE
+    init_freetype();
+#endif
     g_initialized = 1;
 }
 
@@ -245,9 +270,10 @@ int fs_emu_font_render(fs_emu_font *font, const char *text, float x, float y,
     int required_width = 0;
     int required_height = font->h;
 
-    char *upper_text = fs_utf8_strup(text, -1);
+    //char *base_text = fs_utf8_strup(text, -1);
+    const char *base_text = text;
 
-    unsigned char *c = (unsigned char*) upper_text;
+    unsigned const char *c = (unsigned const char*) base_text;
     int continuations = 0;
     int cp = 0;
     while(*c) {
@@ -261,8 +287,8 @@ int fs_emu_font_render(fs_emu_font *font, const char *text, float x, float y,
         else if ((*c & 0xc0) == 0x80) {
             continuations--;
             cp = cp << 6;
-            //cp = cp | (*c & 0b0011111);
-            cp = cp | (*c & 0x1f);
+            //cp = cp | (*c & 0b00111111);
+            cp = cp | (*c & 0x3f);
         }
         //else if ((*c & 0b11111110) == 0b11111100) { // 1111110x
         else if ((*c & 0xfe) == 0xfc) { // 1111110x
@@ -311,11 +337,13 @@ int fs_emu_font_render(fs_emu_font *font, const char *text, float x, float y,
 
     int dx = 0;
     int dy = 0;
-    c = (unsigned char*) upper_text;
+    c = (unsigned const char*) base_text;
+    //printf("base_text: %s\n", c);
     continuations = 0;
     cp = 0;
     int k = 0;
     while(*c) {
+        //printf("%d\n", *c);
         //if ((*c & 0b10000000) == 0b00000000) {
         if ((*c & 0x80) == 0x0) {
             continuations = 0;
@@ -326,8 +354,8 @@ int fs_emu_font_render(fs_emu_font *font, const char *text, float x, float y,
         else if ((*c & 0xc0) == 0x80) {
             continuations--;
             cp = cp << 6;
-            //cp = cp | (*c & 0b0011111);
-            cp = cp | (*c & 0x1f);
+            //cp = cp | (*c & 0b00111111);
+            cp = cp | (*c & 0x3f);
         }
         //else if ((*c & 0b11111110) == 0b11111100) { // 1111110x
         else if ((*c & 0xfe) == 0xfc) { // 1111110x
@@ -383,6 +411,7 @@ int fs_emu_font_render(fs_emu_font *font, const char *text, float x, float y,
         //}
 
         // draw character
+        //printf("-----------> %d\n", cp);
 
         int *sl = ((int *) font->image->data) + font->image->width * sy + sx;
         int ss = font->image->width; // source stride
@@ -412,6 +441,7 @@ int fs_emu_font_render(fs_emu_font *font, const char *text, float x, float y,
         dx += sw;
     }
     //free(utext);
+    //free(base_text);
 
     fs_list *last = fs_list_last(g_cache);
     cache_item *last_item = (cache_item *) last->data;
@@ -474,13 +504,13 @@ static fs_image *load_font_from_file(const char *path) {
     //char *path = g_build_filename(fs_emu_get_share_dir(), full_name, NULL);
     //char *path = fs_get_program_data_file(full_name);
     if (path == NULL) {
-        fs_emu_warning("Could not find font");
+        fs_emu_warning(_("Could not find font: %s"), path);
         return NULL;
     }
     fs_emu_log("loading image \"%s\"\n", path);
     fs_image *image = fs_image_new_from_file(path);
     if (image == NULL) {
-        fs_emu_warning("Error loading font");
+        fs_emu_warning(_("Error loading font: %s"), path);
         return NULL;
     }
 

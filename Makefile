@@ -40,7 +40,7 @@ use_glib := 0
 warnings = 
 errors = -Werror=implicit-function-declaration -Werror=return-type
 cxxflags = $(warnings) $(errors) -Isrc/od-fs -Isrc/od-fs/include \
-		-Isrc/include -Igen -Isrc -Isrc/od-win32/caps \
+		-Isrc/include -Igensrc -Isrc -Isrc/od-win32/caps \
 		-I$(libfsemu_dir)/include \
 		-Wno-write-strings -fpermissive
 
@@ -50,13 +50,15 @@ libs = -L$(libfsemu_dir)/out -lfsemu -lpng -lz
 
 else
 use_glib := 1
+use_freetype := 1
 common_flags = -Isrc/od-fs -Isrc/od-fs/include \
 		-Isrc/include -Igen -Isrc -Isrc/od-win32/caps \
 		`$(pkg_config) --cflags glib-2.0 gthread-2.0 libpng` \
 		-I$(libfsemu_dir)/include \
 		`$(sdl_config) --cflags`
 cflags = $(common_flags) -std=c99 $(CFLAGS) $(EXTRA_CPPFLAGS) $(SYS_INCLUDES)
-cxxflags = $(common_flags) -fpermissive $(CXXFLAGS) $(EXTRA_CPPFLAGS) $(SYS_INCLUDES)
+#cxxflags = $(common_flags) -fpermissive $(CXXFLAGS)
+cxxflags = $(common_flags) $(CXXFLAGS) $(EXTRA_CPPFLAGS) $(SYS_INCLUDES)
 ldflags = $(LDFLAGS)
 libs = -L$(libfsemu_dir)/out -lfsemu `$(sdl_config) --libs` \
 		`$(pkg_config) --libs libpng` -lpng -lz
@@ -76,6 +78,10 @@ ifeq ($(use_glib), 1)
 else ifeq ($(android), 1)
 else
 	libs += -lrt -lpthread
+endif
+
+ifeq ($(use_freetype), 1)
+	libs += `pkg-config --libs freetype2`
 endif
 
 profile_generate := 0
@@ -106,10 +112,10 @@ ifeq ($(force_32bit), 1)
 	cxxflags += -m32
 endif
 
-#uae_warnings = -Wno-unused-value -Wno-uninitialized -Wno-sign-compare
-#uae_warnings += -fpermissive -Wno-unused-function -Wno-format
-#uae_warnings +=  -Wmissing-braces -Wall -Wno-sign-compare
-uae_warnings = -Wall -Wno-sign-compare
+#uae_warn = -Wno-unused-value -Wno-uninitialized -Wno-sign-compare
+#uae_warn += -fpermissive -Wno-unused-function -Wno-format
+#uae_warn +=  -Wmissing-braces -Wall -Wno-sign-compare
+uae_warn = -Wall -Wno-sign-compare
 generate = 0
 
 ifeq ($(os), android)
@@ -119,7 +125,7 @@ ifeq ($(os), android)
 else ifeq ($(os), windows)
   cppflags += -DWINDOWS
   cxxflags += -U_WIN32 -UWIN32
-  libs += -lOpenGL32 -lGLU32 -lgdi32 -lWinmm -lOpenAL32 -lWs2_32
+  libs += -lOpenGL32 -lGLU32 -lgdi32 -lWinmm -lOpenAL32 -lWs2_32 -lWininet
 
   ifeq ($(devel), 1)
   libs += -mno-windows
@@ -181,17 +187,17 @@ objects += obj/fs-uae.res
 endif
 
 uae_objects = \
-obj/gen-blitfunc.o \
-obj/gen-blittable.o \
-obj/gen-cpudefs.o \
-obj/gen-cpuemu_0.o \
-obj/gen-cpuemu_11.o \
-obj/gen-cpuemu_12.o \
-obj/gen-cpuemu_20.o \
-obj/gen-cpuemu_21.o \
-obj/gen-cpuemu_22.o \
-obj/gen-cpuemu_31.o \
-obj/gen-cpustbl.o \
+obj/gensrc-blitfunc.o \
+obj/gensrc-blittable.o \
+obj/gensrc-cpudefs.o \
+obj/gensrc-cpuemu_0.o \
+obj/gensrc-cpuemu_11.o \
+obj/gensrc-cpuemu_12.o \
+obj/gensrc-cpuemu_20.o \
+obj/gensrc-cpuemu_21.o \
+obj/gensrc-cpuemu_22.o \
+obj/gensrc-cpuemu_31.o \
+obj/gensrc-cpustbl.o \
 obj/a2091.o \
 obj/akiko.o \
 obj/amax.o \
@@ -307,77 +313,83 @@ obj/od-fs-video.o
 
 ifeq ($(generate), 1)
 
-gen/genblitter: obj/genblitter.o obj/blitops.o obj/writelog.o
+gensrc/genblitter: obj/genblitter.o obj/blitops.o obj/writelog.o
 	$(cxx) $(cppflags) $(cxxflags) obj/genblitter.o obj/blitops.o \
-			obj/writelog.o -o gen/genblitter
+			obj/writelog.o -o gensrc/genblitter
 
-gen/gencpu: gen/cpudefs.cpp obj/gencpu.o obj/readcpu.o obj/missing.o \
-		gen/cpudefs.cpp
+gensrc/gencpu: gensrc/cpudefs.cpp obj/gencpu.o obj/readcpu.o obj/missing.o \
+		gensrc/cpudefs.cpp
 	$(cxx) $(cppflags) $(cxxflags) obj/gencpu.o obj/readcpu.o obj/missing.o \
-			gen/cpudefs.cpp -o gen/gencpu
+			gensrc/cpudefs.cpp -o gensrc/gencpu
 
-gen/genlinetoscr:
-	$(cxx) $(cppflags) $(cxxflags) src/genlinetoscr.cpp -o gen/genlinetoscr
+gensrc/genlinetoscr:
+	$(cxx) $(cppflags) $(cxxflags) src/genlinetoscr.cpp -o gensrc/genlinetoscr
 
-gen/gencomp: src/jit/gencomp.cpp obj/readcpu.o obj/gen-cpudefs.o obj/missing.o obj/writelog.o
-	$(cxx) $(cppflags) $(cxxflags) src/jit/gencomp.cpp obj/readcpu.o obj/gen-cpudefs.o obj/missing.o obj/writelog.o -o gen/gencomp
+gensrc/gencomp: src/jit/gencomp.cpp obj/readcpu.o obj/gen-cpudefs.o obj/missing.o obj/writelog.o
+	$(cxx) $(cppflags) $(cxxflags) src/jit/gencomp.cpp obj/readcpu.o obj/gen-cpudefs.o obj/missing.o obj/writelog.o -o gensrc/gencomp
 
-gen/linetoscr.cpp: gen/genlinetoscr
-	gen/genlinetoscr > gen/linetoscr.cpp
+gensrc/linetoscr.cpp: gensrc/genlinetoscr
+	gensrc/genlinetoscr > gensrc/linetoscr.cpp
 
-gen/blit.h: gen/genblitter
-	gen/genblitter i > gen/blit.h
+gensrc/blit.h: gensrc/genblitter
+	gensrc/genblitter i > gensrc/blit.h
 
-gen/blitfunc.cpp: gen/genblitter gen/blitfunc.h
-	gen/genblitter f > gen/blitfunc.cpp
+gensrc/blitfunc.cpp: gensrc/genblitter gensrc/blitfunc.h
+	gensrc/genblitter f > gensrc/blitfunc.cpp
 
-gen/blitfunc.h: gen/genblitter
-	gen/genblitter h > gen/blitfunc.h
+gensrc/blitfunc.h: gensrc/genblitter
+	gensrc/genblitter h > gensrc/blitfunc.h
 
-gen/blittable.cpp: gen/genblitter gen/blitfunc.h
-	gen/genblitter t > gen/blittable.cpp
+gensrc/blittable.cpp: gensrc/genblitter gensrc/blitfunc.h
+	gensrc/genblitter t > gensrc/blittable.cpp
 
-gen/build68k:
-	$(cxx) $(cppflags) $(cxxflags) src/build68k.cpp src/writelog.cpp -o gen/build68k
+gensrc/build68k:
+	$(cxx) $(cppflags) $(cxxflags) src/build68k.cpp src/writelog.cpp -o gensrc/build68k
 
-gen/cpudefs.cpp: gen/build68k src/table68k
-	./gen/build68k < src/table68k > gen/cpudefs.cpp
-	#python util/fix_tchar.py gen/cpudefs.cpp
+gensrc/cpudefs.cpp: gensrc/build68k src/table68k
+	./gensrc/build68k < src/table68k > gensrc/cpudefs.cpp
+	#python util/fix_tchar.py gensrc/cpudefs.cpp
 
-gen/cpuemu_0.cpp: gen/gencpu
-	cd gen && ./gencpu --optimized-flags
+gensrc/cpuemu_0.cpp: gensrc/gencpu
+	cd gensrc && ./gencpu --optimized-flags
 
-gen/cpustbl.cpp: gen/cpuemu_0.cpp
+gensrc/cpustbl.cpp: gensrc/cpuemu_0.cpp
 
-gen/cputbl.h: gen/cpuemu_0.cpp
+gensrc/cputbl.h: gensrc/cpuemu_0.cpp
 
-gen/cpuemu_11.cpp: gen/cpuemu_0.cpp
-gen/cpuemu_12.cpp: gen/cpuemu_0.cpp
-gen/cpuemu_20.cpp: gen/cpuemu_0.cpp
-gen/cpuemu_21.cpp: gen/cpuemu_0.cpp
-gen/cpuemu_31.cpp: gen/cpuemu_0.cpp
+gensrc/cpuemu_11.cpp: gensrc/cpuemu_0.cpp
+gensrc/cpuemu_12.cpp: gensrc/cpuemu_0.cpp
+gensrc/cpuemu_20.cpp: gensrc/cpuemu_0.cpp
+gensrc/cpuemu_21.cpp: gensrc/cpuemu_0.cpp
+gensrc/cpuemu_31.cpp: gensrc/cpuemu_0.cpp
 
 endif
 
-obj/gen-%.o: gen/%.cpp
-	$(cxx) $(cppflags) $(cxxflags) $(uae_warnings) -c $< -o $@
+obj/gensrc-%.o: gensrc/%.cpp
+	$(cxx) $(cppflags) $(cxxflags) -c $< -o $@
 
 obj/%.o: src/%.cpp
-	$(cxx) $(cppflags) $(cxxflags) $(uae_warnings) -c $< -o $@
+	$(cxx) $(cppflags) $(cxxflags) $(uae_warn) -c $< -o $@
 
 obj/zip-archiver-%.o: src/archivers/zip/%.cpp
-	$(cxx) $(cppflags) $(cxxflags) $(uae_warnings) -c $< -o $@
+	$(cxx) $(cppflags) $(cxxflags) $(uae_warn) -c $< -o $@
 
 obj/dms-archiver-%.o: src/archivers/dms/%.cpp
-	$(cxx) $(cppflags) $(cxxflags) $(uae_warnings) -c $< -o $@
+	$(cxx) $(cppflags) $(cxxflags) $(uae_warn) -c $< -o $@
 
 obj/jit-%.o: src/jit/%.cpp
-	$(cxx) $(cppflags) $(cxxflags) $(uae_warnings) -c $< -o $@
+	$(cxx) $(cppflags) $(cxxflags) $(uae_warn) -c $< -o $@
+
+obj/jit-compemu_support.o: src/jit/compemu_support.cpp
+	$(cxx) $(cppflags) $(cxxflags) $(uae_warn) -fpermissive -c $< -o $@
+
+obj/bsdsocket.o: src/bsdsocket.cpp
+	$(cxx) $(cppflags) $(cxxflags) $(uae_warn) -fpermissive -c $< -o $@
 
 obj/od-fs-%.o: src/od-fs/%.cpp
 	$(cxx) $(cppflags) $(cxxflags) -c $< -o $@
 
-obj/uae.a: gen/blit.h gen/linetoscr.cpp $(uae_objects)
+obj/uae.a: gensrc/blit.h gensrc/linetoscr.cpp $(uae_objects)
 ifeq ($(os), macosx)
 	rm -f $@
 endif
@@ -405,8 +417,10 @@ share/locale/%/LC_MESSAGES/fs-uae.mo: po/%.po
 	msgfmt --verbose $< -o $@
 
 catalogs = \
+	share/locale/cs/LC_MESSAGES/fs-uae.mo \
 	share/locale/de/LC_MESSAGES/fs-uae.mo \
 	share/locale/es/LC_MESSAGES/fs-uae.mo \
+	share/locale/fi/LC_MESSAGES/fs-uae.mo \
 	share/locale/fr/LC_MESSAGES/fs-uae.mo \
 	share/locale/it/LC_MESSAGES/fs-uae.mo \
 	share/locale/nb/LC_MESSAGES/fs-uae.mo \
@@ -416,10 +430,9 @@ catalogs = \
 
 mo: $(catalogs)
 
-out/fs-uae: libfsemu-target obj/uae.a $(objects)
-	$(cxx) $(ldflags) $(objects) obj/uae.a $(libs) -o out/fs-uae
-
-fs-uae: out/fs-uae
+fs-uae: libfsemu-target obj/uae.a $(objects)
+	rm -f out/fs-uae
+	$(cxx) $(ldflags) $(objects) obj/uae.a $(libs) -o fs-uae
 
 dist_dir := fs-uae-$(version)
 dist_dir_launcher := fs-uae-launcher-$(version)
@@ -465,14 +478,14 @@ distdir-base: distdir-launcher-base
 	touch $(dist_dir)/obj/.dummy
 	mkdir -p $(dist_dir)/out
 	touch $(dist_dir)/out/.dummy
-	cp -a INSTALL README COPYING VERSION SERIES Changelog $(dist_dir)
+	cp -a INSTALL README COPYING VERSION SERIES ChangeLog $(dist_dir)
 	cp -a common.mk targets.mk $(dist_dir)
 	# windows.mk macosx.mk debian.mk
 	cp -a Makefile fs-uae.spec example.conf $(dist_dir)
 	cp -a src share licenses $(dist_dir)
 	find $(dist_dir)/share -name *.mo -delete
-	mkdir -p $(dist_dir)/gen
-	cp -a gen/*.cpp gen/*.h $(dist_dir)/gen
+	mkdir -p $(dist_dir)/gensrc
+	cp -a gensrc/*.cpp gensrc/*.h $(dist_dir)/gensrc
 
 	mkdir -p $(dist_dir)/libfsemu
 	cp -a $(libfsemu_dir)/COPYING $(dist_dir)/libfsemu
@@ -525,6 +538,7 @@ distdir-base: distdir-launcher-base
 	mkdir -p $(dist_dir)/server
 	cp -a server/fs_uae_netplay_server $(dist_dir)/server/
 	find $(dist_dir)/server -name "*.pyc" -delete
+	cp -a server/COPYING $(dist_dir)/server/
 	cp -a server/README $(dist_dir)/server/
 	cp -a server/setup.py $(dist_dir)/server/
 
@@ -617,7 +631,7 @@ dist: distdir pubfiles-source po-dist
 
 install:
 	install -d $(DESTDIR)$(prefix)/bin
-	install out/fs-uae $(DESTDIR)$(prefix)/bin/fs-uae
+	install fs-uae $(DESTDIR)$(prefix)/bin/fs-uae
 	install -d $(DESTDIR)$(prefix)/share
 	cp -R share/* $(DESTDIR)$(prefix)/share
 
@@ -625,9 +639,11 @@ install:
 	cp README COPYING example.conf $(DESTDIR)$(docdir)
 
 clean:
-	rm -f gen/build68k gen/genblitter gen/gencpu gen/genlinetoscr
+	rm -f gensrc/build68k gensrc/genblitter gensrc/gencpu gensrc/genlinetoscr
 	rm -f obj/*.o obj/*.a
 	rm -f out/fs-uae*
+	rm -f fs-uae
+	rm -f fs-uae.exe
 	$(make) -C libfsemu clean
 
 distclean: clean

@@ -46,6 +46,9 @@ cfg = [
     ("joystick_port_3_mode",  "",         "checksum", "sync"),
     ("joystick_port_3_autofire",  "",     "checksum", "sync"),
 
+    # this is not an Amiga device, so no need to checksum / sync
+    ("joystick_port_4_mode",  "", "custom"),
+
     ("kickstart_file",        ""),
     ("x_kickstart_file",      "",                             "nosave"),
     ("x_kickstart_file_sha1", "",         "checksum", "sync", "nosave"),
@@ -73,16 +76,24 @@ cfg = [
     ("sub_title",             "",                             "custom"),
     ("viewport",              "",                             "custom"),
 
-    ("year",                  "",                             "custom"),
-    ("developer",             "",                             "custom"),
-    ("publisher",             "",                             "custom"),
-    ("languages",             "",                             "custom"),
-    ("hol_url",               "",                             "custom"),
-    ("wikipedia_url",         "",                             "custom"),
-    ("database_url",          "",                             "custom"),
-    ("lemon_url",             "",                             "custom"),
-    ("mobygames_url",         "",                             "custom"),
-    ("__variant_rating",      "",                             "custom"),
+    ("year",                  ""),
+    ("developer",             ""),
+    ("publisher",             ""),
+    ("languages",             ""),
+    ("hol_url",               ""),
+    ("wikipedia_url",         ""),
+    ("database_url",          ""),
+    ("lemon_url",             ""),
+    ("mobygames_url",         ""),
+    ("__variant_rating",      ""),
+
+    ("screen1_sha1",          ""),
+    ("screen2_sha1",          ""),
+    ("screen3_sha1",          ""),
+    ("screen4_sha1",          ""),
+    ("screen5_sha1",          ""),
+    ("front_sha1",            ""),
+    ("title_sha1",            ""),
 
 ]
 
@@ -100,6 +111,8 @@ for i in range(Amiga.MAX_CDROM_IMAGES):
     cfg.append(("x_cdrom_image_{0}_sha1".format(i), "", "checksum", "sync", "nosave"))
 for i in range(Amiga.MAX_HARD_DRIVES):
     cfg.append(("hard_drive_{0}".format(i), ""))
+    cfg.append(("hard_drive_{0}_label".format(i), "", "checksum", "sync"))
+    cfg.append(("hard_drive_{0}_priority".format(i), "", "checksum", "sync"))
     cfg.append(("x_hard_drive_{0}_sha1".format(i), "", "checksum", "sync", "nosave"))
 
 class Config:
