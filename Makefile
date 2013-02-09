@@ -81,7 +81,7 @@ else
 endif
 
 ifeq ($(use_freetype), 1)
-	libs += `pkg-config --libs freetype2`
+	libs += `$(pkg_config) --libs freetype2`
 endif
 
 profile_generate := 0
