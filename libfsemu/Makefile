@@ -44,9 +44,15 @@ debug := 0
 noflags := 0
 
 cppflags = $(CXXFLAGS) $(EXTRA_CPPFLAGS)
-cflags = -std=c99 -Iinclude `$(sdl_config) --cflags` \
-		`$(pkg_config) --cflags glib-2.0 gthread-2.0 libpng` \
-		`$(pkg_config) --cflags freetype2` \
+
+sdl_cflags    ?= $(shell $(sdl_config) --cflags)
+glib_cflags   ?= $(shell $(pkg_config) --cflags glib-2.0 gthread-2.0)
+png_cflags    ?= $(shell $(pkg_config) --cflags libpng zlib)
+ft2_cflags    ?= $(shell $(pkg_config) --cflags freetype2)
+extlib_cflags ?= $(sdl_cflags) $(glib_cflags) $(png_cflags) $(ft2_cflags)
+
+cflags = -std=c99 -Iinclude \
+		$(extlib_cflags) \
 		$(CFLAGS) -D_FILE_OFFSET_BITS=64
 objects = obj/emu_emu.o obj/emu_video.o obj/emu_audio_openal.o \
 		obj/emu_audio_common.o obj/emu_audio_dummy.o obj/emu_audio_sdl.o \

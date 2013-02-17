@@ -51,17 +51,29 @@ libs = -L$(libfsemu_dir)/out -lfsemu -lpng -lz
 else
 use_glib := 1
 use_freetype := 1
+
+sdl_cflags    ?= $(shell $(sdl_config) --cflags)
+glib_cflags   ?= $(shell $(pkg_config) --cflags glib-2.0 gthread-2.0)
+png_cflags    ?= $(shell $(pkg_config) --cflags libpng zlib)
+extlib_cflags ?= $(sdl_cflags) $(glib_cflags) $(png_cflags)
+
+sdl_ldflags    ?= $(shell $(sdl_config) --libs)
+glib_ldflags   ?= $(shell $(pkg_config) --libs glib-2.0 gthread-2.0)
+png_ldflags    ?= $(shell $(pkg_config) --libs libpng zlib)
+ft2_ldflags    ?= $(shell $(pkg_config) --libs freetype2)
+extlib_ldflags ?= $(sdl_ldflags) $(glib_ldflags) $(png_ldflags) $(extra_ldflags)
+
 common_flags = -Isrc/od-fs -Isrc/od-fs/include \
 		-Isrc/include -Igensrc -Isrc -Isrc/od-win32/caps \
-		`$(pkg_config) --cflags glib-2.0 gthread-2.0 libpng` \
 		-I$(libfsemu_dir)/include \
-		`$(sdl_config) --cflags`
+		$(extlib_cflags)
+		
 cflags = $(common_flags) -std=c99 $(CFLAGS) $(EXTRA_CPPFLAGS) $(SYS_INCLUDES)
 #cxxflags = $(common_flags) -fpermissive $(CXXFLAGS)
 cxxflags = $(common_flags) $(CXXFLAGS) $(EXTRA_CPPFLAGS) $(SYS_INCLUDES)
 ldflags = $(LDFLAGS)
-libs = -L$(libfsemu_dir)/out -lfsemu `$(sdl_config) --libs` \
-		`$(pkg_config) --libs libpng` -lpng -lz
+libs = -L$(libfsemu_dir)/out -lfsemu \
+		$(extlib_ldflags)
 
 ifeq ($(devel), 1)
 	warnings = -Wno-unused-variable -Wno-unused-function -Wno-write-strings \
@@ -74,14 +86,14 @@ endif
 endif
 
 ifeq ($(use_glib), 1)
-	libs += `$(pkg_config) --libs glib-2.0 gthread-2.0`
+	extra_ldflags += $(glib_ldflags)
 else ifeq ($(android), 1)
 else
-	libs += -lrt -lpthread
+	extra_ldflags += -lrt -lpthread
 endif
 
 ifeq ($(use_freetype), 1)
-	libs += `$(pkg_config) --libs freetype2`
+	extra_ldflags += $(ft2_ldflags)
 endif
 
 profile_generate := 0
