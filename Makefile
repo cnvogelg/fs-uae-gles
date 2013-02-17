@@ -134,6 +134,7 @@ else ifeq ($(os), windows)
 
 else ifeq ($(os), macosx)
   uname_m := $(shell uname -m)
+  arch ?= i386
   ifneq ($(arch),)
   else ifneq ($(findstring i386,$(uname_m)),)
     arch = i386

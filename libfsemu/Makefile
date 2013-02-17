@@ -23,16 +23,16 @@ else ifeq ($(os), windows)
 	cxx = g++
 	ar = ar
 else ifeq ($(os), macosx)
-	cc = gcc
-	cxx = g++
-	ar = ar
+	# cv: use MacPorts gcc
+	cc ?= gcc-mp-4.7 
+	cxx ?= g++-mp-4.7
+	ar ?= ar
 else
 	cc = $(CC)
 	cxx = $(CXX)
 	ar = $(AR)
 endif
 
-arch :=
 debug := 0
 noflags := 0
 
@@ -126,6 +126,7 @@ else ifeq ($(android), 1)
 
 else ifeq ($(os), macosx)
 	uname_m := $(shell uname -m)
+	arch ?= i386
 	ifneq ($(arch),)
 	else ifneq ($(findstring i386,$(uname_m)),)
 	arch = i386
