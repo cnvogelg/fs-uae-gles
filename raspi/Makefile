@@ -5,7 +5,7 @@ SB2_RUNTIME=eval
 
 RASPI_CFLAGS := -march=armv6 -mfloat-abi=hard -mfpu=vfp 
 
-.phony: all cross cross-build cross-link fs-uae clean
+.phony: all cross fs-uae clean
 
 all: fs-uae
 
@@ -19,20 +19,12 @@ all: fs-uae
 #   usr/bin/pkg-config      <- copy from /usr/bin (no link!)
 #   usr/bin/sdl-config      <- copy from /usr/bin (no link!)
 #
-cross: cross-build cross-link
-# build runs through compile but currently fails on link line... so ignore it and...
-cross-build:
+cross: 
 	$(MAKE) fs-uae \
 		COMPILER_PREFIX=/usr/bin/ \
 		RASPI_ROOT=/home/user/ \
-		SB2_RUNTIME="sb2 -t $(SB2_TARGET) --" \
-	|| exit 0
-# ...workaround for failing link step: re-run in emulation mode
-cross-link:
-	$(MAKE) fs-uae \
-		COMPILER_PREFIX=/usr/bin/ \
-		RASPI_ROOT=/home/user/ \
-		SB2_RUNTIME="sb2 -t $(SB2_TARGET) -m emulate --"
+		SB2_LDFLAGS="-Wl,-rpath-link,/usr/lib/arm-linux-gnueabihf:/home/user/opt/vc/lib:/usr/lib/arm-linux-gnueabihf/pulseaudio" \
+		SB2_RUNTIME="sb2 -t $(SB2_TARGET) --" 
 
 # local build on raspi
 fs-uae:
@@ -42,7 +34,7 @@ fs-uae:
 		pkg_config=$(RASPI_ROOT)/usr/bin/pkg-config \
 		EXTRA_CPPFLAGS=\"$(RASPI_CFLAGS) -DUSE_EGL_RAW -DUSE_GLES1 -DRPI\" \
 		GLES_INCLUDES=\"-I$(RASPI_ROOT)/opt/vc/include -I$(RASPI_ROOT)/opt/vc/include/interface/vcos/pthreads\" \
-		GLES_LIBS=\"-L$(RASPI_ROOT)/opt/vc/lib -lEGL -lGLESv1_CM\"
+		GLES_LIBS=\"$(SB2_LDFLAGS) -L$(RASPI_ROOT)/opt/vc/lib -lEGL -lGLESv1_CM -lbcm_host\"
 
 clean:
 	$(MAKE) -C .. clean
