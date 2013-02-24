@@ -14,6 +14,7 @@ import tempfile
 import pkg_resources
 import fs_uae_launcher.fs as fs
 import fs_uae_launcher.fsui as fsui
+from fs_uae_launcher.fsgs.GameNameUtil import GameNameUtil
 from .FSUAE import FSUAE
 from .Archive import Archive
 from .Amiga import Amiga
@@ -100,6 +101,7 @@ class LaunchHandler:
         self.init_changes()
 
         self.prepare_theme()
+        self.prepare_extra_settings()
 
         if start:
             self.start()
@@ -247,6 +249,8 @@ class LaunchHandler:
         for i in range(0, 10):
             key = "hard_drive_{0}".format(i)
             src = self.config.get(key, "")
+            dummy, ext = os.path.splitext(src)
+            ext = ext.lower()
 
             if src.startswith("http://") or src.startswith("https://"):
                 name = src.rsplit("/", 1)[-1]
@@ -268,10 +272,11 @@ class LaunchHandler:
                 self.disable_save_states()
                 return
 
-            if src.endswith(".zip"):
+            if ext in [".zip", ".lha"]:
                 print("zipped hard drive", src)
                 self.unpack_hard_drive(i, src)
                 self.disable_save_states()
+
             elif src.endswith("HardDrive"):
                 print("XML-described hard drive", src)
                 self.unpack_hard_drive(i, src)
@@ -340,8 +345,9 @@ class LaunchHandler:
             if not name.startswith(drive_prefix):
                 continue
             dst_file = os.path.join(dir_path, name[len(drive_prefix):])
+            print(repr(dst_file))
             if name.endswith("/"):
-                os.makedirs(dst_file)
+                os.makedirs(fs.encode_path(dst_file))
                 continue
             sha1 = file_entry["sha1"]
             src_file = database.find_file(sha1=sha1)
@@ -350,10 +356,31 @@ class LaunchHandler:
             archive = Archive(src_file)
             f = archive.open(src_file)
             data = f.read()
-            print(dst_file)
             with open(dst_file, "wb") as out_file:
                 out_file.write(data)
+            metadata = ["----rwed", " ", "2000-01-01 00:00:00.00", " ", "",
+                    "\n"]
+            if "comment" in file_entry:
+                metadata[4] = self.encode_file_comment(file_entry["comment"])
+            with open(dst_file + ".uaem", "wb") as out_file:
+                out_file.write("".join(metadata))
+            
         self.config["hard_drive_{0}".format(i)] = dir_path
+
+    def encode_file_comment(self, comment):
+        result = []
+        #raw = 0
+        for c in comment:
+        #    if c == '%':
+        #        result.append("%")
+        #        raw = 2
+        #    elif raw:
+        #        result.append(c)
+        #        raw = raw - 1
+        #    else:
+        #        result.append("%{0:x}".format(ord(c)))
+            result.append("%{0:x}".format(ord(c)))
+        return "".join(result)
 
     def unpack_hard_drive(self, i, src):
         src, archive = self.expand_default_path(src,
@@ -584,6 +611,23 @@ class LaunchHandler:
         path = self.game_handler.get_theme_path()
         if path:
             self.config["theme"] = path
+
+    def prepare_extra_settings(self):
+        prefix = self.config.get("screenshots_output_prefix", "")
+        if prefix:
+            return
+        name = self.config.get("floppy_drive_0", "")
+        #if not name:
+        #    name = self.config.get("hard_drive_0", "")
+        if not name:
+            name = self.config.get("cdrom_drive_0", "")
+        #if not name:
+        #    name = self.config.get("floppy_image_0", "")
+        if not name:
+            name = "fs-uae"
+        name, variant = GameNameUtil.extract_names(name)
+        name = GameNameUtil.create_cmpname(name)
+        self.config["screenshots_output_prefix"] = name
 
     def create_config(self):
         config = ConfigWriter(self.config).create_fsuae_config()

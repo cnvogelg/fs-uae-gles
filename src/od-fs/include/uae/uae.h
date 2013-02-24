@@ -7,6 +7,12 @@
 extern "C" {
 #endif
 
+#ifdef WITH_LUA
+#include <lauxlib.h>
+void amiga_init_lua(void (*lock)(void), void (*unlock)(void));
+void amiga_init_lua_state(lua_State *L);
+#endif
+
 #define AMIGA_FLOPPY_LIST_SIZE 20
 
 // FIXME
@@ -39,7 +45,7 @@ int amiga_pause(int pause);
 int amiga_cpu_get_speed();
 int amiga_cpu_set_speed(int speed);
 
-void amiga_enable_netplay_mode();
+void amiga_set_deterministic_mode();
 
 int amiga_enable_serial_port(const char *serial_name);
 

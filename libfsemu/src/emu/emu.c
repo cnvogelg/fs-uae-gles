@@ -12,6 +12,7 @@
 #include <fs/ml.h>
 #include <fs/string.h>
 #include <fs/thread.h>
+#include <fs/time.h>
 
 #ifdef USE_GLIB
 #include <glib.h>
@@ -19,6 +20,7 @@
 
 #include "audio.h"
 #include "dialog.h"
+#include "emu_lua.h"
 #include "hud.h"
 #include "input.h"
 #include "libfsemu.h"
@@ -104,26 +106,11 @@ void fs_emu_deprecated(const char *format, ...) {
     char *buffer = fs_strdup_vprintf(format, ap);
     va_end(ap);
     int len = strlen(buffer);
-    // strip trailing newline, of any
-    if (len > 0 && buffer[len] == '\n') {
-        buffer[len] = '\0';
+    // strip trailing newline, if any
+    if (len > 0 && buffer[len - 1] == '\n') {
+        buffer[len - 1] = '\0';
     }
     fs_log("DEPRECATED: %s\n", buffer);
-    fs_emu_hud_add_console_line(buffer, 0);
-    free(buffer);
-}
-
-void fs_emu_notification(const char *format, ...) {
-    va_list ap;
-    va_start(ap, format);
-    char *buffer = fs_strdup_vprintf(format, ap);
-    va_end(ap);
-    int len = strlen(buffer);
-    // strip trailing newline, of any
-    if (len > 0 && buffer[len] == '\n') {
-        buffer[len] = '\0';
-    }
-    fs_log("NOTIFICATION: %s\n", buffer);
     fs_emu_hud_add_console_line(buffer, 0);
     free(buffer);
 }
@@ -238,6 +225,7 @@ void fs_emu_init() {
     //if (!g_fs_emu_config) {
     //    g_fs_emu_config = g_key_file_new();
     //}
+    fs_time_init();
 
     if (fs_config_get_boolean("stdout") == 1) {
         fs_log_enable_stdout();
@@ -245,6 +233,10 @@ void fs_emu_init() {
 
     fs_emu_log("calling fs_ml_init\n");
     fs_ml_init();
+
+#ifdef WITH_LUA
+    fs_emu_lua_init();
+#endif
 
     g_gui_mutex = fs_mutex_create();
     fs_emu_hud_init();

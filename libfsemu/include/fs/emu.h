@@ -24,13 +24,22 @@
 //#include <SDL.h>
 //#endif
 
-#ifdef WITH_SDL
-#include <SDL.h>
-#endif
+//#ifdef WITH_SDL
+//#include <SDL.h>
+//#endif
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+#ifdef WITH_LUA
+#include <lauxlib.h>
+lua_State *fs_emu_get_lua_state(void);
+void fs_emu_acquire_lua(void);
+void fs_emu_release_lua(void);
+#endif
+
+void fs_emu_lua_run_handler(const char *name);
 
 // Can (or should) be called before fs_emu_init
 
@@ -60,9 +69,10 @@ typedef void (*fs_emu_zoom_function)(int);
 void fs_emu_set_toggle_zoom_function(fs_emu_zoom_function function);
 void fs_emu_toggle_zoom();
 
+void fs_emu_notification(int type, const char *format, ...);
+
 void fs_emu_warning(const char *format, ...);
 void fs_emu_deprecated(const char *format, ...);
-void fs_emu_notification(const char *format, ...);
 
 //void fs_emu_warning(const char* warning);
 

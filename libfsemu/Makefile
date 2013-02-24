@@ -37,7 +37,7 @@ debug := 0
 noflags := 0
 
 cppflags = $(CXXFLAGS)
-cflags = -std=c99 -Iinclude `sdl-config --cflags` \
+cflags = -std=c99 -Iinclude -Isrc/lua `sdl-config --cflags` \
 		`pkg-config --cflags glib-2.0 gthread-2.0 libpng` \
 		`pkg-config --cflags freetype2` \
 		$(CFLAGS) -D_FILE_OFFSET_BITS=64
@@ -49,6 +49,7 @@ objects = obj/emu_emu.o obj/emu_video.o obj/emu_audio_openal.o \
 		obj/emu_xml_shader.o obj/emu_util.o obj/emu_netplay.o \
 		obj/emu_scanlines.o obj/emu_theme.o obj/emu_video_buffer.o \
 		obj/emu_video_options.o obj/emu_audio_dummy.o \
+		obj/emu_emu_lua.o \
 		\
 		obj/ml_ml.o obj/ml_windows.o obj/ml_render.o \
 		obj/ml_sdl.o obj/ml_rawinput.o obj/ml_macosx.o obj/ml_x11.o \
@@ -56,7 +57,7 @@ objects = obj/emu_emu.o obj/emu_video.o obj/emu_audio_openal.o \
 		obj/base.o obj/log.o obj/config.o obj/image.o obj/ref.o \
 		obj/glee.o obj/opengl.o obj/thread.o obj/string.o obj/filesys.o \
 		obj/unicode.o obj/init.o obj/random.o obj/list.o obj/eventlog.o \
-		obj/queue.o obj/hashtable.o obj/inifile.o \
+		obj/queue.o obj/hashtable.o obj/inifile.o obj/time.o \
 		obj/lua_lapi.o \
 		obj/lua_lauxlib.o \
 		obj/lua_lbaselib.o \
@@ -92,6 +93,10 @@ objects = obj/emu_emu.o obj/emu_video.o obj/emu_audio_openal.o \
 
 ldflags = $(LDFLAGS)
 libs =
+ifeq ($(force_32bit),1)
+    cflags += -m32
+    ldflags += -m32
+endif
 
 ifeq ($(devel), 1)
 	cflags += -Wall -Wno-deprecated-declarations
