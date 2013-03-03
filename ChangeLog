@@ -1,3 +1,47 @@
+Version 2.1.31:
+
+* Shortcuts F12 + P or Pause/Break key to pause the emulation.
+* Left and right mouse buttons are aliased to joystick port 0 fire and
+  2nd button (unless joystick_port0_mode is nothing, or mouse is already
+  used in a port).
+* Disabled automatic port 0 joystick switching for mouse, alias
+  mouse buttons instead.
+* Disabled automatic port 0 joystick switching for emulated joystick.
+* Warn, if necessary, when joystick/gamepad has no config for CD32 game pad.
+* Fixed scanline code for PPC.
+* Support for a more advanced viewport syntax.
+* Updated bitmap font with new character.
+* Updated translations: pl [grimi].
+* (Launcher) Retry database download operations several times on failure.
+* (Launcher) Support floppy_list field from online database, as well as 
+  new database fields.
+* (Launcher) WHDLoad versions can be selected via the new x_whdload_version
+  option.
+* (Launcher) Added WHDLoad versions 16.0 - 16.9 [TheCyberDruid].
+* (Launcher) ADFFileExtractor module [TheCyberDruid].
+* (Launcher) SetPatch is extracted using the new ADFFileExtractor module
+  instead of the old hack.
+
+Version 2.1.30:
+
+* Make the volume function more sane.
+* Check/respect GL_MAX_TEXTURE_SIZE for text cache texture.
+* Make the scanline shaders more standards-compatible, fixes compilation
+  errors which occured with some GL drivers.
+* Write shader compiler log to log file on shader compilation failure.
+* Updated translations: cs [spajdr], de [nexusle].
+* (Launcher) Updated translations: cs [spajdr].
+
+Version 2.1.29:
+
+* Fixed a bug with notification replacing earlier notifications of the
+  same type.
+* F12 + w to toggle warp mode (no frame limit, no audio).
+* F12 + comma to decrease the volume.
+* F12 + period to increase the volume.
+* Updated translations: fi [GoingDown], sr [Milanchez].
+* (Launcher) Updated translations: sr [Milanchez].
+
 Version 2.1.28:
 
 * For directory hard drives, save file attributes in .uaem files
@@ -26,6 +70,7 @@ Version 2.1.28:
 * Patch for Linux CD ioctl support [Jason S. McMullan].
 * Removed a some useless stubs printed to stdout, removed several printf
   statements logging stuff to stdout.
+* F12 + m to mute the sound.
 * Updated translations: fi [GoingDown], cs [spajdr].
 * (Launcher) Make sure the nickname is a valid IRC nickname (net play).
 * (Launcher) Fixed problem where .fs-uae configurations could in some cases
