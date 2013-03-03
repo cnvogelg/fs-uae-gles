@@ -1,3 +1,94 @@
+Version 2.1.31:
+
+* Shortcuts F12 + P or Pause/Break key to pause the emulation.
+* Left and right mouse buttons are aliased to joystick port 0 fire and
+  2nd button (unless joystick_port0_mode is nothing, or mouse is already
+  used in a port).
+* Disabled automatic port 0 joystick switching for mouse, alias
+  mouse buttons instead.
+* Disabled automatic port 0 joystick switching for emulated joystick.
+* Warn, if necessary, when joystick/gamepad has no config for CD32 game pad.
+* Fixed scanline code for PPC.
+* Support for a more advanced viewport syntax.
+* Updated bitmap font with new character.
+* Updated translations: pl [grimi].
+* (Launcher) Retry database download operations several times on failure.
+* (Launcher) Support floppy_list field from online database, as well as 
+  new database fields.
+* (Launcher) WHDLoad versions can be selected via the new x_whdload_version
+  option.
+* (Launcher) Added WHDLoad versions 16.0 - 16.9 [TheCyberDruid].
+* (Launcher) ADFFileExtractor module [TheCyberDruid].
+* (Launcher) SetPatch is extracted using the new ADFFileExtractor module
+  instead of the old hack.
+
+Version 2.1.30:
+
+* Make the volume function more sane.
+* Check/respect GL_MAX_TEXTURE_SIZE for text cache texture.
+* Make the scanline shaders more standards-compatible, fixes compilation
+  errors which occured with some GL drivers.
+* Write shader compiler log to log file on shader compilation failure.
+* Updated translations: cs [spajdr], de [nexusle].
+* (Launcher) Updated translations: cs [spajdr].
+
+Version 2.1.29:
+
+* Fixed a bug with notification replacing earlier notifications of the
+  same type.
+* F12 + w to toggle warp mode (no frame limit, no audio).
+* F12 + comma to decrease the volume.
+* F12 + period to increase the volume.
+* Updated translations: fi [GoingDown], sr [Milanchez].
+* (Launcher) Updated translations: sr [Milanchez].
+
+Version 2.1.28:
+
+* For directory hard drives, save file attributes in .uaem files
+  (permissions, timestamp, file note).
+* Fix for directory hard drives so correct case is reported back to the
+  Amiga when the Amiga opens a file with another case than what's stored.
+* Report local time for files in directory hard drive.
+* Use re-entrant / thread-safe variants of time functions.
+* Reverted the scanline function to its older / simpler behavior, use
+  the shader "scanlines-nonlinear" instead.
+* New shaders included: scanlines-classic (same as scanline CPU filter),
+  and scanlines-nonlinear (a scanline filter which varies with pixel
+  intensity and also introduces some pixel blending).
+* Text cache texture size is now 2048x2048 (was 1024x1024).
+* For automatic directory hard drive volume label, only use the part before
+  an opening parenthesis (if it exists).
+* New options to configure what screenshots to save and where to save them.
+* A bit more compact naming of screenshots, and reset sub-minute counter
+  for each minute (makes sorted names always cronological even with large
+  number of screenshots).
+* Can now bind keys to action_screenshot, notification replaces previous
+  notification (of same type).
+* Lua scripts can be used to read/write Amiga memory, position the
+  output video rectangle, change shader (experimental feature).
+* Support /dev/tty as the serial output [Jason S. McMullan].
+* Patch for Linux CD ioctl support [Jason S. McMullan].
+* Removed a some useless stubs printed to stdout, removed several printf
+  statements logging stuff to stdout.
+* F12 + m to mute the sound.
+* Updated translations: fi [GoingDown], cs [spajdr].
+* (Launcher) Make sure the nickname is a valid IRC nickname (net play).
+* (Launcher) Fixed problem where .fs-uae configurations could in some cases
+  disappear from the configuration list when refreshing the online database.
+* (Launcher) Fixed a bug where config name was saved in config file if
+  based on a config from online database.
+* (Launcher) Automatically set screenshots_output_prefix based on floppy name.
+* (Launcher) If A500 kickstart is not found on startup, look for Amiga Forever
+  in default location and add kickstarts to database if found (Windows).
+* (Launcher) Add Amiga Forever shared documents directory to search path.
+* (Launcher) Index files in .rp9 archives, contained disk images can be used
+  with the online database (when match is found).
+* (Launcher) Support file comments for WHDLoad slave files when using the
+  online database, comments are stored in .uaem files. Fixes Embryo.
+* (Launcher) Allowing selecting .lha files as hard drives.
+* (Launcher) Fixed an issue with selecting Amiga 1000 (2.1.26).
+* (Launcher) Updated translations: cs [spajdr].
+
 Version 2.1.27:
 
 * Added lua (sandboxed), (possibly) to be used as a scripting engine.

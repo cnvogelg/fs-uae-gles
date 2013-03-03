@@ -78,7 +78,86 @@ void select_port_0_device(int data) {
     //fs_emu_menu_update_current();
 }
 
+int g_fs_uae_last_input_event = 0;
+int g_fs_uae_last_input_event_state = 0;
+int g_fs_uae_state_number = 0;
+
+void fs_uae_process_input_event(int action, int state) {
+#if 0
+    g_fs_uae_last_input_event = input_event;
+    g_fs_uae_last_input_event_state = state;
+    fs_emu_lua_run_handler("on_fs_uae_input_event");
+    // handler can modify input event
+    amiga_send_input_event(g_fs_uae_last_input_event,
+            g_fs_uae_last_input_event_state);
+#endif
+
+    if (action >= INPUTEVENT_AMIGA_JOYPORT_MODE_0_NONE &&
+            action < INPUTEVENT_AMIGA_JOYPORT_MODE_3_LAST) {
+        change_port_device_mode(
+                action - INPUTEVENT_AMIGA_JOYPORT_MODE_0_NONE);
+        return;
+
+    }
+    if (action >= INPUTEVENT_AMIGA_JOYPORT_0_DEVICE_0 &&
+            action < INPUTEVENT_AMIGA_JOYPORT_0_DEVICE_LAST) {
+        select_port_0_device(action - INPUTEVENT_AMIGA_JOYPORT_0_DEVICE_0);
+        return;
+    }
+    if (state && action >= INPUTEVENT_AMIGA_JOYPORT_0_AUTOFIRE &&
+            action <= INPUTEVENT_AMIGA_JOYPORT_3_AUTOFIRE) {
+        int port = action - INPUTEVENT_AMIGA_JOYPORT_0_AUTOFIRE;
+        if (g_fs_uae_input_ports[port].autofire_mode) {
+            g_fs_uae_input_ports[port].autofire_mode = 0;
+            amiga_set_joystick_port_autofire(port, 0);
+            fs_emu_warning(_("Auto-fire disabled for port %d"), port);
+        }
+        else {
+            g_fs_uae_input_ports[port].autofire_mode = 1;
+            amiga_set_joystick_port_autofire(port, 1);
+            fs_emu_warning(_("Auto-fire enabled for port %d"), port);
+        }
+        fs_emu_menu_update_current();
+        // this event must be passed on to the Amiga core
+    }
+
+    int load_state = 0;
+    int save_state = 0;
+    if (action >= INPUTEVENT_SPC_STATESAVE1 &&
+            action <= INPUTEVENT_SPC_STATESAVE9) {
+        save_state = action - INPUTEVENT_SPC_STATESAVE1 + 1;
+        g_fs_uae_state_number = save_state;
+    }
+
+    if (action >= INPUTEVENT_SPC_STATERESTORE1 &&
+            action <= INPUTEVENT_SPC_STATERESTORE9) {
+        load_state = action - INPUTEVENT_SPC_STATERESTORE1 + 1;
+        g_fs_uae_state_number = load_state;
+    }
+
+    if (load_state) {
+        fs_log("run handler on_fs_uae_load_state\n");
+        fs_emu_lua_run_handler("on_fs_uae_load_state");
+    }
+    else if (save_state) {
+        fs_log("run handler on_fs_uae_save_state\n");
+        fs_emu_lua_run_handler("on_fs_uae_save_state");
+    }
+    amiga_send_input_event(action, state);
+    if (load_state) {
+        fs_log("run handler on_fs_uae_load_state_done\n");
+        fs_emu_lua_run_handler("on_fs_uae_load_state_done");
+    }
+    else if (save_state) {
+        fs_log("run handler on_fs_uae_save_state_done\n");
+        fs_emu_lua_run_handler("on_fs_uae_save_state_done");
+    }
+}
+
 int event_handler_loop(void) {
+
+    fs_emu_lua_run_handler("on_fs_uae_read_input");
+
     int action;
     //int reconfigure_input = 0;
     while((action = fs_emu_get_input_event()) != 0) {
@@ -89,34 +168,16 @@ int event_handler_loop(void) {
         action = action & 0x0000ffff;
         //amiga_keyboard_set_host_key(input_event, state);
 
-        if (action >= INPUTEVENT_AMIGA_JOYPORT_MODE_0_NONE &&
-                action < INPUTEVENT_AMIGA_JOYPORT_MODE_3_LAST) {
-            change_port_device_mode(
-                    action - INPUTEVENT_AMIGA_JOYPORT_MODE_0_NONE);
+        g_fs_uae_last_input_event = action;
+        g_fs_uae_last_input_event_state = state;
+        fs_emu_lua_run_handler("on_fs_uae_input_event");
 
-        }
-        else if (action >= INPUTEVENT_AMIGA_JOYPORT_0_DEVICE_0 &&
-                action < INPUTEVENT_AMIGA_JOYPORT_0_DEVICE_LAST) {
-            select_port_0_device(action - INPUTEVENT_AMIGA_JOYPORT_0_DEVICE_0);
-        }
-        else {
-            if (state && action >= INPUTEVENT_AMIGA_JOYPORT_0_AUTOFIRE &&
-                    action <= INPUTEVENT_AMIGA_JOYPORT_3_AUTOFIRE) {
-                int port = action - INPUTEVENT_AMIGA_JOYPORT_0_AUTOFIRE;
-                if (g_fs_uae_input_ports[port].autofire_mode) {
-                    g_fs_uae_input_ports[port].autofire_mode = 0;
-                    amiga_set_joystick_port_autofire(port, 0);
-                    fs_emu_warning(_("Auto-fire disabled for port %d"), port);
-                }
-                else {
-                    g_fs_uae_input_ports[port].autofire_mode = 1;
-                    amiga_set_joystick_port_autofire(port, 1);
-                    fs_emu_warning(_("Auto-fire enabled for port %d"), port);
-                }
-                fs_emu_menu_update_current();
-            }
-            amiga_send_input_event(action, state);
-        }
+        // handler can modify input event
+        //action = g_fs_uae_last_input_event;
+        //state = g_fs_uae_last_input_event_state;
+        fs_uae_process_input_event(g_fs_uae_last_input_event,
+                g_fs_uae_last_input_event_state);
+
     }
     return 1;
 }
@@ -130,12 +191,13 @@ static void pause_throttle() {
     fs_emu_msleep(5);
 }
 
+static int g_fs_uae_frame = 0;
+
 void event_handler(void) {
     //static int busy = 0;
     //static int idle = 0;
     //static int64_t last_time = 0;
-    static int frame = 0;
-    frame = frame + 1;
+    g_fs_uae_frame = g_fs_uae_frame + 1;
     //printf("event_handler frame=%d\n", frame);
 
     /*
@@ -146,8 +208,10 @@ void event_handler(void) {
     }
     */
 
-    fs_emu_wait_for_frame(frame);
-    if (frame == 1) {
+    //fs_emu_lua_run_handler("on_fs_uae_frame_start");
+
+    fs_emu_wait_for_frame(g_fs_uae_frame);
+    if (g_fs_uae_frame == 1) {
         // we configure input ports after first frame are confirmed,
         // because otherwise configure events would get lost if initially
         // connected to the server (for net play game), but aborted connection
@@ -162,9 +226,11 @@ void event_handler(void) {
     }
     event_handler_loop();
     while (fs_emu_is_paused()) {
+        /*
         if (!event_handler_loop()) {
             break;
         }
+        */
         pause_throttle();
         if (fs_emu_is_quitting()) {
             break;
@@ -414,32 +480,6 @@ static void main_function() {
     fs_log("amiga_main returned\n");
 }
 
-void print_and_log_copyright_notice() {
-    printf("FS-UAE VERSION %s\n", g_fs_uae_version);
-    printf("Copyright 1995-2002 Bernd Schmidt\n");
-    printf("          1999-2012 Toni Wilen\n");
-    printf("          2003-2007 Richard Drummond\n");
-    printf("          2006-2011 Mustafa 'GnoStiC' Tufan\n");
-    printf("          2011-2013 Frode Solheim\n\n");
-    printf("See the source for a full list of contributors.\n");
-    printf("This is free software; see the file COPYING for copying "
-            "conditions. There is NO\n");
-    printf("warranty; not even for MERCHANTABILITY or FITNESS FOR A "
-            "PARTICULAR PURPOSE.\n\n");
-
-    fs_log("FS-UAE VERSION %s\n", g_fs_uae_version);
-    fs_log("Copyright 1995-2002 Bernd Schmidt\n");
-    fs_log("          1999-2012 Toni Wilen\n");
-    fs_log("          2003-2007 Richard Drummond\n");
-    fs_log("          2006-2011 Mustafa 'GnoStiC' Tufan\n");
-    fs_log("          2011-2013 Frode Solheim\n\n");
-    fs_log("See the source for a full list of contributors.\n");
-    fs_log("This is free software; see the file COPYING for copying "
-            "conditions. There is NO\n");
-    fs_log("warranty; not even for MERCHANTABILITY or FITNESS FOR A "
-            "PARTICULAR PURPOSE.\n\n");
-}
-
 void init_i18n() {
     if (fs_config_get_boolean("localization") == 0) {
         fs_log("localization was forced off\n");
@@ -447,25 +487,23 @@ void init_i18n() {
     }
     char *locale = setlocale(LC_MESSAGES, "");
     if (locale) {
-        printf("locale is set to %s\n", locale);
         fs_log("locale is set to %s\n", locale);
     }
     else {
-        printf("failed to set current locale\n");
         fs_log("failed to set current locale\n");
     }
 #ifndef ANDROID
     textdomain("fs-uae");
     char *path = fs_get_data_file("fs-uae/share-dir");
     if (path) {
-        printf("%s\n", path);
-        // remove 17 chars
+        fs_log("using data dir \"%s\"\n", path);
+        // remove "fs-uae/share-dir" from the returned path
         int len = strlen(path);
-        if (len > 17) {
-            path[len - 17] = '\0';
+        if (len > 16) {
+            path[len - 16] = '\0';
         }
         char *locale_base = fs_path_join(path, "locale", NULL);
-        printf("%s\n", locale_base);
+        fs_log("using locale dir \"%s\"\n", locale_base);
         bindtextdomain("fs-uae", locale_base);
         free(locale_base);
         free(path);
@@ -526,6 +564,16 @@ static const char *overlay_names[] = {
     NULL,
 };
 
+#define COPYRIGHT_NOTICE "\nFS-UAE VERSION %s\n" \
+"Copyright 1995-2002 Bernd Schmidt, 1999-2012 Toni Wilen,\n" \
+"2003-2007 Richard Drummond, 2006-2011 Mustafa 'GnoStiC' Tufan,\n" \
+"2011-2013 Frode Solheim, and contributors.\n" \
+"\n" \
+"This is free software; see the file COPYING for copying conditions. There\n" \
+"is NO warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR\n" \
+"PURPOSE. See the README for more copyright info, and the source code for\n" \
+"a full list of contributors\n\n"
+
 int main(int argc, char* argv[]) {
     int result;
     fs_uae_argc = argc;
@@ -551,7 +599,9 @@ int main(int argc, char* argv[]) {
 
     //result = parse_options(argc, argv);
 
-    print_and_log_copyright_notice();
+    printf(COPYRIGHT_NOTICE, g_fs_uae_version);
+    fs_log(COPYRIGHT_NOTICE, g_fs_uae_version);
+
     char *current_dir = fs_get_current_dir();
     fs_log("current directory is %s\n", current_dir);
     free(current_dir);
@@ -645,8 +695,9 @@ int main(int argc, char* argv[]) {
 
     //fs_uae_init_input();
     fs_emu_init_2(FS_EMU_INIT_EVERYTHING);
-    if (fs_emu_netplay_enabled()) {
-        amiga_enable_netplay_mode();
+    if (fs_emu_netplay_enabled() ||
+            fs_config_get_boolean("deterministic") == 1) {
+        amiga_set_deterministic_mode();
     }
 
     if (logs_dir) {
@@ -683,6 +734,12 @@ int main(int argc, char* argv[]) {
     amiga_set_led_function(led_function);
     amiga_set_media_function(media_function);
     amiga_set_init_function(on_init);
+
+#ifdef WITH_LUA
+    amiga_init_lua(fs_emu_acquire_lua, fs_emu_release_lua);
+    amiga_init_lua_state(fs_emu_get_lua_state());
+    fs_uae_init_lua_state(fs_emu_get_lua_state());
+#endif
 
     if (fs_emu_get_video_format() == FS_EMU_VIDEO_FORMAT_RGBA) {
         amiga_set_video_format(AMIGA_VIDEO_FORMAT_RGBA);

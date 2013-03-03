@@ -16,6 +16,7 @@
 #include "disk.h"
 #include "gui.h"
 #include "events.h"
+#include "luascript.h"
 
 int uae_get_memory_checksum();
 
@@ -25,7 +26,7 @@ log_function g_amiga_gui_message_function = NULL;
 amiga_led_function g_amiga_led_function = NULL;
 amiga_media_function g_amiga_media_function = NULL;
 
-int g_amiga_netplay_mode = 0;
+int g_uae_deterministic_mode = 0;
 int g_amiga_paused = 0;
 char *g_libamiga_save_image_path = NULL;
 
@@ -39,12 +40,11 @@ int g_amiga_video_bpp = 4;
 static char *g_floppy_sounds_dir;
 
 int g_fs_uae_writable_disk_images = 0;
-/*
- * This is called from the main UAE thread to inform
- * the GUI that a floppy disk has been inserted or ejected.
- */
+
+// This is called from the main UAE thread to inform the GUI that a floppy
+// disk has been inserted or ejected.
+
 void gui_filename (int num, const char *name) {
-    STUB("num=%d name=\"%s\"", num, name);
     if (g_amiga_media_function) {
         g_amiga_media_function(num, name);
     }
@@ -139,6 +139,18 @@ void gui_led (int led, int state) {
 
 extern "C" {
 
+void amiga_init_lua(void (*lock)(void), void (*unlock)(void)) {
+#ifdef WITH_LUA
+    uae_lua_init(lock, unlock);
+#endif
+}
+
+void amiga_init_lua_state(lua_State *L) {
+#ifdef WITH_LUA
+    uae_lua_init_state(L);
+#endif
+}
+
 void amiga_set_floppy_sounds_dir(const char *path) {
     int len = strlen(path);
     if (path[len - 1] == '/') {
@@ -163,9 +175,9 @@ void amiga_floppy_set_writable_images(int writable) {
 }
 
 int amiga_init() {
-    printf("libamiga (based on %s) initialized\n",
+    printf("libamiga (based on emulation core from %s) initialized\n",
             get_libamiga_base_version());
-    write_log("libamiga (based on %s) initialized\n",
+    write_log("libamiga (based on emulation core from %s) initialized\n",
             get_libamiga_base_version());
 
     // because frame_time_t is sometimes cast to int, we make sure to
@@ -229,9 +241,9 @@ void amiga_map_cd_drives(int enable) {
     changed_prefs.win32_automount_cddrives = (enable != 0);
 }
 
-void amiga_enable_netplay_mode() {
+void amiga_set_deterministic_mode() {
     write_log("libamiga enabling net play mode\n");
-    g_amiga_netplay_mode = 1;
+    g_uae_deterministic_mode = 1;
 }
 
 void amiga_write_uae_config(const char *path) {

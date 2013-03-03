@@ -262,6 +262,7 @@ static int spti_inquiry (struct dev_info_ioctl *ciw, int unitnum, uae_u8 *data, 
 	return 1;
 }
 
+// FIXME: suggest removing this, use the (same) one in blkdev_cdimage.cpp
 static void sub_deinterleave (const uae_u8 *s, uae_u8 *d)
 {
 	for (int i = 0; i < 8 * 12; i ++) {
@@ -276,6 +277,7 @@ static void sub_deinterleave (const uae_u8 *s, uae_u8 *d)
 	}
 }
 
+// FIXME: suggest removing this, use the (same) one in blkdev_cdimage.cpp
 static void sub_to_deinterleaved (const uae_u8 *s, uae_u8 *d)
 {
 	for (int i = 0; i < 8 * 12; i ++) {

@@ -87,7 +87,7 @@ void fs_ml_video_set_post_render_function(fs_ml_void_function function);
 void fs_ml_frame_update_begin(int frame);
 void fs_ml_frame_update_end(int frame);
 
-void fs_ml_video_screenshot(int number);
+void fs_ml_video_screenshot(const char *path);
 int fs_ml_video_width();
 int fs_ml_video_height();
 void fs_ml_video_sync_enable(int enable);
@@ -104,6 +104,8 @@ int fs_ml_get_windowed_height();
 //void fs_ml_swap_buffers();
 //void fs_ml_wait_vblank();
 void fs_ml_video_swap_buffers();
+
+int fs_ml_get_max_texture_size();
 
 typedef enum {
        FS_ML_NOEVENT = 0,

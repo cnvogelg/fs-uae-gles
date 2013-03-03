@@ -57,6 +57,7 @@ cfg = [
     ("x_kickstart_ext_file_sha1", "",     "checksum", "sync", "nosave"),
 
     ("x_whdload_args",        "",         "checksum", "sync"),
+    ("x_whdload_version",     "17.1",     "checksum", "sync"),
     ("floppy_drive_count",    "",         "checksum", "sync", "custom"),
     ("floppy_drive_speed",    "",         "checksum", "sync", "custom"),
     ("cdrom_drive_count",     "",         "checksum", "sync", "custom"),
@@ -592,7 +593,7 @@ class Config:
 
         cls.load(config)
 
-        config_name = config.get("x_config_name", "")
+        config_name = config.get("__config_name", "")
         if config_name:
             config_name = cls.create_fs_name(config_name)
         else:
@@ -619,14 +620,14 @@ class Config:
         value_config_loader = ValueConfigLoader(uuid=uuid)
         value_config_loader.load_values(values)
         config = value_config_loader.get_config()
-        config["x_config_uuid"] = uuid
+        #config["x_config_uuid"] = uuid
 
         from .Settings import Settings
         Settings.set("config_path", "")
 
         cls.load(config)
 
-        config_name = config.get("x_config_name", "")
+        config_name = config.get("__config_name", "")
         if config_name:
             config_name = cls.create_fs_name(config_name)
         #else:

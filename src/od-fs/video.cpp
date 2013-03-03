@@ -148,6 +148,8 @@ bool render_screen (bool immediate) {
     int flushed = g_has_flushed_line || g_has_flushed_block ||
             g_has_flushed_screen;
 
+    g_renderdata.bpp = g_amiga_video_bpp;
+
     static int cx, cy, cw, ch, crealh;
     //printf("g_picasso_enabled %d\n", g_picasso_enabled);
     if (g_picasso_enabled) {
@@ -223,7 +225,12 @@ bool render_screen (bool immediate) {
     //printf("flush_screen (%d -> %d) %d %d %d %d\n", first_line, last_line,
     //        cx, cy, cw, ch);
 
-    g_renderdata.refresh_rate = (int) (currprefs.chipset_refreshrate + 0.5);
+    if (currprefs.turbo_emulation) {
+        g_renderdata.refresh_rate = -1;
+    }
+    else {
+        g_renderdata.refresh_rate = (int) (currprefs.chipset_refreshrate + 0.5);
+    }
     //printf("%d\n", g_renderdata.refresh_rate);
     if (g_libamiga_callbacks.render) {
         g_libamiga_callbacks.render(&g_renderdata);
@@ -783,14 +790,6 @@ void graphics_leave (void) {
 int check_prefs_changed_gfx (void) {
     //write_log("check_prefs_changed_gfx\n");
     return 0;
-}
-
-void refreshtitle (void) {
-    STUB("");
-}
-
-void updatedisplayarea (void) {
-    STUB("");
 }
 
 void gui_fps(int fps, int idle) {

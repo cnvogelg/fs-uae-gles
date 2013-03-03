@@ -66,6 +66,7 @@ extlib_ldflags ?= $(sdl_ldflags) $(glib_ldflags) $(png_ldflags) $(extra_ldflags)
 common_flags = -Isrc/od-fs -Isrc/od-fs/include \
 		-Isrc/include -Igensrc -Isrc -Isrc/od-win32/caps \
 		-I$(libfsemu_dir)/include \
+		-I$(libfsemu_dir)/src/lua \
 		$(extlib_cflags)
 		
 cflags = $(common_flags) -std=c99 $(CFLAGS) $(EXTRA_CPPFLAGS) $(SYS_INCLUDES)
@@ -119,9 +120,10 @@ ifeq ($(profile_use), 1)
 	cxxflags += -fprofile-use
 endif
 
-ifeq ($(force_32bit), 1)
+ifeq ($(force_32bit),1)
 	cflags += -m32
 	cxxflags += -m32
+	ldflags += -m32
 endif
 
 #uae_warn = -Wno-unused-value -Wno-uninitialized -Wno-sign-compare
@@ -178,7 +180,7 @@ endif
 endif
 
 ifneq ($(os), android)
-	cppflags += -DUSE_SDL -DUSE_GLIB
+	cppflags += -DUSE_SDL -DUSE_GLIB -DWITH_LUA
 endif
 
 objects = \
@@ -186,6 +188,7 @@ obj/fs-uae-config.o \
 obj/fs-uae-input.o \
 obj/fs-uae-joystick.o \
 obj/fs-uae-keyboard.o \
+obj/fs-uae-luascript.o \
 obj/fs-uae-main.o \
 obj/fs-uae-menu.o \
 obj/fs-uae-mouse.o \
@@ -255,6 +258,7 @@ obj/identify.o \
 obj/inputrecord.o \
 obj/isofs.o \
 obj/keybuf.o \
+obj/luascript.o \
 obj/main.o \
 obj/memory.o \
 obj/missing.o \
@@ -293,6 +297,7 @@ obj/dms-archiver-u_quick.o \
 obj/dms-archiver-u_rle.o \
 obj/od-fs-audio.o \
 obj/od-fs-bsdsocket_host.o \
+obj/od-fs-blkdev-linux.o \
 obj/od-fs-caps.o \
 obj/od-fs-cda_play.o \
 obj/od-fs-charset.o \
