@@ -14,6 +14,8 @@ from .Settings import Settings
 
 class ValueConfigLoader:
 
+    DB_VERSION_MAX = 1
+
     def __init__(self, uuid=""):
         self.config = {}
         self.options = {}
@@ -26,6 +28,16 @@ class ValueConfigLoader:
         return self.config.copy()
 
     def load_values(self, values):
+        if values.get("db_version"):
+            try:
+                version = int(values.get("db_version"))
+            except ValueError:
+                version = 10000
+            if version > self.DB_VERSION_MAX:
+                self.config["__config_name"] = "Unsupported Database " \
+                        "Version (Please upgrade FS-UAE Launcher)"
+                return
+            
         self.values = values
 
         cd_based = False
@@ -162,7 +174,9 @@ class ValueConfigLoader:
             self.options["x_whdload_version"] = value
         elif key == "kickstart":
             model = self.options.get("amiga_model", "")
-            if value == "2.0":
+            if value == "1.2":
+                self.options["amiga_model"] = "A1000"
+            elif value == "2.0":
                 if model in ["A500+", "A600"]:
                     pass
                 else:
@@ -228,7 +242,7 @@ class ValueConfigLoader:
                 "screen4_sha1", "screen5_sha1", "title_sha1",
                 "year", "publisher", "developer", "hol_url",
                 "lemon_url", "wikipedia_url", "mobygames_url",
-                "languages"]:
+                "languages", "dongle_type"]:
             self.options[key] = value
         elif key == "requirements":
             if "wb" in value.lower():
@@ -311,7 +325,7 @@ class ValueConfigLoader:
                         continue
                     added.add(p)
                     # FIXME: hack for now
-                    sha1 = self.values.get("dh0_sha1")
+                    sha1 = self.values.get("dh0_sha1", "")
                     media_list.append((p, sha1))
                 else:
                     continue

@@ -40,7 +40,7 @@ use_glib := 0
 warnings = 
 errors = -Werror=implicit-function-declaration -Werror=return-type
 cxxflags = $(warnings) $(errors) -Isrc/od-fs -Isrc/od-fs/include \
-		-Isrc/include -Igensrc -Isrc -Isrc/od-win32/caps \
+		-Isrc/include -Igensrc -Isrc \
 		-I$(libfsemu_dir)/include \
 		-Wno-write-strings -fpermissive
 
@@ -65,6 +65,7 @@ extlib_ldflags ?= $(sdl_ldflags) $(glib_ldflags) $(png_ldflags) $(extra_ldflags)
 
 common_flags = -Isrc/od-fs -Isrc/od-fs/include \
 		-Isrc/include -Igensrc -Isrc -Isrc/od-win32/caps \
+		`pkg-config --cflags glib-2.0 gthread-2.0 libpng` \
 		-I$(libfsemu_dir)/include \
 		-I$(libfsemu_dir)/src/lua \
 		$(extlib_cflags)
@@ -382,6 +383,9 @@ gensrc/cpuemu_31.cpp: gensrc/cpuemu_0.cpp
 
 endif
 
+obj/gensrc-cpuemu%.o: gensrc/cpuemu%.cpp
+	$(cxx) $(cppflags) $(cxxflags) -O0 -c $< -o $@
+
 obj/gensrc-%.o: gensrc/%.cpp
 	$(cxx) $(cppflags) $(cxxflags) -c $< -o $@
 
@@ -500,6 +504,14 @@ distdir-base: distdir-launcher-base
 	# windows.mk macosx.mk debian.mk
 	cp -a Makefile fs-uae.spec example.conf $(dist_dir)
 	cp -a src share licenses $(dist_dir)
+	rm -Rf $(dist_dir)/src/od-win32
+	rm -Rf $(dist_dir)/src/prowizard
+	rm -Rf $(dist_dir)/src/archivers/lha
+	rm -Rf $(dist_dir)/src/archivers/lzx
+	rm -Rf $(dist_dir)/src/archivers/xfd
+	rm -Rf $(dist_dir)/src/jit2
+	rm -f $(dist_dir)/src/akiko2.cpp
+	rm -f $(dist_dir)/src/custom2.cpp
 	find $(dist_dir)/share -name *.mo -delete
 	mkdir -p $(dist_dir)/gensrc
 	cp -a gensrc/*.cpp gensrc/*.h $(dist_dir)/gensrc
