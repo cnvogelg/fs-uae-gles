@@ -64,8 +64,7 @@ ft2_ldflags    ?= $(shell $(pkg_config) --libs freetype2)
 extlib_ldflags ?= $(sdl_ldflags) $(glib_ldflags) $(png_ldflags) $(extra_ldflags)
 
 common_flags = -Isrc/od-fs -Isrc/od-fs/include \
-		-Isrc/include -Igensrc -Isrc -Isrc/od-win32/caps \
-		`pkg-config --cflags glib-2.0 gthread-2.0 libpng` \
+		-Isrc/include -Igensrc -Isrc \
 		-I$(libfsemu_dir)/include \
 		-I$(libfsemu_dir)/src/lua \
 		$(extlib_cflags)
