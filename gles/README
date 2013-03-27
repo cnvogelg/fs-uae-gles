@@ -1,0 +1,29 @@
+Building on a OpenGL ES target
+------------------------------
+(Assuming a Ubunt/Debian-like Linux System)
+
+* Install your GPU drivers
+
+* Packages:
+  # apt-get install build-essential libsdl-dev libopenal-dev
+  
+* Build:
+  > cd gles
+  > make
+
+* Configuration Options:
+
+[config]
+# use a small system
+amiga_model = A500
+fullscreen = 0
+
+# in GLES its important to set the right texture format
+video_format = rgb565
+texture_format = rgb
+
+# use low accuracy for faster speed 
+accuracy = -1
+
+# might improve performance
+video_sync = off

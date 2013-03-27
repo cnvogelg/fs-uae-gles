@@ -1,3 +1,27 @@
+----- fs-uae-gles README begin -----
+
+This is an patched/extended version of the FS-UAE repository that focuses
+on devices with OpenGL ES 1.x support.
+
+The following devices are currently support:
+
+  OpenPandora   -> see "pandora"
+  Raspberry Pi  -> see "raspi"
+
+  Generic GLES  -> see "gles"
+
+Generic GLES target was tested on:
+
+  Cubieboard
+
+Just enter the specified directory and run 'make' there.
+
+Note: some targets also support cross-compiling on a host system.
+Read the README in the directory for more details
+
+----- fs-uae-gles README end -----
+
+
 FS-UAE 9.8.7 README
 ===================
 
