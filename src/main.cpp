@@ -838,6 +838,9 @@ void do_leave_program (void)
 	DISK_free ();
 	close_sound ();
 	dump_counts ();
+#if defined (PARALLEL_PORT)
+	exitparallel ();
+#endif
 #ifdef SERIAL_PORT
 	serial_exit ();
 #endif

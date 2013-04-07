@@ -620,6 +620,14 @@ static void resetwarning_check (void)
 
 void CIA_hsync_prehandler (void)
 {
+    /* CV: check for parallel ACK */
+#ifdef PARALLEL_PORT
+    if (isprinter () < 0) {
+        if(parallel_direct_check_ack_flag()) {
+            cia_parallelack ();
+        }
+    }
+#endif
 }
 
 static void keyreq (void)
@@ -1067,7 +1075,7 @@ static void WriteCIAA (uae_u16 addr, uae_u8 val)
 			cia_parallelack ();
 		} else if (isprinter() < 0) {
 			parallel_direct_write_data (val, ciaadrb);
-			cia_parallelack ();
+            /* CV: cia_parallelack (); */
 #ifdef ARCADIA
 		} else if (arcadia_bios) {
 			arcadia_parport (1, ciaaprb, ciaadrb);
@@ -1218,7 +1226,7 @@ static void WriteCIAB (uae_u16 addr, uae_u8 val)
 		ciabpra = val;
 #ifdef SERIAL_PORT
 		if (currprefs.use_serial)
-			serial_writestatus(ciabpra, ciabdra);
+			serial_writestatus(val, ciabdra);
 #endif
 #ifdef PARALLEL_PORT
 		if (isprinter () < 0)

@@ -374,6 +374,17 @@ int amiga_enable_serial_port(const char *serial_name) {
     return 1;
 }
 
+int amiga_enable_parallel_port(const char *parallel_name)
+{
+    write_log("amiga_enable_parallel_port\n");
+    if(parallel_name != NULL && parallel_name[0]) {
+        write_log("parallel port device: %s\n", parallel_name);
+        strcpy(changed_prefs.prtname, parallel_name);
+        strcpy(currprefs.prtname, parallel_name);
+    }
+    return 1;
+}
+
 void amiga_set_cpu_idle(int idle) {
     write_log("setting cpu_idle = %d\n", idle);
     changed_prefs.cpu_idle = idle;

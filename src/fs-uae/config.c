@@ -455,6 +455,16 @@ void fs_uae_configure_amiga_hardware() {
         amiga_enable_serial_port(fs_config_get_const_string("serial_port"));
     }
 
+    /* CV: added parallel_port */
+    const char *parallel_port = fs_config_get_const_string("parallel_port");
+    if (!parallel_port) {
+    }
+    else if (fs_ascii_strcasecmp(parallel_port, "none") == 0) {
+    }
+    else {
+        amiga_enable_parallel_port(parallel_port);
+    }
+
     configure_accuracy(c);
 
     if (fs_config_get_boolean("line_doubling") == 0) {

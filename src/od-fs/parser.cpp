@@ -9,6 +9,7 @@
 #include "sysconfig.h"
 
 #undef SERIAL_ENET
+//#define DEBUG_PAR
 
 #include "config.h"
 #include "sysdeps.h"
@@ -130,7 +131,50 @@ static int dataininput, dataininputcnt;
 static int writepending;
 */
 
-void initparallel (void) {
+#define PAR_MODE_OFF     0
+#define PAR_MODE_PRT     1
+#define PAR_MODE_RAW     -1
+
+static int par_fd = -1;
+static int par_mode = PAR_MODE_OFF;
+
+void initparallel (void) 
+{
+    /* is a printer file given? */
+    char *name = strdup(currprefs.prtname);
+    if (name[0]) {
+        /* is a mode given with "mode:/file/path" ? */
+        char *colptr = strchr(name,':');
+        char *file_name = name;
+        if(colptr) {
+            *colptr = 0;
+            /* raw mode */
+            if(strcmp(name,"raw")==0) {
+                par_mode = PAR_MODE_RAW;
+            } 
+            /* printer mode */
+            else if(strcmp(name,"prt")==0) {
+                par_mode = PAR_MODE_PRT;
+            } 
+            /* unknown mode */
+            else {
+                write_log("invalid parallel mode: '%s'\n", name);
+                par_mode = PAR_MODE_PRT;
+            }
+            file_name = colptr+1;
+        } else {
+            par_mode = PAR_MODE_PRT;
+        }
+        /* open parallel control file */
+        if(par_fd == -1) {
+            par_fd = open(file_name, O_RDWR|O_NONBLOCK|O_BINARY|O_CREAT);
+            write_log("parallel: open file='%s' mode=%d -> fd=%d\n", file_name, par_mode, par_fd);
+        }
+    } else {
+        par_mode = PAR_MODE_OFF;
+    }
+    free(name);
+
 #if 0
     if (uae_boot_rom) {
         uaecptr a = here (); //this install the ahisound
@@ -143,28 +187,217 @@ void initparallel (void) {
 #endif
 }
 
-int isprinter (void) {
-    return 0;
+void exitparallel (void)
+{
+    /* close parallel control file */
+    if(par_fd >= 0) {
+        write_log("parallel: close fd=%d\n", par_fd);
+        close(par_fd);
+        par_fd = -1;
+    }
 }
 
-void doprinter (uae_u8 val) {
-    //parflush = 0;
-    //DoSomeWeirdPrintingStuff (val);
+int isprinter (void) {
+    if(par_fd >= 0) {
+        return par_mode;
+    } else {
+        return PAR_MODE_OFF;
+    }
+}
+
+void doprinter (uae_u8 val) 
+{
+    if(par_fd >= 0) {
+        write(par_fd, &val, 1);
+    }
+}
+
+/* virtual parallel stream state */
+static uae_u8 pctl;
+static uae_u8 pdat;
+static uae_u8 last_pctl;
+static uae_u8 last_pdat;
+
+/*
+    "virtual parallel port protocol"
+    
+    always send/receive 2 bytes: one control byte, one data byte
+    
+    send to UAE the following control byte:
+        0x01 0 = BUSY line value
+        0x02 1 = POUT line value
+        0x04 2 = SELECT line value
+        0x08 3 = trigger ACK (and IRQ if enabled)
+        
+        0x10 4 = set following data byte
+        0x20 5 = set line value as given in bits 0..2
+        0x40 6 = set line bits given in bits 0..2
+        0x80 7 = clr line bits given in bits 0..2
+        
+    receive from UAE the following control byte:
+        0x01 0 = BUSY line set
+        0x02 1 = POUT line set
+        0x04 2 = SELECT line set
+        0x08 3 = STROBE was triggered
+    
+    Note: sending a 00,00 pair returns the current state pair
+*/
+
+#ifdef DEBUG_PAR
+static char buf[80];
+static const char *decode_ctl(uae_u8 ctl)
+{
+    int busy = (ctl & 1) == 1;
+    int pout = (ctl & 2) == 2;
+    int select = (ctl & 4) == 4;
+    int ack = (ctl & 8) == 8;
+    sprintf(buf,"busy=%d pout=%d select=%d ack=%d",busy, pout, select, ack);
+    return buf;
+}
+#endif
+
+static void par_write_state(int strobe)
+{
+    if(par_fd == -1) {
+        return;
+    }
+    
+    struct timeval tv;
+    fd_set fds;
+    tv.tv_sec = 0;
+    tv.tv_usec = 0;
+    FD_ZERO(&fds);
+    FD_SET(par_fd, &fds);
+    int num_ready = select (FD_SETSIZE, NULL, &fds, NULL, &tv);
+    if(num_ready > 0) {
+        /* only write if value changed */
+        if(strobe || (last_pctl != pctl) || (last_pdat != pdat)) {
+            uae_u8 data[2] = { pctl, pdat };
+            if(strobe) {
+                data[0] |= 0x08;
+            }
+            write(par_fd, data, 2);
+            last_pctl = pctl;
+            last_pdat = pdat;
+#ifdef DEBUG_PAR
+            printf("tx: ctl=%02x dat=%02x %s\n", data[0], data[1], decode_ctl(data[0]));
+#endif
+        }
+    }
+}
+
+static int par_read_state(void)
+{
+    if(par_fd == -1) {
+        return 0;
+    }
+    
+    struct timeval tv;
+    fd_set fds;
+    tv.tv_sec = 0;
+    tv.tv_usec = 0;
+    FD_ZERO(&fds);
+    FD_SET(par_fd, &fds);
+    int num_ready = select (FD_SETSIZE, &fds, NULL, NULL, &tv);
+    if(num_ready > 0) {
+        uae_u8 data[2];
+        
+        /* read 2 bytes command */
+        int rem = 2;
+        int off = 0;
+        while(rem > 0) {
+            int n = read(par_fd, data+off, rem);
+            if(n<0) {
+                printf("rx: ERR: %d rem: %d\n", n, rem);
+                return 0;
+            } else {
+                rem -= n;
+                off += n;
+            }
+        }
+            
+        int ack = 0;
+        uae_u8 cmd = data[0];
+            
+        // only poll an update
+        if(cmd == 0) {
+            par_write_state(1);
+        } else {            
+            uae_u8 bits = cmd & 7;
+        
+            // update pdat value
+            if(cmd & 0x10) {
+                pdat = data[1];
+            }
+            
+            // absolute set line bits
+            if(cmd & 0x20) {
+                pctl = bits;
+            }
+            // set line bits
+            else if(cmd & 0x40) {
+                pctl |= bits;
+            }
+            // clear line bits
+            else if(cmd & 0x80) {
+                pctl &= ~bits;
+            }
+            
+            // set ack flag
+            if(cmd & 8) {
+                ack = 1;
+            }
+            
+#ifdef DEBUG_PAR
+            printf("rx: [%02x %02x] ctl=%02x dat=%02x %s\n", data[0], data[1], pctl, pdat, decode_ctl(pctl));
+#endif
+        }
+                
+        // is ACK bit set?
+        return ack; 
+    }
+    return 0;        
+}
+
+int parallel_direct_check_ack_flag(void)
+{
+    return par_read_state();
 }
 
 int parallel_direct_write_status (uae_u8 v, uae_u8 dir) {
+    uae_u8 pdir = dir & 7;
+    pctl = (v & pdir) | (pctl & ~pdir);
+    
+#ifdef DEBUG_PAR
+    printf("wr: ctl=%02x dir=%02x %s\n", pctl, pdir, decode_ctl(pctl));
+#endif
+        
+    par_write_state(0);
     return 0;
 }
 
 int parallel_direct_read_status (uae_u8 *vp) {
+    par_read_state();
+    par_write_state(0);
+    *vp = pctl;
     return 0;
 }
 
 int parallel_direct_write_data (uae_u8 v, uae_u8 dir) {
+    pdat = (v & dir) | (pdat & ~dir);
+    
+#ifdef DEBUG_PAR
+    printf("wr: dat=%02x dir=%02x\n", pdat, dir);
+#endif
+    
+    par_write_state(1); /* write with strobe */
     return 0;
 }
 
 int parallel_direct_read_data (uae_u8 *v) {
+    par_read_state();
+    par_write_state(0);
+    *v = pdat;
     return 0;
 }
 
