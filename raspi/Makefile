@@ -33,7 +33,7 @@ fs-uae:
 		sdl_config=$(RASPI_ROOT)/usr/bin/sdl-config \
 		pkg_config=$(RASPI_ROOT)/usr/bin/pkg-config \
 		EXTRA_CPPFLAGS=\"$(RASPI_CFLAGS) -DUSE_EGL_RAW -DUSE_GLES1 -DRPI\" \
-		GLES_INCLUDES=\"-I$(RASPI_ROOT)/opt/vc/include -I$(RASPI_ROOT)/opt/vc/include/interface/vcos/pthreads\" \
+		GLES_INCLUDES=\"-I$(RASPI_ROOT)/opt/vc/include -I$(RASPI_ROOT)/opt/vc/include/interface/vcos/pthreads -I$(RASPI_ROOT)/opt/vc/include/interface/vmcs_host/linux\" \
 		GLES_LIBS=\"$(SB2_LDFLAGS) -L$(RASPI_ROOT)/opt/vc/lib -lEGL -lGLESv1_CM -lbcm_host\"
 
 clean:
