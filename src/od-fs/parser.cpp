@@ -9,7 +9,7 @@
 #include "sysconfig.h"
 
 #undef SERIAL_ENET
-//#define DEBUG_PAR
+#define DEBUG_PAR
 
 #include "config.h"
 #include "sysdeps.h"
@@ -146,15 +146,17 @@ void initparallel (void)
         /* is a mode given with "mode:/file/path" ? */
         char *colptr = strchr(name,':');
         char *file_name = name;
+        int oflag = 0;
         if(colptr) {
             *colptr = 0;
-            /* raw mode */
+            /* raw mode: expect an existing socat stream */
             if(strcmp(name,"raw")==0) {
                 par_mode = PAR_MODE_RAW;
             } 
-            /* printer mode */
+            /* printer mode: allow to create new file */
             else if(strcmp(name,"prt")==0) {
                 par_mode = PAR_MODE_PRT;
+                oflag = O_CREAT;
             } 
             /* unknown mode */
             else {
@@ -167,7 +169,7 @@ void initparallel (void)
         }
         /* open parallel control file */
         if(par_fd == -1) {
-            par_fd = open(file_name, O_RDWR|O_NONBLOCK|O_BINARY|O_CREAT);
+            par_fd = open(file_name, O_RDWR|O_NONBLOCK|O_BINARY|oflag);
             write_log("parallel: open file='%s' mode=%d -> fd=%d\n", file_name, par_mode, par_fd);
         }
     } else {
