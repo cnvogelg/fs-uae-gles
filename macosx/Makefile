@@ -1,6 +1,13 @@
 include ../common.mk
 version = $(strip $(shell cat ../VERSION))
 
+all: bundle
+
+clean:
+	$(MAKE) -C .. clean
+	rm -Rf fs-uae-$(version)-macosx
+	rm -f fs-uae-$(version)-macosx.tar.gz
+
 bindist: bundle
 	python fix-app.py
 	cp -pPR ../licenses fs-uae-$(version)-macosx/
