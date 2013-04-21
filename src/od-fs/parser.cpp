@@ -9,7 +9,7 @@
 #include "sysconfig.h"
 
 #undef SERIAL_ENET
-#define DEBUG_PAR
+//#define DEBUG_PAR
 
 #include "config.h"
 #include "sysdeps.h"
