@@ -620,14 +620,6 @@ static void resetwarning_check (void)
 
 void CIA_hsync_prehandler (void)
 {
-    /* CV: check for parallel ACK */
-#ifdef PARALLEL_PORT
-    if (isprinter () < 0) {
-        if(parallel_direct_check_ack_flag()) {
-            cia_parallelack ();
-        }
-    }
-#endif
 }
 
 static void keyreq (void)
