@@ -258,27 +258,132 @@ static const char *decode_ctl(uae_u8 ctl)
 }
 #endif
 
+static int par_low_write(uae_u8 data[2])
+{
+    struct timeval tv;
+    fd_set fds, fde;
+    tv.tv_sec = 0;
+    tv.tv_usec = 0;
+    FD_ZERO(&fds);
+    FD_SET(par_fd, &fds);
+    FD_ZERO(&fde);
+    FD_SET(par_fd, &fds);
+    int num_ready = select (FD_SETSIZE, NULL, &fds, &fde, &tv);
+    if(num_ready > 0) {
+        if(FD_ISSET(par_fd, &fde)) {
+            /* error */
+#ifdef DEBUG_PAR
+            printf("tx: fd ERROR!\n");
+#endif
+            close(par_fd);
+            par_fd = -1;
+            return -1; /* failed */
+        }
+        if(FD_ISSET(par_fd, &fds)) {
+            int rem = 2;
+            int off = 0;
+            while(rem > 0) {
+                int num = write(par_fd, data+off, rem);
+                if(num < 0) {
+                    if(errno != EAGAIN) {
+#ifdef DEBUG_PAR
+                        printf("tx: ERROR(-1): %d rem %d\n", num, rem);
+#endif
+                        close(par_fd);
+                        par_fd = -1;
+                        return -1; /* failed */
+                    }
+                } 
+                else if(num == 0) {
+#ifdef DEBUG_PAR
+                    printf("tx: ERROR(0): %d rem %d\n", num, rem);
+#endif
+                    close(par_fd);
+                    par_fd = -1;
+                    return -1; /* failed */
+                }
+                else {
+                    rem -= num;
+                    off += num;
+                }
+            }
+            return 0; /* ok */
+        }
+    }
+    return 1; /* delayed */
+}
+
+static int par_low_read(uae_u8 data[2])
+{
+    struct timeval tv;
+    fd_set fds, fde;
+    tv.tv_sec = 0;
+    tv.tv_usec = 0;
+    FD_ZERO(&fds);
+    FD_SET(par_fd, &fds);
+    FD_ZERO(&fde);
+    FD_SET(par_fd, &fde);
+    int num_ready = select (FD_SETSIZE, &fds, NULL, &fde, &tv);
+    if(num_ready > 0) {
+        if(FD_ISSET(par_fd, &fde)) {
+#ifdef DEBUG_PAR
+            printf("rx: fd ERROR\n");
+#endif
+            close(par_fd);
+            par_fd = -1;
+            return -1; /* failed */
+        }
+        if(FD_ISSET(par_fd, &fds)) {
+            /* read 2 bytes command */
+            int rem = 2;
+            int off = 0;
+            while(rem > 0) {
+                int n = read(par_fd, data+off, rem);
+                if(n<0) {
+                    if(errno != EAGAIN) {
+#ifdef DEBUG_PAR
+                        printf("rx: ERROR(-1): %d rem: %d\n", n, rem);
+#endif
+                        close(par_fd);
+                        par_fd = -1;
+                        return -1; /* failed */
+                    }
+                } 
+                else if(n==0) {
+#ifdef DEBUG_PAR
+                    printf("rx: ERROR(0): %d rem: %d\n", n, rem);
+#endif
+                    close(par_fd);
+                    par_fd = -1;
+                    return -1; /* failed */
+                }
+                else {
+                    rem -= n;
+                    off += n;
+                }
+            }
+            return 0; /* ok */
+        }
+    }
+    return 1; /* delayed */
+}
+
 static void par_write_state(int strobe)
 {
     if(par_fd == -1) {
         return;
     }
     
-    struct timeval tv;
-    fd_set fds;
-    tv.tv_sec = 0;
-    tv.tv_usec = 0;
-    FD_ZERO(&fds);
-    FD_SET(par_fd, &fds);
-    int num_ready = select (FD_SETSIZE, NULL, &fds, NULL, &tv);
-    if(num_ready > 0) {
-        /* only write if value changed */
-        if(strobe || (last_pctl != pctl) || (last_pdat != pdat)) {
-            uae_u8 data[2] = { pctl, pdat };
-            if(strobe) {
-                data[0] |= 0x08;
-            }
-            write(par_fd, data, 2);
+    /* only write if value changed */
+    if(strobe || (last_pctl != pctl) || (last_pdat != pdat)) {
+        uae_u8 data[2] = { pctl, pdat };
+        if(strobe) {
+            data[0] |= 0x08;
+        }
+        
+        /* try to write out value */
+        int res = par_low_write(data);
+        if(res == 0) {
             last_pctl = pctl;
             last_pdat = pdat;
 #ifdef DEBUG_PAR
@@ -294,44 +399,24 @@ static int par_read_state(void)
         return 0;
     }
     
-    struct timeval tv;
-    fd_set fds;
-    tv.tv_sec = 0;
-    tv.tv_usec = 0;
-    FD_ZERO(&fds);
-    FD_SET(par_fd, &fds);
-    int num_ready = select (FD_SETSIZE, &fds, NULL, NULL, &tv);
-    if(num_ready > 0) {
-        uae_u8 data[2];
-        
-        /* read 2 bytes command */
-        int rem = 2;
-        int off = 0;
-        while(rem > 0) {
-            int n = read(par_fd, data+off, rem);
-            if(n<0) {
-                printf("rx: ERR: %d rem: %d\n", n, rem);
-                return 0;
-            } else {
-                rem -= n;
-                off += n;
-            }
-        }
+    uae_u8 data[2];
+    int res = par_low_read(data);
             
+    if(res == 0) {
         int ack = 0;
         uae_u8 cmd = data[0];
-            
+        
         // only poll an update
         if(cmd == 0) {
             par_write_state(1);
         } else {            
             uae_u8 bits = cmd & 7;
-        
+    
             // update pdat value
             if(cmd & 0x10) {
                 pdat = data[1];
             }
-            
+        
             // absolute set line bits
             if(cmd & 0x20) {
                 pctl = bits;
@@ -344,17 +429,17 @@ static int par_read_state(void)
             else if(cmd & 0x80) {
                 pctl &= ~bits;
             }
-            
+        
             // set ack flag
             if(cmd & 8) {
                 ack = 1;
             }
-            
+        
 #ifdef DEBUG_PAR
             printf("rx: [%02x %02x] ctl=%02x dat=%02x %s\n", data[0], data[1], pctl, pdat, decode_ctl(pctl));
 #endif
         }
-                
+            
         // is ACK bit set?
         return ack; 
     }
