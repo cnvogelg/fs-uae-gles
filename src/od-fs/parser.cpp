@@ -9,7 +9,6 @@
 #include "sysconfig.h"
 
 #undef SERIAL_ENET
-//#define DEBUG_PAR
 
 #include "config.h"
 #include "sysdeps.h"
@@ -138,6 +137,7 @@ static int writepending;
 
 static int par_fd = -1;
 static int par_mode = PAR_MODE_OFF;
+static int vpar_debug = 0;
 
 static void *vpar_thread(void *);
 static uae_sem_t vpar_sem;
@@ -181,6 +181,8 @@ void initparallel (void)
             uae_sem_init(&vpar_sem, 0, 1);
             uae_start_thread (_T("parser_ack"), vpar_thread, NULL, NULL);
         }
+        /* enable debug output */
+        vpar_debug = (getenv("VPAR_DEBUG")!=NULL);
     } else {
         par_mode = PAR_MODE_OFF;
     }
@@ -254,18 +256,28 @@ static uae_u8 last_pdat;
     Note: sending a 00,00 pair returns the current state pair
 */
 
-#ifdef DEBUG_PAR
 static char buf[80];
-static const char *decode_ctl(uae_u8 ctl)
+static const char *decode_ctl(uae_u8 ctl,const char *txt)
 {
     int busy = (ctl & 1) == 1;
     int pout = (ctl & 2) == 2;
     int select = (ctl & 4) == 4;
-    int ack = (ctl & 8) == 8;
-    sprintf(buf,"busy=%d pout=%d select=%d ack=%d",busy, pout, select, ack);
+    if(txt != NULL) {
+        int ack = (ctl & 8) == 8;
+        sprintf(buf,"busy=%d pout=%d select=%d %s=%d",busy, pout, select, txt, ack);
+    } else {
+        sprintf(buf,"busy=%d pout=%d select=%d",busy, pout, select);
+    }
     return buf;
 }
-#endif
+static char buf2[16];
+static const char *get_ts(void)
+{
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    sprintf(buf2,"%8d.%06d",tv.tv_sec,tv.tv_usec);
+    return buf2;
+}
 
 static int vpar_low_write(uae_u8 data[2])
 {
@@ -275,18 +287,18 @@ static int vpar_low_write(uae_u8 data[2])
         int num = write(par_fd, data+off, rem);
         if(num < 0) {
             if(errno != EAGAIN) {
-#ifdef DEBUG_PAR
-                printf("tx: ERROR(-1): %d rem %d\n", num, rem);
-#endif
+                if(vpar_debug) {
+                    printf("tx: ERROR(-1): %d rem %d\n", num, rem);
+                }
                 close(par_fd);
                 par_fd = -1;
                 return -1; /* failed */
             }
         } 
         else if(num == 0) {
-#ifdef DEBUG_PAR
-            printf("tx: ERROR(0): %d rem %d\n", num, rem);
-#endif
+            if(vpar_debug) {
+                printf("tx: ERROR(0): %d rem %d\n", num, rem);
+            }
             close(par_fd);
             par_fd = -1;
             return -1; /* failed */
@@ -309,9 +321,9 @@ static int vpar_low_read(uae_u8 data[2])
     int num_ready = select (FD_SETSIZE, &fds, NULL, &fde, NULL);
     if(num_ready > 0) {
         if(FD_ISSET(par_fd, &fde)) {
-#ifdef DEBUG_PAR
-            printf("rx: fd ERROR\n");
-#endif
+            if(vpar_debug) {
+                printf("rx: fd ERROR\n");
+            }
             close(par_fd);
             par_fd = -1;
             return -1; /* failed */
@@ -324,18 +336,18 @@ static int vpar_low_read(uae_u8 data[2])
                 int n = read(par_fd, data+off, rem);
                 if(n<0) {
                     if(errno != EAGAIN) {
-#ifdef DEBUG_PAR
-                        printf("rx: ERROR(-1): %d rem: %d\n", n, rem);
-#endif
+                        if(vpar_debug) {
+                            printf("rx: ERROR(-1): %d rem: %d\n", n, rem);
+                        }
                         close(par_fd);
                         par_fd = -1;
                         return -1; /* failed */
                     }
                 } 
                 else if(n==0) {
-#ifdef DEBUG_PAR
-                    printf("rx: ERROR(0): %d rem: %d\n", n, rem);
-#endif
+                    if(vpar_debug) {
+                        printf("rx: ERROR(0): %d rem: %d\n", n, rem);
+                    }
                     close(par_fd);
                     par_fd = -1;
                     return -1; /* failed */
@@ -369,9 +381,9 @@ static void vpar_write_state(int strobe)
         if(res == 0) {
             last_pctl = pctl;
             last_pdat = pdat;
-#ifdef DEBUG_PAR
-            printf("tx: ctl=%02x dat=%02x %s\n", data[0], data[1], decode_ctl(data[0]));
-#endif
+            if(vpar_debug) {
+                printf("%s tx: ctl=%02x dat=%02x %s\n", get_ts(), data[0], data[1], decode_ctl(data[0],"strobe"));
+            }
         }
     }
 }
@@ -408,11 +420,12 @@ static int vpar_read_state(const uae_u8 data[2])
         // set ack flag
         if(cmd & 8) {
             ack = 1;
+            pctl |= 8;
         }
     
-#ifdef DEBUG_PAR
-        printf("rx: [%02x %02x] ctl=%02x dat=%02x %s\n", data[0], data[1], pctl, pdat, decode_ctl(pctl));
-#endif
+        if(vpar_debug) {
+            printf("%s rx: [%02x %02x] ctl=%02x dat=%02x %s\n", get_ts(), data[0], data[1], pctl, pdat, decode_ctl(pctl,"ack"));
+        }
     }
         
     // is ACK bit set?
@@ -423,9 +436,9 @@ static int vpar_read_state(const uae_u8 data[2])
 
 void *vpar_thread(void *)
 {
-#ifdef DEBUG_PAR
-    printf("th: enter\n");
-#endif
+    if(vpar_debug) {
+        printf("th: enter\n");
+    }
     while(par_fd != -1) {
         /* block until we got data */
         uae_u8 data[2];
@@ -435,16 +448,17 @@ void *vpar_thread(void *)
             int do_ack = vpar_read_state(data);
             uae_sem_post(&vpar_sem);
             if(do_ack) {
-#ifdef DEBUG_PAR
-                printf("th: ACK\n");
-#endif
+                if(vpar_debug) {
+                    printf("%s th: ACK\n",get_ts());
+                }
                 cia_parallelack();
+                pctl &= ~8; // clear ack
             }
         }
     }
-#ifdef DEBUG_PAR
-    printf("th: leave\n");
-#endif
+    if(vpar_debug) {
+        printf("th: leave\n");
+    }
     return 0;
 }
 
@@ -454,15 +468,17 @@ int parallel_direct_write_status (uae_u8 v, uae_u8 dir)
 {
     uae_u8 pdir = dir & 7;
     
+#ifdef DEBUG_PAR
+    uae_u8 val = v & pdir;
+    printf("%s wr: ctl=%02x dir=%02x %s\n", get_ts(), val, pdir, decode_ctl(val ,NULL));
+#endif
+    
     // update pctl
     uae_sem_wait(&vpar_sem);
     pctl = (v & pdir) | (pctl & ~pdir);
     vpar_write_state(0);
     uae_sem_post(&vpar_sem);
 
-#ifdef DEBUG_PAR
-    printf("wr: ctl=%02x dir=%02x %s\n", pctl, pdir, decode_ctl(pctl));
-#endif
     return 0;
 }
 
@@ -476,14 +492,16 @@ int parallel_direct_read_status (uae_u8 *vp)
 
 int parallel_direct_write_data (uae_u8 v, uae_u8 dir) 
 {
+#ifdef DEBUG_PAR
+    uae_u8 val = v & dir;
+    printf("%s wr: dat=%02x dir=%02x\n", get_ts(), val, dir);
+#endif
+
     uae_sem_wait(&vpar_sem);
     pdat = (v & dir) | (pdat & ~dir);
     vpar_write_state(1); /* write with strobe */
     uae_sem_post(&vpar_sem);
     
-#ifdef DEBUG_PAR
-    printf("wr: dat=%02x dir=%02x\n", pdat, dir);
-#endif
     return 0;
 }
 
