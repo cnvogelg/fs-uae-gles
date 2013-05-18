@@ -140,10 +140,13 @@ static int writepending;
 static int par_fd = -1;
 static int par_mode = PAR_MODE_OFF;
 static int vpar_debug = 0;
-static int vpar_init = 0;
+static int vpar_init_done = 0;
 
 static void *vpar_thread(void *);
 static uae_sem_t vpar_sem;
+
+static void vpar_init(void);
+static void vpar_exit(void);
 
 void initparallel (void) 
 {
@@ -180,13 +183,20 @@ void initparallel (void)
             write_log("parallel: open file='%s' mode=%d -> fd=%d\n", file_name, par_mode, par_fd);
         }
         /* start vpar reader thread */
-        if(!vpar_init) {
+        if(!vpar_init_done) {
             uae_sem_init(&vpar_sem, 0, 1);
             uae_start_thread (_T("parser_ack"), vpar_thread, NULL, NULL);
-            vpar_init = 1;
+            vpar_init_done = 1;
         }
         /* enable debug output */
         vpar_debug = (getenv("VPAR_DEBUG")!=NULL);
+        /* init vpar */
+        if(par_fd >= 0) {
+            if(vpar_debug) {
+                puts("*** vpar init");
+            }
+            vpar_init();
+        }
     } else {
         par_mode = PAR_MODE_OFF;
     }
@@ -208,6 +218,12 @@ void exitparallel (void)
 {
     /* close parallel control file */
     if(par_fd >= 0) {
+        /* exit vpar */
+        if(vpar_debug) {
+            puts("*** vpar exit");
+        }
+        vpar_exit();
+        
         write_log("parallel: close fd=%d\n", par_fd);
         close(par_fd);
         par_fd = -1;
@@ -256,9 +272,19 @@ static uae_u8 last_pdat;
         0x02 1 = POUT line set
         0x04 2 = SELECT line set
         0x08 3 = STROBE was triggered
+
+        0x10 4 = is an reply to a read request (otherwise emu change)
+        0x20 5 = n/a
+        0x40 6 = emulator is starting (first msg of session)
+        0x80 7 = emulator is shutting down (last msg of session)
     
     Note: sending a 00,00 pair returns the current state pair
 */
+
+#define VPAR_STROBE     0x08
+#define VPAR_REPLY      0x10
+#define VPAR_INIT       0x40
+#define VPAR_EXIT       0x80
 
 static char buf[80];
 static const char *decode_ctl(uae_u8 ctl,const char *txt)
@@ -367,17 +393,17 @@ static int vpar_low_read(uae_u8 data[2])
     return 1; /* delayed */
 }
 
-static void vpar_write_state(int strobe, int force)
+static void vpar_write_state(int force_flags)
 {
     if(par_fd == -1) {
         return;
     }
     
     /* only write if value changed */
-    if(force || strobe || (last_pctl != pctl) || (last_pdat != pdat)) {
+    if(force_flags || (last_pctl != pctl) || (last_pdat != pdat)) {
         uae_u8 data[2] = { pctl, pdat };
-        if(strobe) {
-            data[0] |= 0x08;
+        if(force_flags) {
+            data[0] |= force_flags;
         }
         
         /* try to write out value */
@@ -386,7 +412,7 @@ static void vpar_write_state(int strobe, int force)
             last_pctl = pctl;
             last_pdat = pdat;
             if(vpar_debug) {
-                const char *what = force ? "TX" : "tx";
+                const char *what = force_flags ? "TX" : "tx";
                 printf("%s %s: ctl=%02x dat=%02x %s\n", get_ts(), what, data[0], data[1], decode_ctl(data[0],"strobe"));
             }
         }
@@ -439,6 +465,18 @@ static int vpar_read_state(const uae_u8 data[2])
     return ack; 
 }
 
+static void vpar_init(void)
+{
+    /* write initial state with init flag set */
+    vpar_write_state(VPAR_INIT);
+}
+
+static void vpar_exit(void)
+{
+    /* write final state with exit flag set */
+    vpar_write_state(VPAR_EXIT);
+}
+
 // --- worker thread ---
 
 void *vpar_thread(void *)
@@ -454,7 +492,7 @@ void *vpar_thread(void *)
             uae_sem_wait(&vpar_sem);
             int do_ack = vpar_read_state(data);
             /* ack value -> force write */
-            vpar_write_state(0,1);
+            vpar_write_state(VPAR_REPLY);
             uae_sem_post(&vpar_sem);
             if(do_ack) {
                 if(vpar_debug) {
@@ -468,7 +506,7 @@ void *vpar_thread(void *)
     if(vpar_debug) {
         printf("th: leave\n");
     }
-    vpar_init = 0;
+    vpar_init_done = 0;
     return 0;
 }
 
@@ -486,7 +524,7 @@ int parallel_direct_write_status (uae_u8 v, uae_u8 dir)
     // update pctl
     uae_sem_wait(&vpar_sem);
     pctl = (v & pdir) | (pctl & ~pdir);
-    vpar_write_state(0,0);
+    vpar_write_state(0);
     uae_sem_post(&vpar_sem);
 
     return 0;
@@ -509,7 +547,7 @@ int parallel_direct_write_data (uae_u8 v, uae_u8 dir)
 
     uae_sem_wait(&vpar_sem);
     pdat = (v & dir) | (pdat & ~dir);
-    vpar_write_state(1,0); /* write with strobe */
+    vpar_write_state(VPAR_STROBE); /* write with strobe (0x08) */
     uae_sem_post(&vpar_sem);
     
     return 0;
