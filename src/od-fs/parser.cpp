@@ -131,6 +131,8 @@ static int dataininput, dataininputcnt;
 static int writepending;
 */
 
+/* ---------- parallel port ------------------------------------------------ */
+
 #define PAR_MODE_OFF     0
 #define PAR_MODE_PRT     1
 #define PAR_MODE_RAW     -1
@@ -138,6 +140,7 @@ static int writepending;
 static int par_fd = -1;
 static int par_mode = PAR_MODE_OFF;
 static int vpar_debug = 0;
+static int vpar_init = 0;
 
 static void *vpar_thread(void *);
 static uae_sem_t vpar_sem;
@@ -177,9 +180,10 @@ void initparallel (void)
             write_log("parallel: open file='%s' mode=%d -> fd=%d\n", file_name, par_mode, par_fd);
         }
         /* start vpar reader thread */
-        if(par_fd != -1) {
+        if(!vpar_init) {
             uae_sem_init(&vpar_sem, 0, 1);
             uae_start_thread (_T("parser_ack"), vpar_thread, NULL, NULL);
+            vpar_init = 1;
         }
         /* enable debug output */
         vpar_debug = (getenv("VPAR_DEBUG")!=NULL);
@@ -363,14 +367,14 @@ static int vpar_low_read(uae_u8 data[2])
     return 1; /* delayed */
 }
 
-static void vpar_write_state(int strobe)
+static void vpar_write_state(int strobe, int force)
 {
     if(par_fd == -1) {
         return;
     }
     
     /* only write if value changed */
-    if(strobe || (last_pctl != pctl) || (last_pdat != pdat)) {
+    if(force || strobe || (last_pctl != pctl) || (last_pdat != pdat)) {
         uae_u8 data[2] = { pctl, pdat };
         if(strobe) {
             data[0] |= 0x08;
@@ -382,7 +386,8 @@ static void vpar_write_state(int strobe)
             last_pctl = pctl;
             last_pdat = pdat;
             if(vpar_debug) {
-                printf("%s tx: ctl=%02x dat=%02x %s\n", get_ts(), data[0], data[1], decode_ctl(data[0],"strobe"));
+                const char *what = force ? "TX" : "tx";
+                printf("%s %s: ctl=%02x dat=%02x %s\n", get_ts(), what, data[0], data[1], decode_ctl(data[0],"strobe"));
             }
         }
     }
@@ -393,10 +398,8 @@ static int vpar_read_state(const uae_u8 data[2])
     int ack = 0;
     uae_u8 cmd = data[0];
     
-    // only poll an update
-    if(cmd == 0) {
-        vpar_write_state(1);
-    } else {            
+    // is an update
+    if(cmd != 0) {
         uae_u8 bits = cmd & 7;
 
         // update pdat value
@@ -426,6 +429,10 @@ static int vpar_read_state(const uae_u8 data[2])
         if(vpar_debug) {
             printf("%s rx: [%02x %02x] ctl=%02x dat=%02x %s\n", get_ts(), data[0], data[1], pctl, pdat, decode_ctl(pctl,"ack"));
         }
+    } else {
+        if(vpar_debug) {
+            printf("%s rx: poll ctl=%02x dat=%02x %s\n", get_ts(), pctl, pdat, decode_ctl(pctl,"ack"));            
+        }
     }
         
     // is ACK bit set?
@@ -446,6 +453,8 @@ void *vpar_thread(void *)
         if(res == 0) {
             uae_sem_wait(&vpar_sem);
             int do_ack = vpar_read_state(data);
+            /* ack value -> force write */
+            vpar_write_state(0,1);
             uae_sem_post(&vpar_sem);
             if(do_ack) {
                 if(vpar_debug) {
@@ -459,6 +468,7 @@ void *vpar_thread(void *)
     if(vpar_debug) {
         printf("th: leave\n");
     }
+    vpar_init = 0;
     return 0;
 }
 
@@ -476,7 +486,7 @@ int parallel_direct_write_status (uae_u8 v, uae_u8 dir)
     // update pctl
     uae_sem_wait(&vpar_sem);
     pctl = (v & pdir) | (pctl & ~pdir);
-    vpar_write_state(0);
+    vpar_write_state(0,0);
     uae_sem_post(&vpar_sem);
 
     return 0;
@@ -499,7 +509,7 @@ int parallel_direct_write_data (uae_u8 v, uae_u8 dir)
 
     uae_sem_wait(&vpar_sem);
     pdat = (v & dir) | (pdat & ~dir);
-    vpar_write_state(1); /* write with strobe */
+    vpar_write_state(1,0); /* write with strobe */
     uae_sem_post(&vpar_sem);
     
     return 0;
