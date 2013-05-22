@@ -177,6 +177,8 @@ void initparallel (void)
         } else {
             par_mode = PAR_MODE_PRT;
         }
+        /* enable debug output */
+        vpar_debug = (getenv("VPAR_DEBUG")!=NULL);
         /* open parallel control file */
         if(par_fd == -1) {
             par_fd = open(file_name, O_RDWR|O_NONBLOCK|O_BINARY|oflag);
@@ -188,8 +190,6 @@ void initparallel (void)
             uae_start_thread (_T("parser_ack"), vpar_thread, NULL, NULL);
             vpar_init_done = 1;
         }
-        /* enable debug output */
-        vpar_debug = (getenv("VPAR_DEBUG")!=NULL);
         /* init vpar */
         if(par_fd >= 0) {
             if(vpar_debug) {
@@ -300,7 +300,7 @@ static const char *decode_ctl(uae_u8 ctl,const char *txt)
     }
     return buf;
 }
-static char buf2[16];
+static char buf2[32];
 static const char *get_ts(void)
 {
     struct timeval tv;
