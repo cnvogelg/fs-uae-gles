@@ -292,12 +292,34 @@ static const char *decode_ctl(uae_u8 ctl,const char *txt)
     int busy = (ctl & 1) == 1;
     int pout = (ctl & 2) == 2;
     int select = (ctl & 4) == 4;
+    
+    char *ptr = buf;
+    if(busy) {
+        strcpy(ptr, "BUSY ");
+    } else {
+        strcpy(ptr, "busy ");
+    }
+    ptr+=5;
+    if(pout) {
+        strcpy(ptr, "POUT ");
+    } else {
+        strcpy(ptr, "pout ");
+    }
+    ptr+=5;
+    if(select) {
+        strcpy(ptr, "SELECT ");
+    } else {
+        strcpy(ptr, "select ");
+    }
+    ptr+=7;
     if(txt != NULL) {
         int ack = (ctl & 8) == 8;
-        sprintf(buf,"busy=%d pout=%d select=%d %s=%d",busy, pout, select, txt, ack);
-    } else {
-        sprintf(buf,"busy=%d pout=%d select=%d",busy, pout, select);
+        if(ack) {
+            strcpy(ptr, txt);
+            ptr += strlen(txt);
+        }
     }
+    *ptr = '\0';
     return buf;
 }
 static char buf2[32];
@@ -413,7 +435,9 @@ static void vpar_write_state(int force_flags)
             last_pdat = pdat;
             if(vpar_debug) {
                 const char *what = force_flags ? "TX" : "tx";
-                printf("%s %s: ctl=%02x dat=%02x %s\n", get_ts(), what, data[0], data[1], decode_ctl(data[0],"strobe"));
+                printf("%s %s: [%02x %02x] ctl=%02x  (%02x)  %s\n", 
+                    get_ts(), what, data[0], data[1], pctl, pdat, 
+                    decode_ctl(data[0],"strobe"));
             }
         }
     }
@@ -453,11 +477,13 @@ static int vpar_read_state(const uae_u8 data[2])
         }
     
         if(vpar_debug) {
-            printf("%s rx: [%02x %02x] ctl=%02x dat=%02x %s\n", get_ts(), data[0], data[1], pctl, pdat, decode_ctl(pctl,"ack"));
+            printf("%s rx: [%02x %02x] ctl=%02x  (%02x)  %s\n", 
+                get_ts(), data[0], data[1], pctl, pdat, decode_ctl(pctl,"ack"));
         }
     } else {
         if(vpar_debug) {
-            printf("%s rx: poll ctl=%02x dat=%02x %s\n", get_ts(), pctl, pdat, decode_ctl(pctl,"ack"));            
+            printf("%s rx: [00 xx] ctl=%02x  (%02x)  %s\n",
+                get_ts(), pctl, pdat, decode_ctl(pctl,"ack"));            
         }
     }
         
@@ -512,6 +538,8 @@ void *vpar_thread(void *)
 
 // --- direct parallel API ---
 
+//#define DEBUG_PAR
+
 int parallel_direct_write_status (uae_u8 v, uae_u8 dir) 
 {
     uae_u8 pdir = dir & 7;
@@ -535,6 +563,15 @@ int parallel_direct_read_status (uae_u8 *vp)
     uae_sem_wait(&vpar_sem);
     *vp = pctl;
     uae_sem_post(&vpar_sem);
+
+#ifdef DEBUG_PAR
+    static uae_u8 last_v = 0;
+    if(*vp != last_v) {
+        last_v = *vp;
+        printf("%s RD: ctl=%02x\n", get_ts(), last_v);
+    }
+#endif
+
     return 0;
 }
 
@@ -558,6 +595,15 @@ int parallel_direct_read_data (uae_u8 *v)
     uae_sem_wait(&vpar_sem);
     *v = pdat;
     uae_sem_post(&vpar_sem);
+
+#ifdef DEBUG_PAR
+    static uae_u8 last_v = 0;
+    if(*v != last_v) {
+        last_v = *v;
+        printf("%s RD: dat=%02x\n", get_ts(), last_v);
+    }
+#endif
+
     return 0;
 }
 
