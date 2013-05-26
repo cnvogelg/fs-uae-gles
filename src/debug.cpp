@@ -36,6 +36,7 @@
 #include "rommgr.h"
 #include "inputrecord.h"
 #include "calc.h"
+#include "segtracker.h"
 
 int debugger_active;
 static uaecptr skipaddr_start, skipaddr_end;
@@ -142,6 +143,9 @@ static TCHAR help[] = {
 	_T("  dm                    Dump current address space map.\n")
 	_T("  v <vpos> [<hpos>]     Show DMA data (accurate only in cycle-exact mode).\n")
 	_T("                        v [-1 to -4] = enable visual DMA debugger.\n")
+    _T("  Z                     show seglists tracked by SegmentTracker.\n")
+    _T("  Za <addr>             find segment that contains given address.\n")
+    _T("  Zs 'name'             search seglist with given name.\n")
 	_T("  ?<value>              Hex ($ and 0x)/Bin (%)/Dec (!) converter.\n")
 #ifdef _WIN32
 	_T("  x                     Close debugger.\n")
@@ -3399,6 +3403,72 @@ static void m68k_modify (TCHAR **inptr)
 	}
 }
 
+static int parse_string(TCHAR **inptr, TCHAR *str, int max_len)
+{
+    int len = 0;
+    
+    ignore_ws (inptr);
+    if ((**inptr == '"')||(**inptr == '\'')) {
+        TCHAR delim = **inptr;
+        (*inptr)++;
+        while (**inptr != delim && **inptr != 0) {
+            str[len++] = tolower(**inptr);
+            (*inptr)++;
+            if(len == max_len) {
+                break;
+            }
+        }
+        if (**inptr != 0)
+            (*inptr)++;
+    }
+    str[len] = '\0';
+    return len;
+}
+
+static void segtracker(TCHAR **inptr)
+{
+    if (more_params (inptr)) {
+        switch (next_char (inptr))
+        {
+        case 'a': /* 'Za' <address> searches segment for address */
+            {
+                uae_u32 addr = readhex (inptr);
+                seglist *sl;
+                int num_seg;
+                int found = segtracker_search_address(addr, &sl, &num_seg);
+                if(found) {
+                    uae_u32 s_addr = sl->segments[num_seg].addr;
+                    uae_u32 s_size = sl->segments[num_seg].size;
+                    uae_u32 s_end = s_addr + s_size;
+                    uae_u32 offset = addr - s_addr;
+                    console_out_f(_T("%08x: '%s' #%02d [%08x,%08x,%08x] +%08x\n"),
+                                addr, sl->name, num_seg,
+                                s_addr, s_size, s_end, 
+                                offset);
+                } else {
+                    console_out_f(_T("%08x: not found in any segments.\n"), addr);
+                }
+            }
+            break;
+        case 's': /* 'Zs' "pattern" show seglists matching name pattern */
+            {
+                TCHAR str[64];
+                int len = parse_string(inptr, str, 64);
+                if(len > 0) {
+                    char *cstr = au(str);
+                    console_out_f(_T("Searching seglists matching '%s'\n"),cstr);
+                    segtracker_dump(cstr);
+                    xfree(cstr);
+                }
+            }
+            break;
+        }
+    } else {
+        /* only 'Z' dumps all seglists */
+        segtracker_dump(NULL);
+    }
+}
+
 static uaecptr nxdis, nxmem;
 
 static BOOL debug_line (TCHAR *input)
@@ -3729,6 +3799,9 @@ static BOOL debug_line (TCHAR *input)
 				console_out_f (_T("\n"));
 			}
 			break;
+        case 'Z':
+            segtracker(&inptr);
+            break;
 		case 'h':
 		case '?':
 			if (more_params (&inptr))

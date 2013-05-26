@@ -50,6 +50,7 @@
 #include "blkdev.h"
 #include "gfxfilter.h"
 #include "uaeresource.h"
+#include "segtracker.h"
 #include "dongle.h"
 #include "sampler.h"
 #include "consolehook.h"
@@ -893,6 +894,7 @@ void virtualdevice_init (void)
 #endif
 #ifdef FILESYS
 	rtarea_init ();
+    segtracker_install ();
 	uaeres_install ();
 	hardfile_install ();
 #endif

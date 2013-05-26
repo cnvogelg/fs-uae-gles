@@ -249,11 +249,13 @@ obj/missing.o \
 obj/native2amiga.o \
 obj/newcpu.o \
 obj/ncr_scsi.o \
+obj/patch.o \
 obj/readcpu.o \
 obj/rommgr.o \
 obj/savestate.o \
 obj/scsi.o \
 obj/scsiemul.o \
+obj/segtracker.o \
 obj/specialmonitors.o \
 obj/statusline.o \
 obj/traps.o \

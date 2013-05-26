@@ -49,6 +49,7 @@
 #include "sana2.h"
 #include "bsdsocket.h"
 #include "uaeresource.h"
+#include "segtracker.h"
 #include "inputdevice.h"
 #include "clipboard.h"
 #include "consolehook.h"
@@ -5992,6 +5993,9 @@ static uae_u32 REGPARAM2 filesys_diagentry (TrapContext *context)
 	* Resident structures and call InitResident() for them at the end of the
 	* diag entry. */
 
+    /* CV: segtracker setup */
+    resaddr = segtracker_startup( resaddr );
+    
 	resaddr = uaeres_startup (resaddr);
 #ifdef BSDSOCKET
 	resaddr = bsdlib_startup (resaddr);
