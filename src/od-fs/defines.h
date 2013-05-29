@@ -19,8 +19,8 @@
 #include "uae_host.h"
 
 #define STUB(format, ...) { write_log(" -- stub -- %s " format "\n", \
-        __func__, ##__VA_ARGS__); \
-        printf(" -- stub -- %s " format "\n", __func__, ##__VA_ARGS__); }
+        __func__, ##__VA_ARGS__); }
+//        printf(" -- stub -- %s " format "\n", __func__, ##__VA_ARGS__); }
 
 #define LOG_STUB(format, ...) { write_log(" -- stub -- %s " format "\n", \
         __func__, ##__VA_ARGS__); }
