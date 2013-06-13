@@ -143,9 +143,13 @@ static TCHAR help[] = {
 	_T("  dm                    Dump current address space map.\n")
 	_T("  v <vpos> [<hpos>]     Show DMA data (accurate only in cycle-exact mode).\n")
 	_T("                        v [-1 to -4] = enable visual DMA debugger.\n")
-    _T("  Z                     show seglists tracked by SegmentTracker.\n")
+    // segtracker commands
+    _T("  Z                     print SegmentTracker status.\n")
+    _T("  Ze [<0-1>]            enable/disable/toggle SegmentTracker\n")
+    _T("  Zl                    show seglists tracked by SegmentTracker.\n")
     _T("  Za <addr>             find segment that contains given address.\n")
     _T("  Zs 'name'             search seglist with given name.\n")
+    
 	_T("  ?<value>              Hex ($ and 0x)/Bin (%)/Dec (!) converter.\n")
 #ifdef _WIN32
 	_T("  x                     Close debugger.\n")
@@ -3425,8 +3429,10 @@ static int parse_string(TCHAR **inptr, TCHAR *str, int max_len)
     return len;
 }
 
+/* SegmentTracker Z* command parser */
 static void segtracker(TCHAR **inptr)
 {
+    int show_status = 0;
     if (more_params (inptr)) {
         switch (next_char (inptr))
         {
@@ -3462,10 +3468,35 @@ static void segtracker(TCHAR **inptr)
                 }
             }
             break;
+        case 'l': /* 'Zl' list all tracked segments */
+            segtracker_dump(NULL);
+            break;
+        case 'e': /* 'Ze' enable segtracker */
+            ignore_ws(inptr);
+            if(more_params(inptr)) {
+                int v = readint(inptr);
+                segtracker_enabled = v ? 1 : 0;
+            } else {
+                segtracker_enabled = segtracker_enabled ? 0 : 1;
+            }
+            show_status = 1;
+            /* clear seglist if disabled */
+            if(!segtracker_enabled) {
+                segtracker_clear();
+            }
+            break;
         }
     } else {
-        /* only 'Z' dumps all seglists */
-        segtracker_dump(NULL);
+        /* only 'Z': show tracker status */
+        show_status = 1;
+    }
+    
+    if(show_status) {
+        console_out_f(_T("SegmentTracker is %s\n"), segtracker_enabled ? "enabled":"disabled");
+        int num = segtracker_pool.num_seglists;
+        if(num > 0) {
+            console_out_f(_T("Found %d segment lists\n"), num);
+        }
     }
 }
 

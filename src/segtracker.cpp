@@ -24,16 +24,22 @@ static patch_func pf_LoadSeg;
 static patch_func pf_UnLoadSeg;
 static patch_func pf_NewLoadSeg;
 
+int segtracker_enabled = 0;
+
+/* patch the interesting DOS functions.
+   Since we call exec's SetFunction to perform the patch it will work on
+   V36 and pre too as there the patch is not performed. */
 static void patch_dos(TrapContext *ctx)
 {
     uae_u16 ver = get_word(dos_base + 20);
-    printf("segtracker: dos V%d -> %s\n", ver, (ver <= 36) ? "can't patch":"patched");
+    write_log("segtracker: dos V%d -> %s\n", ver, (ver <= 36) ? "can't patch":"patched");
     
     patch_func_set(ctx, dos_base, -150, &pf_LoadSeg);
     patch_func_set(ctx, dos_base, -156, &pf_UnLoadSeg);
     patch_func_set(ctx, dos_base, -768, &pf_NewLoadSeg);
 }
 
+/* patched EXEC: OpenLibrary call */
 static uae_u32 REGPARAM2 OpenLibrary(TrapContext *ctx)
 {
     uaecptr name_addr = m68k_areg (regs, 1); // a1 = lib name
@@ -56,6 +62,7 @@ static uae_u32 REGPARAM2 OpenLibrary(TrapContext *ctx)
 /* global list of all seglists */
 seglist_pool segtracker_pool;
 
+/* dump the segment list */
 void segtracker_dump(const char *match)
 {
     int sl_num = 0;
@@ -78,6 +85,7 @@ void segtracker_dump(const char *match)
     printf("found %d seglists.\n", sl_num);
 }
 
+/* search a segment by address */
 int segtracker_search_address(uae_u32 addr, seglist **found_sl, int *num_seg)
 {
     seglist *sl = segtracker_pool.first;
@@ -242,6 +250,13 @@ static void rem_seglist(uae_u32 seglist_addr)
     }
 }
 
+/* remove all tracked segment lists */
+void segtracker_clear(void)
+{
+    del_all_seglists();
+}
+
+/* patched DOS: LoadSeg call */
 static uae_u32 REGPARAM2 LoadSeg(TrapContext *ctx)
 {
     uaecptr name_addr = m68k_areg(regs,0); // a0 = name (was d1)
@@ -255,6 +270,7 @@ static uae_u32 REGPARAM2 LoadSeg(TrapContext *ctx)
     return 0;
 }
 
+/* patched DOS: NewLoadSeg call */
 static uae_u32 REGPARAM2 NewLoadSeg(TrapContext *ctx)
 {
     uaecptr name_addr = m68k_areg(regs,0); // a0 = name (was d1)
@@ -268,6 +284,7 @@ static uae_u32 REGPARAM2 NewLoadSeg(TrapContext *ctx)
     return 0;    
 }
 
+/* patched DOS: UnLoadSeg call */
 static uae_u32 REGPARAM2 UnLoadSeg(TrapContext *ctx)
 {
     uaecptr seglist_baddr = m68k_dreg(regs,1); // d1 = seglist
@@ -279,23 +296,33 @@ static uae_u32 REGPARAM2 UnLoadSeg(TrapContext *ctx)
     return 0;
 }
 
+/* When the dummy resident is executed then call this function via trap.
+   Our first patch is to track OpenLibrary calls so we can spot the 
+   dos.library */
 static uae_u32 REGPARAM2 segtracker_init(TrapContext *ctx)
 {
-    /* reset dos patching */
-    dos_base = 0;
-    del_all_seglists();
-
     /* patch exec funcs */
     uae_u32 exec_base = get_long(4);
     patch_func_set(ctx, exec_base, -552, &pf_OpenLibrary);
-    puts("segtracker: patched OpenLibrary");
+    write_log("segtracker: patched OpenLibrary\n");
 
     return 0;
 }
 
+/* main entry of SegmentTracker for each Amiga run: setting up AutoConf area...
+   if tracker is enabled then install a dummy resident that does the
+   function patching in its init function */
 uaecptr segtracker_startup (uaecptr resaddr)
 {
-    puts("segtracker: startup");
+    /* reset dos patching and clear seglist */
+    dos_base = 0;
+    del_all_seglists();
+
+    if(!segtracker_enabled) {
+        return resaddr;
+    }
+    
+    write_log("segtracker: startup\n");
 
     /* setup a fake resident resident */
     put_word (resaddr + 0x0, 0x4AFC);
@@ -311,9 +338,11 @@ uaecptr segtracker_startup (uaecptr resaddr)
     return resaddr;
 }
 
+/* initial entry of SegmentTracker: on first startup of UAE register some
+   traps for the patched functions */
 void segtracker_install (void)
 {
-    puts("segtracker: install");
+    write_log("segtracker: install\n");
 
     // setup init trap to setup patches
     init_addr = here ();

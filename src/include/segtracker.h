@@ -27,3 +27,6 @@ void segtracker_install(void);
 
 void segtracker_dump(const char *match);
 int segtracker_search_address(uae_u32 addr, seglist **found_sl, int *num_seg);
+void segtracker_clear(void);
+
+extern int segtracker_enabled;
