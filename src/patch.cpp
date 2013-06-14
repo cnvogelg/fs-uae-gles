@@ -3,6 +3,7 @@
 *
 * Patch System Utilities
 *
+* Written by Christian Vogelgsang <chris@vogelgsang.org>
 */
 
 #include "sysconfig.h"

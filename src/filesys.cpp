@@ -49,6 +49,7 @@
 #include "sana2.h"
 #include "bsdsocket.h"
 #include "uaeresource.h"
+#include "debuginfo.h"
 #include "segtracker.h"
 #include "inputdevice.h"
 #include "clipboard.h"

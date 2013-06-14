@@ -3,6 +3,7 @@
 *
 * Segment Tracker
 *
+* Written by Christian Vogelgsang <chris@vogelgsang.org>
 */
 
 #include "sysconfig.h"
@@ -14,6 +15,7 @@
 #include "traps.h"
 #include "patch.h"
 #include "newcpu.h"
+#include "debuginfo.h"
 #include "segtracker.h"
 
 static uae_u32 init_addr;
@@ -73,8 +75,28 @@ void segtracker_dump(const char *match)
             segment *s = sl->segments;
             int num = 0;
             while(s->addr != 0) {
-                printf("  #%02d [%08x,%08x,%08x]\n", num, 
+                printf("  #%02d [%08x,%08x,%08x]", num, 
                        s->addr, s->size, s->addr + s->size);
+                
+                /* show attached debug info */
+                debug_segment *ds = s->debug;
+                if(ds != NULL) {
+                    printf("  %3d symbols,  %3d src files\n",
+                           ds->num_symbols, ds->num_src_files);
+                           
+                    /* dump symbols */
+                    if(match != NULL) {
+                        debug_symbol *symbol = ds->symbols;
+                        for(int i=0;i<ds->num_symbols;i++) {
+                            uae_u32 addr = s->addr + symbol->offset;
+                            printf("    %08x  %s\n", addr, symbol->name);
+                            symbol++;
+                        }
+                    }
+                } else {
+                    printf("\n");
+                }
+                
                 s++;
                 num++;
             }
@@ -142,16 +164,20 @@ static void add_seglist(const char *name, uae_u32 seglist_addr)
     sl->segments = segs;
     sl->next = NULL;
     sl->prev = NULL;
+    sl->debug = NULL;
     
     /* fill segments */
     ptr = seglist_addr;
     segment *s = segs;
     while(ptr != 0) {
-        s->size = get_long(ptr - 4);
-        s->addr = ptr + 4;        
-        ptr = get_long(ptr) << 2;
+        s->size = get_long(ptr - 4); // size of BPTR + segment
+        s->size -= 8; // correct size
+        s->addr = ptr + 4;
+        s->debug = NULL;
+        ptr = get_long(ptr) << 2; // BPTR to next segment
         s++;
     }
+    /* last segment is zero */
     s->size = 0;
     s->addr = 0;
     
@@ -189,6 +215,11 @@ static void del_seglist(seglist *sl)
     if(sl->segments != NULL) {
         xfree(sl->segments);
     }
+    
+    if(sl->debug != NULL) {
+        debug_info_free_file(sl->debug);
+    }
+    
     xfree(sl);
 }
 
@@ -356,4 +387,77 @@ void segtracker_install (void)
     patch_func_init_post_call(LoadSeg, &pf_LoadSeg, 0, PATCH_SAVE_D1_RESTORE_A0);
     patch_func_init_post_call(NewLoadSeg, &pf_NewLoadSeg, 0, PATCH_SAVE_D1_RESTORE_A0);
     patch_func_init_pre_call(UnLoadSeg, &pf_UnLoadSeg, 0);
+}
+
+seglist *segtracker_find_by_name(const char *name)
+{
+    seglist *sl = segtracker_pool.first;
+    while(sl != NULL) {
+        const char *sname = sl->name;
+        if(strcasestr(sname, name)!=NULL) {
+            return sl;
+        }
+        sl = sl->next;
+    }
+    return NULL;
+}
+
+int segtracker_add_debug_info(seglist *seglist, debug_file *file, const char **err)
+{
+    /* already has debug info? */
+    if(seglist->debug != NULL) {
+        if(err != NULL) {
+            *err = "Already has debug info!";
+        }
+        return -3;
+    }
+    
+    /* first validate if segments match in both seglist and file */
+    if(seglist->num_segments != file->num_segments) {
+        if(err != NULL) {
+            *err = "Number of segments mismatch!";
+        }
+        return -1;
+    }
+    for(int i=0;i<seglist->num_segments;i++) {
+        segment *s = &seglist->segments[i];
+        debug_segment *ds = &file->segments[i];
+        if(s->size != ds->size) {
+            if(err != NULL) {
+                *err = "Segment size mismatch!";
+            }
+            return -2;
+        }
+    }
+    
+    /* seems to be ok -> set infos */
+    seglist->debug = file;
+    for(int i=0;i<seglist->num_segments;i++) {
+        segment *s = &seglist->segments[i];
+        debug_segment *ds = &file->segments[i];
+        s->debug = ds;
+    }
+    
+    return 0;
+}
+
+int segtracker_find_symbol(const segment *seg, uae_u32 offset,
+                           debug_symbol **ret_symbol, uae_u32 *ret_reloff)
+{
+    if(seg->debug != NULL) {
+        return debug_info_find_symbol(seg->debug, offset, ret_symbol, ret_reloff);
+    } else {
+        return -1;
+    }
+}
+
+int segtracker_find_src_line(const segment *seg, uae_u32 offset,
+                             debug_src_file **ret_file,
+                             debug_src_line **ret_line, uae_u32 *ret_reloff)
+{
+    if(seg->debug != NULL) {
+        return debug_info_find_src_line(seg->debug, offset, ret_file, ret_line, ret_reloff);
+    } else {
+        return -1;
+    }
 }

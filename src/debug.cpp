@@ -36,6 +36,7 @@
 #include "rommgr.h"
 #include "inputrecord.h"
 #include "calc.h"
+#include "debuginfo.h"
 #include "segtracker.h"
 
 int debugger_active;
@@ -149,6 +150,7 @@ static TCHAR help[] = {
     _T("  Zl                    show seglists tracked by SegmentTracker.\n")
     _T("  Za <addr>             find segment that contains given address.\n")
     _T("  Zs 'name'             search seglist with given name.\n")
+    _T("  Zf 'hostfile'         load debug info from given executable file.\n")
     
 	_T("  ?<value>              Hex ($ and 0x)/Bin (%)/Dec (!) converter.\n")
 #ifdef _WIN32
@@ -3443,14 +3445,38 @@ static void segtracker(TCHAR **inptr)
                 int num_seg;
                 int found = segtracker_search_address(addr, &sl, &num_seg);
                 if(found) {
-                    uae_u32 s_addr = sl->segments[num_seg].addr;
-                    uae_u32 s_size = sl->segments[num_seg].size;
+                    segment *seg = &sl->segments[num_seg];
+                    uae_u32 s_addr = seg->addr;
+                    uae_u32 s_size = seg->size;
                     uae_u32 s_end = s_addr + s_size;
                     uae_u32 offset = addr - s_addr;
                     console_out_f(_T("%08x: '%s' #%02d [%08x,%08x,%08x] +%08x\n"),
                                 addr, sl->name, num_seg,
                                 s_addr, s_size, s_end, 
                                 offset);
+                    
+                    /* try to find symbol info */
+                    debug_symbol *symbol;
+                    uae_u32 reloff;
+                    int ok = segtracker_find_symbol(seg, offset, &symbol, &reloff);
+                    if(ok == 1) {
+                        console_out_f(_T("    %08x +%08x  %s\n"),
+                                      symbol->offset + seg->addr,
+                                      reloff,
+                                      symbol->name);
+                    }
+                    
+                    /* try to find src line info */
+                    debug_src_file *src_file;
+                    debug_src_line *src_line;
+                    ok = segtracker_find_src_line(seg, offset, &src_file,
+                                                  &src_line, &reloff);
+                    if(ok == 1) {
+                        console_out_f(_T("    %08x +%08x  %s:%d\n"),
+                                      src_line->offset, reloff,
+                                      src_file->src_file, src_line->line);
+                    }
+                    
                 } else {
                     console_out_f(_T("%08x: not found in any segments.\n"), addr);
                 }
@@ -3483,6 +3509,37 @@ static void segtracker(TCHAR **inptr)
             /* clear seglist if disabled */
             if(!segtracker_enabled) {
                 segtracker_clear();
+            }
+            break;
+        case 'f': /* 'Zf': load symbols from hunk file */
+            TCHAR str[256];
+            int len = parse_string(inptr, str, 256);
+            if(len > 0) {
+                /* find segment */
+                seglist *sl = segtracker_find_by_name(str);
+                if(sl != NULL) {
+                    console_out_f(_T("Loading debug info for seglist '%s' from hunk file '%s'\n"),
+                                  sl->name, str);
+                    /* try to load hunk file */
+                    debug_file *file = debug_info_load_hunks(str);
+                    if(file != NULL) {
+                        debug_info_dump_file(file);
+                        /* try to add debug info to segment */
+                        const char *err;
+                        int ok = segtracker_add_debug_info(sl, file, &err);
+                        if(ok != 0) {
+                            /* adding debug info failed -> free debug info */
+                            console_out_f(_T("Error adding debug info: %s\n"), err);
+                            debug_info_free_file(file);
+                        }                        
+                    } else {
+                        console_out_f(_T("Error loading hunk file!\n"));
+                    }
+                } else {
+                    console_out_f(_T("No loaded segment list found for '%s'\n"), str);
+                }
+            } else {
+                console_out_f(_T("No hunk file given!\n"));
             }
             break;
         }

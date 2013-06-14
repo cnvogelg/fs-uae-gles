@@ -220,6 +220,7 @@ obj/cpummu.o \
 obj/crc32.o \
 obj/custom.o \
 obj/debug.o \
+obj/debuginfo.o \
 obj/disk.o \
 obj/diskutil.o \
 obj/dongle.o \

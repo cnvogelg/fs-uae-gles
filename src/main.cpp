@@ -50,6 +50,7 @@
 #include "blkdev.h"
 #include "gfxfilter.h"
 #include "uaeresource.h"
+#include "debuginfo.h"
 #include "segtracker.h"
 #include "dongle.h"
 #include "sampler.h"
