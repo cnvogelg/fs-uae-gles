@@ -42,4 +42,7 @@ extern int segtracker_find_src_line(const segment *seg, uae_u32 offset,
                                     debug_src_file **ret_file,
                                     debug_src_line **ret_line, uae_u32 *ret_reloff);
 
+extern void segtracker_dump_symbols(const char *name);
+extern void segtracker_dump_src_lines(const char *name, int line);
+
 extern int segtracker_enabled;

@@ -151,6 +151,8 @@ static TCHAR help[] = {
     _T("  Za <addr>             find segment that contains given address.\n")
     _T("  Zs 'name'             search seglist with given name.\n")
     _T("  Zf 'hostfile'         load debug info from given executable file.\n")
+    _T("  Zy 'symbol'           find symbol address.\n")
+    _T("  Zc 'file' <line>      find source code line address.\n")
     
 	_T("  ?<value>              Hex ($ and 0x)/Bin (%)/Dec (!) converter.\n")
 #ifdef _WIN32
@@ -3473,7 +3475,7 @@ static void segtracker(TCHAR **inptr)
                                                   &src_line, &reloff);
                     if(ok == 1) {
                         console_out_f(_T("    %08x +%08x  %s:%d\n"),
-                                      src_line->offset, reloff,
+                                      seg->addr + src_line->offset, reloff,
                                       src_file->src_file, src_line->line);
                     }
                     
@@ -3512,34 +3514,64 @@ static void segtracker(TCHAR **inptr)
             }
             break;
         case 'f': /* 'Zf': load symbols from hunk file */
-            TCHAR str[256];
-            int len = parse_string(inptr, str, 256);
-            if(len > 0) {
-                /* find segment */
-                seglist *sl = segtracker_find_by_name(str);
-                if(sl != NULL) {
-                    console_out_f(_T("Loading debug info for seglist '%s' from hunk file '%s'\n"),
-                                  sl->name, str);
-                    /* try to load hunk file */
-                    debug_file *file = debug_info_load_hunks(str);
-                    if(file != NULL) {
-                        debug_info_dump_file(file);
-                        /* try to add debug info to segment */
-                        const char *err;
-                        int ok = segtracker_add_debug_info(sl, file, &err);
-                        if(ok != 0) {
-                            /* adding debug info failed -> free debug info */
-                            console_out_f(_T("Error adding debug info: %s\n"), err);
-                            debug_info_free_file(file);
-                        }                        
+            {
+                TCHAR str[256];
+                int len = parse_string(inptr, str, 256);
+                if(len > 0) {
+                    /* find segment */
+                    seglist *sl = segtracker_find_by_name(str);
+                    if(sl != NULL) {
+                        console_out_f(_T("Loading debug info for seglist '%s' from hunk file '%s'\n"),
+                                      sl->name, str);
+                        /* try to load hunk file */
+                        debug_file *file = debug_info_load_hunks(str);
+                        if(file != NULL) {
+                            debug_info_dump_file(file);
+                            /* try to add debug info to segment */
+                            const char *err;
+                            int ok = segtracker_add_debug_info(sl, file, &err);
+                            if(ok != 0) {
+                                /* adding debug info failed -> free debug info */
+                                console_out_f(_T("Error adding debug info: %s\n"), err);
+                                debug_info_free_file(file);
+                            }                        
+                        } else {
+                            console_out_f(_T("Error loading hunk file!\n"));
+                        }
                     } else {
-                        console_out_f(_T("Error loading hunk file!\n"));
+                        console_out_f(_T("No loaded segment list found for '%s'\n"), str);
                     }
                 } else {
-                    console_out_f(_T("No loaded segment list found for '%s'\n"), str);
+                    console_out_f(_T("No hunk file given!\n"));
                 }
-            } else {
-                console_out_f(_T("No hunk file given!\n"));
+            }
+            break;
+        case 'y': /* 'Zy': find symbol */
+            {
+                TCHAR str[64];
+                int len = parse_string(inptr, str, 64);
+                if(len > 0) {
+                    char *cstr = au(str);
+                    console_out_f(_T("Searching symbols matching '%s'\n"),cstr);
+                    segtracker_dump_symbols(cstr);
+                    xfree(cstr);
+                }
+            }
+            break;
+        case 'c': /* 'Zc': find code line */
+            {
+                TCHAR str[64];
+                int len = parse_string(inptr, str, 64);
+                if(len > 0) {
+                    char *cstr = au(str);
+                    ignore_ws(inptr);
+                    if(more_params(inptr)) {
+                        int line = readint(inptr);
+                        console_out_f(_T("Searching code line matching %s:%d\n"),cstr, line);
+                        segtracker_dump_src_lines(cstr, line);
+                    }
+                    xfree(cstr);
+                }
             }
             break;
         }

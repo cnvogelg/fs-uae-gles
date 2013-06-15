@@ -461,3 +461,90 @@ int segtracker_find_src_line(const segment *seg, uae_u32 offset,
         return -1;
     }
 }
+
+void segtracker_dump_symbols(const char *name)
+{
+    int showed_seglist = 0;
+    seglist *sl = segtracker_pool.first;
+    while(sl != NULL) {
+        /* has seglist debug info? */
+        if(sl->debug != NULL) {
+            segment *s = sl->segments;
+            /* run through segments */
+            for(int i=0;i<sl->num_segments;i++) {
+                if(s->debug != NULL) {
+                    debug_symbol *ds = s->debug->symbols;
+                    int showed_segment = 0;
+                    for(int j=0;j<s->debug->num_symbols;j++) {
+                        /* does symbol name match? */
+                        if(strcasestr(ds->name, name)!=NULL) {
+                            if(!showed_seglist) {
+                                showed_seglist = 1;
+                                printf("'%s'\n", sl->name);
+                            }
+                            if(!showed_segment) {
+                                showed_segment = 1;
+                                printf("  #%02d\n", i);
+                            }
+                            uae_u32 addr = ds->offset + s->addr;
+                            printf("    %08x:  %s\n", addr, ds->name);
+                        }
+                        ds++;
+                    }
+                }
+                s++;
+            }
+        }
+        showed_seglist = 0;
+        sl = sl->next;
+    }
+}
+
+void segtracker_dump_src_lines(const char *name, int line)
+{
+    int showed_seglist = 0;
+    seglist *sl = segtracker_pool.first;
+    while(sl != NULL) {
+        /* has seglist debug info? */
+        if(sl->debug != NULL) {
+            segment *seg = sl->segments;
+            /* run through segments */
+            for(int i=0;i<sl->num_segments;i++) {
+                debug_segment *ds = seg->debug;
+                if(ds != NULL) {
+                    int showed_segment = 0;
+
+                    /* now look in src files */
+                    debug_src_file *sf = ds->src_files;
+                    while(sf != NULL) {
+                        /* does src_file name match? */
+                        if(strcasestr(sf->src_file, name)!=NULL) {
+                            /* check line number */
+                            debug_src_line *l = sf->lines;
+                            for(int j=0;j<sf->num_lines;j++) {
+                                /* found line */
+                                if(l->line == line) {                                
+                                    if(!showed_seglist) {
+                                        showed_seglist = 1;
+                                        printf("'%s'\n", sl->name);
+                                    }
+                                    if(!showed_segment) {
+                                        showed_segment = 1;
+                                        printf("  #%02d\n", i);
+                                    }
+                                    uae_u32 addr = l->offset + seg->addr;
+                                    printf("    %08x:  %s:%d\n", addr, sf->src_file, l->line);
+                                }
+                                l++;
+                            }
+                        }
+                        sf = sf->next;
+                    }
+                }
+                seg++;
+            }
+        }
+        showed_seglist = 0;
+        sl = sl->next;
+    }    
+}
