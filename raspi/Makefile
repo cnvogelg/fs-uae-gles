@@ -26,10 +26,18 @@ cross:
 		SB2_LDFLAGS="-Wl,-rpath-link,/usr/lib/arm-linux-gnueabihf:/home/user/opt/vc/lib:/usr/lib/arm-linux-gnueabihf/pulseaudio" \
 		SB2_RUNTIME="sb2 -t $(SB2_TARGET) --" 
 
+# build with distcc
+distcc:
+	$(MAKE) fs-uae \
+		DISTCC=distcc \
+		COMPILER_PREFIX=arm-linux-gnueabihf-
+
 # local build on raspi
 fs-uae:
 	cd .. && $(SB2_RUNTIME) $(MAKE) gles=1 \
-		CC=$(COMPILER_PREFIX)gcc CXX=$(COMPILER_PREFIX)g++ AR=$(COMPILER_PREFIX)ar \
+		CC=\"$(DISTCC) $(COMPILER_PREFIX)gcc\" \
+		CXX=\"$(DISTCC) $(COMPILER_PREFIX)g++\" \
+		AR=$(COMPILER_PREFIX)ar \
 		sdl_config=$(RASPI_ROOT)/usr/bin/sdl-config \
 		pkg_config=$(RASPI_ROOT)/usr/bin/pkg-config \
 		EXTRA_CPPFLAGS=\"$(RASPI_CFLAGS) -DUSE_EGL_RAW -DUSE_GLES1 -DRPI\" \
