@@ -1,14 +1,19 @@
-#include "texture.h"
+#include <fs/emu.h>
 
 #ifdef USE_OPENGL
 #include <fs/ml/opengl.h>
+#endif
+
+#ifdef USE_SDL2
+#define USE_SDL
+#endif
 
 #ifdef USE_SDL
 #include <SDL.h>
 #include <SDL_opengl.h>
 #endif
 
-#endif
+#include "texture.h"
 
 #include <fs/ml.h>
 #include "fs/image.h"

@@ -27,6 +27,14 @@ cxx ?= g++-mp-4.7
 ar ?= ar
 make = make
 
+else ifneq ($(findstring kFreeBSD,$(uname)),)
+
+os = kfreebsd
+cc = $(CC)
+cxx = $(CXX)
+ar = $(AR)
+make = make
+
 else ifneq ($(findstring FreeBSD,$(uname)),)
 
 os = freebsd

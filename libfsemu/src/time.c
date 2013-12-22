@@ -1,4 +1,4 @@
-
+#define _GNU_SOURCE 1
 #include <fs/base.h>
 #include <fs/init.h>
 #include <fs/log.h>
@@ -77,6 +77,7 @@ struct tm *fs_gmtime_r(const time_t *timep, struct tm *result) {
 }
 
 #ifdef WINDOWS
+// was needed for mingw, not needed for mingw-w32
 int _putenv(const char *envstring);
 void _tzset(void);
 #endif

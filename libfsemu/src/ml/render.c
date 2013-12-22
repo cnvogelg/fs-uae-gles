@@ -1,7 +1,15 @@
+// FIXME: make libfsml independent of libfsmeu
+#include "../emu/util.h"
+#include "../emu/video.h"
+
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 #include <stddef.h>
+
+#ifdef USE_SDL2
+#define USE_SDL
+#endif
 
 #ifdef USE_SDL
 #include <SDL.h>
@@ -20,9 +28,6 @@
 #include "ml_internal.h"
 
 #include <fs/thread.h>
-// FIXME: make libfsml independent of libfsmeu
-#include "../emu/util.h"
-#include "../emu/video.h"
 
 static int g_vblank_count = 0;
 static int64_t g_measured_vblank_time = 0;
@@ -215,9 +220,15 @@ static void render_frame() {
     }
 }
 
+#ifdef USE_SDL2
+extern SDL_Window* g_fs_ml_window;
+#endif
+
 static void swap_opengl_buffers() {
     //int64_t t1 = fs_get_monotonic_time();
-#ifdef USE_SDL
+#if defined(USE_SDL2)
+    SDL_GL_SwapWindow(g_fs_ml_window);
+#elif defined(USE_SDL)
     SDL_GL_SwapBuffers();
 #else
     printf("ERROR: no swap\n");
@@ -615,17 +626,15 @@ void fs_ml_render_iteration() {
         else {
             // wait max 33 ms to allow the user interface to work even if
             // the emu hangs
-
-            //GTimeVal abs_time;
+            int64_t dest_time = fs_get_real_time() + 33 * 1000;
 
             fs_mutex_lock(g_frame_available_mutex);
             while (g_rendered_frame == g_available_frame) {
-                //printf("%d %d\n", g_rendered_frame, g_available_frame);
-                //g_get_current_time(&abs_time);
-                //g_time_val_add(&abs_time, 33 * 1000);
-                int64_t abs_time = fs_get_real_time() + 33 * 1000;
                 fs_condition_timed_wait(g_frame_available_cond,
-                        g_frame_available_mutex, abs_time);
+                        g_frame_available_mutex, dest_time);
+                if (fs_get_real_time() >= dest_time) {
+                    break;
+                }
             }
             fs_mutex_unlock(g_frame_available_mutex);
         }

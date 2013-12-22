@@ -58,7 +58,11 @@
 #ifdef RETROPLATFORM
 #include "rp.h"
 #endif
+#ifdef FSUAE
+// SDL is not used directly here by FS-UAE
+#else
 #ifdef USE_SDL
+#endif
 #include "SDL.h"
 #endif
 
@@ -813,13 +817,20 @@ void do_start_program (void)
 	inputdevice_updateconfig (&changed_prefs, &currprefs);
 	if (quit_program >= 0)
 		quit_program = UAE_RESET;
+#ifdef FSUAE
+
+#else
 #if (defined (_WIN32) || defined (_WIN64)) && !defined (NO_WIN32_EXCEPTION_HANDLER)
 	extern int EvalException (LPEXCEPTION_POINTERS blah, int n_except);
 	__try
 #endif
+#endif
 	{
 		m68k_go (1);
 	}
+#ifdef FSUAE
+
+#else
 #if (defined (_WIN32) || defined (_WIN64)) && !defined (NO_WIN32_EXCEPTION_HANDLER)
 #ifdef JIT
 	__except (EvalException (GetExceptionInformation (), GetExceptionCode ()))
@@ -829,6 +840,7 @@ void do_start_program (void)
 	{
 		// EvalException does the good stuff...
 	}
+#endif
 #endif
 }
 
@@ -925,8 +937,12 @@ void virtualdevice_init (void)
 static int real_main2 (int argc, TCHAR **argv)
 {
 
+#ifdef FSUAE
+    // SDL is initialized by libfsemu
+#else
 #ifdef USE_SDL
 	SDL_Init (SDL_INIT_TIMER | SDL_INIT_AUDIO | SDL_INIT_JOYSTICK | SDL_INIT_NOPARACHUTE);
+#endif
 #endif
 	config_changed = 1;
 	if (restart_config[0]) {

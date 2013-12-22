@@ -8,7 +8,7 @@ msgstr ""
 "Project-Id-Version: fs-uae\n"
 "Report-Msgid-Bugs-To: fs-uae@fengestad.no\n"
 "POT-Creation-Date: 2013-02-24 22:16+0100\n"
-"PO-Revision-Date: 2013-02-25 19:38+0100\n"
+"PO-Revision-Date: 2013-10-28 09:20+0100\n"
 "Last-Translator: Jens Weichert <nexusle@me.com>\n"
 "Language-Team: German\n"
 "Language: de\n"
@@ -16,7 +16,7 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
-"X-Generator: Poedit 1.5.5\n"
+"X-Generator: Poedit 1.5.7\n"
 
 msgid "Activated debugger"
 msgstr "Debugger aktiviert"
@@ -80,7 +80,7 @@ msgstr "Volles Frame"
 
 #, c-format
 msgid "HD not found: %s"
-msgstr "HDD nicht gefunden: %s"
+msgstr "HD nicht gefunden: %s"
 
 #. / TRANSLATORS: Hard reset is a computer reboot with an emulated power
 #. / cycle
@@ -172,19 +172,19 @@ msgid "Option \"%s\" is not enabled"
 msgstr "Option \"%s\" ist nicht aktiviert"
 
 msgid "Option chip_memory must be a multiple of 512"
-msgstr "Für die Option chip_memory muss 512 der Multiplikator sein"
+msgstr "Die Option chip_memory muss ein Vielfaches von 512 sein"
 
 msgid "Option fast_memory must be a multiple of 1024"
-msgstr "Für die Option fast_memory muss 1024 der Multiplikator sein"
+msgstr "Die Option fast_memory muss ein Vielfaches von 1024 sein"
 
 msgid "Option slow_memory must be a multiple of 256"
-msgstr "Für die Option slow_memory muss 256 der Multiplikator sein"
+msgstr "Die Option slow_memory muss ein Vielfaches von 256 sein"
 
 msgid "Option uaegfx.card needs a CPU with 32-bit addressing"
 msgstr "Option uaegfx_card benötigt eine CPU mit 32bit-Adressierung"
 
 msgid "Option zorro_iii_memory must be a multiple of 1024"
-msgstr "Für die Option zorro_iii_memory muss 1024 der Multiplikator sein"
+msgstr "Die Option zorro_iii_memory muss ein Vielfaches von 1024 sein"
 
 msgid "Options zorro_iii_memory needs a CPU with 32-bit addressing"
 msgstr "Die Option zorro_iii_memory benötigt eine CPU mit 32bit-Adressierung"
@@ -208,10 +208,10 @@ msgstr "Wechseldatenträger"
 
 #. / TRANSLATORS: Reset Amiga as in reboot the computer
 msgid "Reset Amiga"
-msgstr "Amiga neustarten"
+msgstr "Amiga neu starten"
 
 msgid "Resume"
-msgstr "Widerrufen"
+msgstr "Wiederaufnehmen"
 
 msgid "Save"
 msgstr "Sichern"
@@ -230,7 +230,7 @@ msgid "Warp mode enabled"
 msgstr "Warp-Modus aktiviert"
 
 msgid "Zoom is disabled in RTG mode"
-msgstr "Zoom ist abgeschaltet im RTG Modus"
+msgstr "Zoom ist im RTG Modus abgeschaltet "
 
 #, c-format
 msgid "Zoom: %s"

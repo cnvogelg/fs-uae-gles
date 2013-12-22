@@ -3,7 +3,7 @@
 My Changes:
 
   * added vpar protocol support (see vpar.md for details)
-  * some convience Mac compile presets
+  * added segment tracker functions in internal debugger
 
 ----- end of message ----
 
