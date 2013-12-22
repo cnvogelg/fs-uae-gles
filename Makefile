@@ -147,7 +147,6 @@ else ifeq ($(os), windows)
 
 else ifeq ($(os), macosx)
   uname_m := $(shell uname -m)
-  arch ?= i386
   ifneq ($(arch),)
   else ifneq ($(findstring i386,$(uname_m)),)
     arch = i386
@@ -155,7 +154,6 @@ else ifeq ($(os), macosx)
     arch = ppc
   else
     arch = x86_64
-    # arch = i386
   endif
   cflags += -arch $(arch)
   cxxflags += -arch $(arch)

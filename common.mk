@@ -21,9 +21,8 @@ make = make
 else ifneq ($(findstring Darwin,$(uname)),)
 
 os = macosx
-# cv: use MacPorts gcc
-cc ?= gcc-mp-4.7
-cxx ?= g++-mp-4.7
+cc ?= gcc
+cxx ?= g++
 ar ?= ar
 make = make
 
