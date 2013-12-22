@@ -63,9 +63,9 @@ endif
 
 common_flags = -Isrc/od-fs -Isrc/od-fs/include \
 		-Isrc/include -Igensrc -Isrc \
-		`pkg-config --cflags glib-2.0 gthread-2.0 libpng` \
 		-I$(libfsemu_dir)/include \
 		-I$(libfsemu_dir)/src/lua \
+		`pkg-config --cflags glib-2.0 gthread-2.0 libpng` \
 		`$(sdl_config) --cflags`
 cflags = $(common_flags) -std=c99 $(CFLAGS)
 #cxxflags = $(common_flags) -fpermissive $(CXXFLAGS)
