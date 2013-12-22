@@ -1,8 +1,14 @@
 include common.mk
-version = $(strip $(shell cat VERSION))
-series = $(strip $(shell cat SERIES))
+version := $(strip $(shell cat VERSION))
+series := $(strip $(shell cat SERIES))
 
-all: fs-uae mo
+ifeq ($(wildcard libfsemu),)
+    libfsemu_dir := "../libfsemu"
+else
+    libfsemu_dir := "libfsemu"
+endif
+
+all: fs-uae fs-uae-device-helper mo
 
 cppflags = -DFSEMU -DFSUAE -D_FILE_OFFSET_BITS=64
 
@@ -10,20 +16,10 @@ ifeq ($(debug), 1)
 cppflags += -DDEBUG
 endif
 
-#ifeq ($(wildcard libfsemu), libfsemu)
-#libfsemu_dir = libfsemu
-#libfsemu/out/libfsemu.a:
-#	make -C libfsemu arch=$(arch)
-#libfsemu-target: libfsemu/out/libfsemu.a
-#else
-#libfsemu_dir = ../libfsemu
-#libfsemu-target:
-#endif
-
-libfsemu_dir = libfsemu
+# libfsemu_dir = libfsemu
 libfsemu-target:
-	$(make) -C libfsemu debug=$(debug) devel=$(devel) optimize=$(optimize) \
-			android=$(android)
+	$(make) -C $(libfsemu_dir) debug=$(debug) devel=$(devel) \
+		optimize=$(optimize) android=$(android) sdl=$(sdl)
 
 #ifeq ($(wildcard libfs-capsimage), libfs-capsimage)
 #libfs-capsimage_dir = libfs-capsimage
@@ -51,17 +47,31 @@ libs = -L$(libfsemu_dir)/out -lfsemu -lpng -lz
 else
 use_glib := 1
 use_freetype := 1
+sdl := 1
+
+ifeq ($(os), macosx)
+	sdl = 2
+endif
+
+ifeq ($(sdl), 2)
+	sdl_config = sdl2-config
+	use_sdl = USE_SDL2
+else
+	sdl_config = sdl-config
+	use_sdl = USE_SDL
+endif
+
 common_flags = -Isrc/od-fs -Isrc/od-fs/include \
 		-Isrc/include -Igensrc -Isrc \
 		`pkg-config --cflags glib-2.0 gthread-2.0 libpng` \
 		-I$(libfsemu_dir)/include \
 		-I$(libfsemu_dir)/src/lua \
-		`sdl-config --cflags`
+		`$(sdl_config) --cflags`
 cflags = $(common_flags) -std=c99 $(CFLAGS)
 #cxxflags = $(common_flags) -fpermissive $(CXXFLAGS)
 cxxflags = $(common_flags) $(CXXFLAGS)
 ldflags = $(LDFLAGS)
-libs = -L$(libfsemu_dir)/out -lfsemu `sdl-config --libs` \
+libs = -L$(libfsemu_dir)/out -lfsemu `$(sdl_config) --libs` \
 		`pkg-config --libs libpng` -lz
 
 ifeq ($(devel), 1)
@@ -127,6 +137,7 @@ ifeq ($(os), android)
 else ifeq ($(os), windows)
   cppflags += -DWINDOWS
   cxxflags += -U_WIN32 -UWIN32
+  #cxxflags += -D_WIN32 -DWIN32
   libs += -lOpenGL32 -lGLU32 -lgdi32 -lWinmm -lOpenAL32 -lWs2_32 -lWininet
 
   ifeq ($(devel), 1)
@@ -143,12 +154,16 @@ else ifeq ($(os), macosx)
     arch = ppc
   else
     arch = x86_64
+    # arch = i386
   endif
   cflags += -arch $(arch)
   cxxflags += -arch $(arch)
   ldflags += -arch $(arch) -headerpad_max_install_names
   cppflags += -DMACOSX
-  libs += -framework OpenGL -framework Carbon -framework OpenAL
+  libs += -framework OpenGL -framework Carbon -framework OpenAL -framework IOKit
+else ifeq ($(os), kfreebsd)
+  cppflags += -DFREEBSD
+  libs += -lGL -lGLU -lopenal -ldl -lX11
 else ifeq ($(os), freebsd)
   cppflags += -DFREEBSD
   libs += -lGL -lGLU -lopenal -lX11 -lcompat
@@ -163,8 +178,10 @@ else
 endif
 
 ifneq ($(os), android)
-	cppflags += -DUSE_SDL -DUSE_GLIB -DWITH_LUA
+	cppflags += -D$(use_sdl) -DUSE_GLIB -DWITH_LUA
 endif
+
+device_helper_objects = obj/fs-uae-device-helper.o
 
 objects = \
 obj/fs-uae-config.o \
@@ -176,6 +193,7 @@ obj/fs-uae-main.o \
 obj/fs-uae-menu.o \
 obj/fs-uae-mouse.o \
 obj/fs-uae-paths.o \
+obj/fs-uae-recording.o \
 obj/fs-uae-uae_config.o \
 obj/fs-uae-version.o \
 obj/fs-uae-video.o
@@ -238,6 +256,7 @@ obj/gfxutil.o \
 obj/hardfile.o \
 obj/hrtmon.rom.o \
 obj/identify.o \
+obj/inputdevice.o \
 obj/inputrecord.o \
 obj/isofs.o \
 obj/keybuf.o \
@@ -291,8 +310,8 @@ obj/od-fs-driveclick.o \
 obj/od-fs-filesys_host.o \
 obj/od-fs-fsdb_host.o \
 obj/od-fs-hardfile_host.o \
+obj/od-fs-gui.o \
 obj/od-fs-input.o \
-obj/od-fs-inputdevice.o \
 obj/od-fs-keymap.o \
 obj/od-fs-libamiga.o \
 obj/od-fs-logging.o \
@@ -425,6 +444,7 @@ share/locale/%/LC_MESSAGES/fs-uae.mo: po/%.po
 
 catalogs = \
 	share/locale/cs/LC_MESSAGES/fs-uae.mo \
+	share/locale/da/LC_MESSAGES/fs-uae.mo \
 	share/locale/de/LC_MESSAGES/fs-uae.mo \
 	share/locale/es/LC_MESSAGES/fs-uae.mo \
 	share/locale/fi/LC_MESSAGES/fs-uae.mo \
@@ -439,48 +459,23 @@ catalogs = \
 mo: $(catalogs)
 
 fs-uae: libfsemu-target obj/uae.a $(objects)
-	rm -f out/fs-uae
+	rm -f fs-uae
 	$(cxx) $(ldflags) $(objects) obj/uae.a $(libs) -o fs-uae
 
-dist_dir := fs-uae-$(version)
-dist_dir_launcher := fs-uae-launcher-$(version)
+fs-uae-device-helper: libfsemu-target $(device_helper_objects)
+	rm -f fs-uae-device-helper
+	$(cxx) $(ldflags) $(device_helper_objects) $(libs) -o fs-uae-device-helper
 
-distdir-launcher-base:
-	rm -Rf $(dist_dir_launcher)/*
-	mkdir -p $(dist_dir_launcher)
 
-	cp -a launcher/fs_uae_launcher $(dist_dir_launcher)/
-	find $(dist_dir_launcher) -name "*.pyc" -delete
-	cp -a launcher/README $(dist_dir_launcher)/
-	cp -a launcher/COPYING $(dist_dir_launcher)/
-	cp -a launcher/fs-uae-launcher.py $(dist_dir_launcher)/
-	cp -a launcher/Makefile.mk $(dist_dir_launcher)/
-	cp -a launcher/setup.py $(dist_dir_launcher)/
-	cp -a launcher/setup_py2exe.py $(dist_dir_launcher)/
-	cp -a launcher/setup_py2app.py $(dist_dir_launcher)/
+build_dir := "."
+dist_name = fs-uae-$(version)
+dist_dir := $(build_dir)/$(dist_name)
+# dist_file := $(build_dir)/$(dist_name).tar.gz
 
-	mkdir -p $(dist_dir_launcher)/debian
-	cp -a launcher/debian/changelog $(dist_dir_launcher)/debian/
-	cp -a launcher/debian/compat $(dist_dir_launcher)/debian/
-	cp -a launcher/debian/control $(dist_dir_launcher)/debian/
-	cp -a launcher/debian/copyright $(dist_dir_launcher)/debian/
-	cp -a launcher/debian/rules $(dist_dir_launcher)/debian/
-	cp -a launcher/debian/source $(dist_dir_launcher)/debian/
-
-	mkdir -p $(dist_dir_launcher)/scripts
-	cp -a launcher/scripts/fs-uae-launcher $(dist_dir_launcher)/scripts/
-	cp -a launcher/fs-uae-launcher.spec $(dist_dir_launcher)
-
-	cp -a launcher/share $(dist_dir_launcher)/
-	find $(dist_dir_launcher)/share -name *.mo -delete
-	mkdir $(dist_dir_launcher)/po/
-	cp -a launcher/po/*.po $(dist_dir_launcher)/po/
-	cp -a launcher/po/update.py $(dist_dir_launcher)/po/
-
-distdir-base: distdir-launcher-base
+distdir-base:
 	rm -Rf $(dist_dir)/*
 	mkdir -p $(dist_dir)
-	cp -a $(dist_dir_launcher) $(dist_dir)/launcher
+	# cp -a $(dist_dir_launcher) $(dist_dir)/launcher
 
 	mkdir -p $(dist_dir)/obj
 	touch $(dist_dir)/obj/.dummy
@@ -490,7 +485,7 @@ distdir-base: distdir-launcher-base
 	cp -a common.mk targets.mk $(dist_dir)
 	# windows.mk macosx.mk debian.mk
 	cp -a Makefile fs-uae.spec example.conf $(dist_dir)
-	cp -a src share licenses $(dist_dir)
+	cp -a src contrib share licenses $(dist_dir)
 	rm -Rf $(dist_dir)/src/od-win32
 	rm -Rf $(dist_dir)/src/prowizard
 	rm -Rf $(dist_dir)/src/archivers/lha
@@ -499,7 +494,10 @@ distdir-base: distdir-launcher-base
 	rm -Rf $(dist_dir)/src/jit2
 	rm -f $(dist_dir)/src/akiko2.cpp
 	rm -f $(dist_dir)/src/custom2.cpp
-	find $(dist_dir)/share -name *.mo -delete
+	rm -f $(dist_dir)/src/core.cw4.cpp
+	rm -f $(dist_dir)/src/catweasel.cpp
+
+	find $(dist_dir)/share -name "*.mo" -delete
 	mkdir -p $(dist_dir)/gensrc
 	cp -a gensrc/*.cpp gensrc/*.h $(dist_dir)/gensrc
 
@@ -514,17 +512,6 @@ distdir-base: distdir-launcher-base
 	mkdir -p $(dist_dir)/libfsemu/out
 	touch $(dist_dir)/libfsemu/out/.dummy
 
-	#mkdir -p $(dist_dir)/libfs-capsimage
-	#cp -a ../libfs-capsimage/Makefile $(dist_dir)/libfs-capsimage
-	#cp -a ../libfs-capsimage/CAPSImage $(dist_dir)/libfs-capsimage
-	#find $(dist_dir)/libfs-capsimage -name *.o -delete
-	#rm -f $(dist_dir)/libfs-capsimage/CAPSImage/config.h
-	#rm -f $(dist_dir)/libfs-capsimage/CAPSImage/config.log
-	#rm -f $(dist_dir)/libfs-capsimage/CAPSImage/config.cache
-	#rm -f $(dist_dir)/libfs-capsimage/CAPSImage/config.status
-	#cp -a ../libfs-capsimage/*.txt $(dist_dir)/libfs-capsimage
-	#mkdir -p $(dist_dir)/libfs-capsimage/out
-
 	mkdir -p $(dist_dir)/po
 	cp -a po/*.po $(dist_dir)/po/
 	cp -a po/update.py $(dist_dir)/po/update.py
@@ -535,13 +522,17 @@ distdir-base: distdir-launcher-base
 
 	mkdir -p $(dist_dir)/macosx
 	cp -a macosx/Makefile $(dist_dir)/macosx/
-	cp -a macosx/fix-app.py $(dist_dir)/macosx/
+	cp -a macosx/fs-make-standalone-app.py $(dist_dir)/macosx/
 	cp -a macosx/template $(dist_dir)/macosx/
 
 	mkdir -p $(dist_dir)/windows
 	cp -a windows/Makefile $(dist_dir)/windows/
+	# cp -a windows/launcher-proxy.exe $(dist_dir)/windows/
+	# cp -a windows/game-center-proxy.exe $(dist_dir)/windows/
 	cp -a windows/replace_icon.py $(dist_dir)/windows/
-	cp -a windows/fs-uae-setup.iss $(dist_dir)/windows/
+	cp -a windows/fs-uae.iss $(dist_dir)/windows/
+	# cp -a windows/launcher.iss $(dist_dir)/windows/
+	# cp -a windows/game-center.iss $(dist_dir)/windows/
 
 	mkdir -p $(dist_dir)/debian
 	cp -a debian/changelog $(dist_dir)/debian/
@@ -551,27 +542,27 @@ distdir-base: distdir-launcher-base
 	cp -a debian/rules $(dist_dir)/debian/
 	cp -a debian/source $(dist_dir)/debian/
 
-	mkdir -p $(dist_dir)/server
-	cp -a server/fs_uae_netplay_server $(dist_dir)/server/
-	find $(dist_dir)/server -name "*.pyc" -delete
-	cp -a server/COPYING $(dist_dir)/server/
-	cp -a server/README $(dist_dir)/server/
-	cp -a server/setup.py $(dist_dir)/server/
+	# mkdir -p $(dist_dir)/server
+	# cp -a server/fs_uae_netplay_server $(dist_dir)/server/
+	# find $(dist_dir)/server -name "*.pyc" -delete
+	# cp -a server/COPYING $(dist_dir)/server/
+	# cp -a server/README $(dist_dir)/server/
+	# cp -a server/setup.py $(dist_dir)/server/
 
-	mkdir -p $(dist_dir)/server/debian
-	cp -a server/debian/changelog $(dist_dir)/server/debian/
-	cp -a server/debian/compat $(dist_dir)/server/debian/
-	cp -a server/debian/control $(dist_dir)/server/debian/
-	cp -a server/debian/copyright $(dist_dir)/server/debian/
-	cp -a server/debian/rules $(dist_dir)/server/debian/
-	cp -a server/debian/preinst $(dist_dir)/server/debian/
-	cp -a server/debian/source $(dist_dir)/server/debian/
-	cp -a server/debian/*.init $(dist_dir)/server/debian/
-	cp -a server/debian/*.default $(dist_dir)/server/debian/
+	# mkdir -p $(dist_dir)/server/debian
+	# cp -a server/debian/changelog $(dist_dir)/server/debian/
+	# cp -a server/debian/compat $(dist_dir)/server/debian/
+	# cp -a server/debian/control $(dist_dir)/server/debian/
+	# cp -a server/debian/copyright $(dist_dir)/server/debian/
+	# cp -a server/debian/rules $(dist_dir)/server/debian/
+	# cp -a server/debian/preinst $(dist_dir)/server/debian/
+	# cp -a server/debian/source $(dist_dir)/server/debian/
+	# cp -a server/debian/*.init $(dist_dir)/server/debian/
+	# cp -a server/debian/*.default $(dist_dir)/server/debian/
 
-	mkdir -p $(dist_dir)/server/scripts
-	cp -a server/scripts/fs-uae-netplay-server $(dist_dir)/server/scripts/
-	cp -a server/scripts/fs-uae-game-server $(dist_dir)/server/scripts/
+	# mkdir -p $(dist_dir)/server/scripts
+	# cp -a server/scripts/fs-uae-netplay-server $(dist_dir)/server/scripts/
+	# cp -a server/scripts/fs-uae-game-server $(dist_dir)/server/scripts/
 
 	#mkdir -p $(dist_dir)/launcher
 	#cp -a launcher/fs_uae_launcher $(dist_dir)/launcher/
@@ -609,16 +600,10 @@ distdir-base: distdir-launcher-base
 	cp icon/fs-uae-launcher.icns $(dist_dir)/icon/
 	cp icon/fs-uae-config.icns $(dist_dir)/icon/
 	
-	find $(dist_dir) -name *~ -delete
+	find $(dist_dir) -name "*~" -delete
 
 distdir: distdir-base
 	cd $(dist_dir) && python util/update-version.py
-	python util/update-version.py $(dist_dir_launcher)/fs-uae-launcher.spec
-	python util/update-version.py $(dist_dir_launcher)/setup.py
-	python util/update-version.py \
-		$(dist_dir_launcher)/fs_uae_launcher/Version.py \
-		--update-series
-	python util/update-version.py $(dist_dir_launcher)/debian/changelog
 
 distcheck: distdir
 	cd $(dist_dir) && $(make)
@@ -626,42 +611,73 @@ distcheck: distdir
 po-dist:
 	mkdir -p dist/$(series)/po/fs-uae
 	cp po/*.po dist/$(series)/po/fs-uae/
-	mkdir -p dist/$(series)/po/fs-uae-launcher
-	cp launcher/po/*.po dist/$(series)/po/fs-uae-launcher/
 
-dist: distdir pubfiles-source po-dist
-	find $(dist_dir_launcher) -exec touch \{\} \;
+	# mkdir -p dist/$(series)/po/fs-uae-launcher
+	# cp launcher/po/*.po dist/$(series)/po/fs-uae-launcher/
+
+#dist: distdir pubfiles-source po-dist
+dist: distdir po-dist
+	# find $(dist_dir_launcher) -exec touch \{\} \;
 	find $(dist_dir) -exec touch \{\} \;
 
-	tar zcfv fs-uae-launcher-$(version).tar.gz $(dist_dir_launcher)
-	tar zcfv fs-uae-$(version).tar.gz $(dist_dir)
-	mkdir -p dist/$(series)/$(version)
-	mv fs-uae-$(version).tar.gz dist/$(series)/$(version)/
-	mv fs-uae-launcher-$(version).tar.gz dist/$(series)/$(version)/
-	mkdir -p dist/files/
-	cp doc/Default.fs-uae dist/files/
-	cp server/fs_uae_netplay_server/game.py \
-		dist/files/fs-uae-netplay-server.py
-	cp server/fs_uae_netplay_server/game.py \
-		dist/$(series)/$(version)/fs-uae-game-server-$(version).py
+	# tar zcfv fs-uae-launcher-$(version).tar.gz $(dist_dir_launcher)
+	cd "$(build_dir)" && tar zcfv $(dist_name).tar.gz $(dist_name)
+	# mkdir -p dist/$(series)/$(version)
+	# mv fs-uae-$(version).tar.gz dist/$(series)/$(version)/
+	# mv fs-uae-launcher-$(version).tar.gz dist/$(series)/$(version)/
+	# mkdir -p dist/files/
+	# cp doc/Default.fs-uae dist/files/
+	# cp server/fs_uae_netplay_server/game.py \
+	# 	dist/files/fs-uae-netplay-server.py
+	# cp server/fs_uae_netplay_server/game.py \
+	# 	dist/$(series)/$(version)/fs-uae-game-server-$(version).py
 
 install:
 	install -d $(DESTDIR)$(prefix)/bin
 	install fs-uae $(DESTDIR)$(prefix)/bin/fs-uae
+	install fs-uae-device-helper $(DESTDIR)$(prefix)/bin/fs-uae-device-helper
 	install -d $(DESTDIR)$(prefix)/share
 	cp -R share/* $(DESTDIR)$(prefix)/share
 
 	install -d $(DESTDIR)$(docdir)
 	cp README COPYING example.conf $(DESTDIR)$(docdir)
 
-clean:
-	rm -f gensrc/build68k gensrc/genblitter gensrc/gencpu gensrc/genlinetoscr
-	rm -f obj/*.o obj/*.a
-	rm -f out/fs-uae*
-	rm -f fs-uae
-	rm -f fs-uae.exe
-	$(make) -C libfsemu clean
+debsrc: dist
+	# test -f $(build_dir)/fs-uae_$(version).orig.tar.gz || cp $(build_dir)/fs-uae-$(version).tar.gz $(build_dir)/fs-uae_$(version).orig.tar.gz
+	mv $(build_dir)/fs-uae-$(version).tar.gz $(build_dir)/fs-uae_$(version).orig.tar.gz
 
-distclean: clean
+	sed -i "s/-0[)] unstable;/-$(debversion)) $(debseries);/g" $(dist_dir)/debian/changelog
+	cd $(dist_dir) && dpkg-buildpackage -S -us -uc
+
+deb: debsrc
+	# cd $(dist_dir) && fakeroot debian/rules binary
+	# mkdir -p dist/$(series)/$(version)
+	# mv build/fs-uae_$(version)-*deb dist/$(series)/$(version)/
+	cd $(dist_dir) && dpkg-buildpackage -us -uc
+
+windows-dist: distdir
+	cd $(dist_dir)/windows && make
+	mv $(dist_dir)/fs-uae_*windows* .
+	rm -Rf $(dist_dir)
+
+macosx-dist: distdir
+	cd $(dist_dir)/macosx && make
+	mv $(dist_dir)/fs-uae_*macosx* .
+	rm -Rf $(dist_dir)
+
+dist_dir_launcher := fs-uae-launcher-$(version)
+
+debseries := unstable
+debversion := $(shell date +"%s")
 
 include targets.mk
+
+clean-dist:
+	rm -Rf build dist fs-uae-[0-9]* fs-uae_*
+
+clean:
+	$(make) -C $(libfsemu_dir) clean
+	rm -f gensrc/build68k gensrc/genblitter gensrc/gencpu gensrc/genlinetoscr
+	rm -f obj/*.o obj/*.a fs-uae fs-uae.exe fs-uae-device-helper fs-uae-device-helper.exe
+
+distclean: clean clean-dist

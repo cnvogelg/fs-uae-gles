@@ -1,3 +1,4 @@
+#include <fs/filesys.h>
 #include "sysconfig.h"
 #include "sysdeps.h"
 
@@ -6,11 +7,11 @@
 
 #include <string.h>
 #include <string.h>
-#include <fs/filesys.h>
 #include <fs/string.h>
 
 #include "uae/memory.h"
 #include "options.h"
+#include "custom.h"
 #include "keyboard.h"
 #include "inputdevice.h"
 #include "disk.h"
@@ -23,7 +24,6 @@
 void keyboard_settrans (void);
 libamiga_callbacks g_libamiga_callbacks = {};
 log_function g_amiga_gui_message_function = NULL;
-amiga_led_function g_amiga_led_function = NULL;
 amiga_media_function g_amiga_media_function = NULL;
 
 int g_uae_deterministic_mode = 0;
@@ -52,94 +52,41 @@ void gui_filename (int num, const char *name) {
     }
 }
 
-static void gui_flicker_led2 (int led, int unitnum, int status) {
-    static int resetcounter[LED_MAX];
-    static uae_s8 gui_data_hd, gui_data_cd, gui_data_md;
-    uae_s8 old;
-    uae_s8 *p;
+uae_callback_function *uae_on_save_state_finished = NULL;
+uae_callback_function *uae_on_restore_state_finished = NULL;
+uae_callback_function *uae_on_update_leds = NULL;
 
-    if (led == LED_HD)
-            p = &gui_data_hd;
-    else if (led == LED_CD)
-            p = &gui_data_cd;
-    else if (led == LED_MD)
-            p = &gui_data_md;
-    else
-            return;
-    old = *p;
-    if (status < 0) {
-            if (old < 0) {
-                    *p = 0;
-                    gui_led (led, 0);
-            }
-            return;
-    }
-    if (status == 0 && old < 0) {
-           resetcounter[led] = 0;
-            return;
-    }
-    if (status == 0) {
-            resetcounter[led]--;
-            if (resetcounter[led] > 0)
-                    return;
-    }
-    *p = status;
-    resetcounter[led] = 6;
-    if (old != *p)
-            gui_led (led, *p);
-}
-
-void gui_flicker_led (int led, int unitnum, int status) {
-    if (led < 0) {
-        gui_flicker_led2 (LED_HD, 0, 0);
-        gui_flicker_led2 (LED_CD, 0, 0);
-        gui_flicker_led2 (LED_MD, 0, 0);
-    }
-    else {
-        gui_flicker_led2 (led, unitnum, status);
-    }
-}
-
-void gui_led (int led, int state) {
-    //STUB("led %d state %d", led, state);
-    int out_led = -1;
-    int out_state = state;
-
-    if (led == LED_DF0) out_led = 0;
-    else if (led == LED_DF1) out_led = 1;
-    else if (led == LED_DF2) out_led = 2;
-    else if (led == LED_DF3) out_led = 3;
-    else if (led == LED_POWER) {
-        //printf("POWER %d b %d\n", state, gui_data.powerled_brightness);
-        out_led = 8;
-    }
-    else if (led == LED_HD) out_led = 9;
-    else if (led == LED_CD) {
-        out_led = 10;
-        if (state == 0) {
-            out_state = 0;
-        }
-        else if (state == 4) {
-            out_state = 2;
-        }
-        else {
-            out_state = 1;
-        }
-    }
-    else if (led == LED_MD) out_led = 11;
-
-    if (led >= LED_DF0 && led <= LED_DF3) {
-        if (gui_data.drive_writing[led - 1]) {
-            out_state = 2;
-        }
-    }
-
-    if (g_amiga_led_function && out_led > -1) {
-        g_amiga_led_function(out_led, out_state);
-    }
-}
 
 extern "C" {
+
+int amiga_set_min_first_line(int line, int ntsc) {
+    if (line < 0 || line > 100) {
+        return 1;
+    }
+    if (ntsc) {
+        g_uae_min_first_line_ntsc = line;
+    }
+    else {
+        g_uae_min_first_line_pal = line;
+    }
+    return 0;
+}
+
+int amiga_get_vsync_counter() {
+    return g_uae_vsync_counter;
+}
+
+void amiga_set_vsync_counter(int vsync_counter) {
+    g_uae_vsync_counter = vsync_counter;
+}
+
+void amiga_on_restore_state_finished(amiga_callback_function *function) {
+    uae_on_restore_state_finished = function;
+}
+
+void amiga_on_save_state_finished(amiga_callback_function *function) {
+    uae_on_save_state_finished = function;
+}
 
 void amiga_set_save_state_compression(int compress) {
     g_amiga_savestate_docompress = compress ? 1 : 0;
@@ -166,10 +113,6 @@ void amiga_set_floppy_sounds_dir(const char *path) {
         // must have directory separator at the end
         g_floppy_sounds_dir = fs_strconcat(path, "/", NULL);
     }
-}
-
-void amiga_set_led_function(amiga_led_function function) {
-    g_amiga_led_function = function;
 }
 
 void amiga_set_media_function(amiga_media_function function) {
@@ -602,6 +545,13 @@ int amiga_parse_option(const char *option, const char *value, int type) {
 
 int amiga_set_option(const char *option, const char *value) {
     return amiga_parse_option(option, value, 0);
+}
+
+int amiga_set_option_and_free(const char *option, char *value,
+        amiga_free_function free_function) {
+    int result = amiga_set_option(option, value);
+    free_function(value);
+    return result;
 }
 
 int amiga_set_hardware_option(const char *option, const char *value) {

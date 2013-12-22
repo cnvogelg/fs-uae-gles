@@ -1,22 +1,23 @@
 Name:           fs-uae
-Version:        9.8.7
+Version:        2.3.15dev
 Release:        1%{?dist}
 
 Summary:        Amiga emulator with on-screen GUI and online play support
 License:        GPL-2.0+
 Group:          System/Emulators/Other
-Url:            http://fengestad.no/fs-uae/
-Source0:        http://fengestad.no/fs-uae/files/%{version}/fs-uae-%{version}.tar.gz
+Url:            http://fs-uae.net/
+Source0:        http://fs-uae.net/devel/%{version}/fs-uae-%{version}.tar.gz
 %if 0%{?suse_version}
 BuildRequires:  fdupes
 %endif
 BuildRequires:  gcc-c++
 BuildRequires:  hicolor-icon-theme
+BuildRequires:  libpng-devel
+BuildRequires:  libXi-devel
 BuildRequires:  pkgconfig(gl)
 BuildRequires:  pkgconfig(glib-2.0)
 BuildRequires:  pkgconfig(glu)
 BuildRequires:  pkgconfig(gthread-2.0)
-BuildRequires:  pkgconfig(libpng)
 BuildRequires:  pkgconfig(openal)
 BuildRequires:  pkgconfig(sdl)
 BuildRequires:  pkgconfig(x11)
@@ -77,6 +78,7 @@ make %{?_smp_mflags}
 %files -f %{name}.lang
 %defattr(0644,root,root,0755)
 %attr(0755,root,root) %{_bindir}/fs-uae
+%attr(0755,root,root) %{_bindir}/fs-uae-device-helper
 %{_datadir}/fs-uae/
 %{_defaultdocdir}/fs-uae/
 %{_datadir}/applications/fs-uae.desktop

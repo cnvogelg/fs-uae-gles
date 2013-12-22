@@ -1,5 +1,7 @@
+// FIXME: REMOVE
+#include "../emu/video.h"
 #ifdef WINDOWS
-#define _WIN32_WINNT 0x0501
+//#define _WIN32_WINNT 0x0501
 #include <Windows.h>
 #endif
 #include <stdio.h>
@@ -7,6 +9,7 @@
 #include <string.h>
 
 #include <fs/base.h>
+#include <fs/string.h>
 #include <fs/log.h>
 #include <fs/ml.h>
 #include <fs/queue.h>
@@ -19,14 +22,7 @@
 #include <sys/resource.h>
 #endif
 
-// FIXME: REMOVE
-#include "../emu/video.h"
-
 #include "ml_internal.h"
-
-static fs_queue *g_input_queue = NULL;
-static fs_mutex *g_input_mutex = NULL;
-static fs_ml_input_function g_input_function = NULL;
 
 int g_fs_ml_benchmarking = 0;
 
@@ -166,50 +162,6 @@ void fs_ml_video_set_post_render_function(fs_ml_void_function function) {
     g_fs_ml_video_post_render_function = function;
 }
 
-fs_ml_event* fs_ml_alloc_event() {
-    return malloc(sizeof(fs_ml_event));
-}
-
-void fs_ml_input_event_free(fs_ml_event *event) {
-    free(event);
-}
-
-void fs_ml_set_input_function(fs_ml_input_function function) {
-    g_input_function = function;
-}
-
-int fs_ml_post_event(fs_ml_event* event) {
-    if (event->type == FS_ML_KEYDOWN || event->type == FS_ML_KEYUP) {
-        if (fs_ml_handle_keyboard_shortcut(event)) {
-            return 1;
-        }
-    }
-    if (g_input_function) {
-        g_input_function(event);
-    }
-    /*
-    fs_mutex_lock(g_input_mutex);
-    fs_queue_push_tail(g_input_queue, event);
-    fs_mutex_unlock(g_input_mutex);
-    */
-    return 1;
-}
-
-static void init_input() {
-    fs_log("init_input\n");
-    g_input_queue = fs_queue_new();
-    g_input_mutex = fs_mutex_create();
-
-    fs_log("calling fs_ml_video_init\n");
-    fs_ml_video_init();
-
-    int size = sizeof(fs_ml_input_device) * FS_ML_INPUT_DEVICES_MAX;
-    // allocate zeroed memory
-    g_fs_ml_input_devices = fs_malloc0(size);
-    fs_log("calling fs_ml_input_init\n");
-    fs_ml_input_init();
-}
-
 int fs_ml_handle_keyboard_shortcut(fs_ml_event *event) {
     int state = event->key.state;
     int key = event->key.keysym.sym;
@@ -254,6 +206,9 @@ int fs_ml_handle_keyboard_shortcut(fs_ml_event *event) {
     else if (key == FS_ML_KEY_TAB && alt_mod) {
         if (state) {
             fs_log("ALT+Tab key press detected\n");
+#ifdef USE_SDL2
+
+#else
 #ifdef WINDOWS
             // input grab will be released be deactivation
                         // event in this case
@@ -264,11 +219,12 @@ int fs_ml_handle_keyboard_shortcut(fs_ml_event *event) {
                 g_fs_ml_had_input_grab = 1;
             }
             if (g_fs_emu_video_fullscreen == 1 &&
-                    g_fs_emu_video_fullscreen_window == 0) {
+                    g_fs_emu_video_fullscreen_mode == 0) {
                 fs_log("- switching to window mode\n");
                 g_fs_ml_was_fullscreen = 1;
                 fs_ml_toggle_fullscreen();
             }
+#endif
 #endif
         }
         return 1;
@@ -359,7 +315,8 @@ void fs_ml_init_2() {
     fs_log("assuming refresh rate: %d (%d usec per frame)\n",
             g_fs_ml_target_refresh_rate, g_fs_ml_target_frame_time);
 
-    init_input();
+    fs_ml_input_init();
+
     g_fs_ml_video_screenshot_mutex = fs_mutex_create();
 }
 

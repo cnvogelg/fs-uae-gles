@@ -1,4 +1,300 @@
-Version 2.3.0:
+Version 2.3.15:
+
+* Reverted to previous MinGW compiler (Windows).
+* (Launcher) Fixed a bug loading online database games with cpu specification.
+* (Arcade) Fixed Windows shortcut for FS-UAE Arcade.
+
+Version 2.3.14:
+
+* JIT should work on Windows too now.
+* New options: audio_frequency, audio_buffer_target_size.
+* Default frequency is now 48000 Hz (will try 44100 Hz if 48000 Hz fails).
+* Default audio buffer size is now 40ms (slightly lower than before).
+* Deprecated the old audio_buffer_target_bytes option (it is now instead
+  calculated from audio_buffer_target_size).
+* Speed up startup by caching information about kickstart ROMs.
+* Skip initializating stuff in inputdevice.cpp which are not used by FS-UAE,
+  speeds up startup - report if it seems to have bad side-effects...
+* Split Savestates into two main menu entries (Load State, Save State).
+* Removed superfluous More... entries.
+* Include #define GLXContextID XID in glee.h to work with recent Mesa.
+* (Launcher) Respect writable_floppy_images option in cases where the
+  floppy drive options directly refer to local paths (don't copy disk
+  images to temp directory).
+* (Launcher) Defragment databases function (Settings -> Maintenance).
+* (Launcher) Use QT to open all URLs, for consistent behavior.
+* (Launcher) Will now try to find and use either of PySide, PyQt5 or PyQt4.
+* (Launcher) Added GUI controls to tweak audio freqency and also audio target
+  buffer size (in ms). The latter can be used to reduce audio latency.
+
+Version 2.3.13:
+
+* Video sync is disabled by default.
+* Updated translations: pl [grimi].
+* (Launcher) New video synchronization settings page, reorg. video settings.
+* (Launcher) New dialog for manual game downloads with scan function to make
+  manual downloads more streamlined.
+* (Launcher) Re-enabled support for manually downloadable games.
+* (Launcher) Re-enabled support for automatically downloadable games.
+* (Launcher) Support downloading and displaying terms for auto-downloadable
+  game files.
+* (Launcher) Changed icons for downloadable games.
+* (Launcher) fullscreen_mode was erroneously specified as fullscreen, should
+  be empty string. Also, fullscreen_mode will now show in advanced settings
+  if overriden.
+* (Launcher) Updated translations: pl [grimi], fi [Goingdown].
+
+Version 2.3.12:
+
+* On OS X, simulate middle click (alt) and right click (ctrl).
+* Don't move mouse to right bottom on exit without requested with environment
+  variable FSGS_SEAMLESS=1.
+* New option load_state = 1..9.
+* New option stereo_separation (0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100).
+* (Launcher) Added GUI control for stereo_separation.
+* (Launcher) Database change, a refresh is needed for the game database.
+* (Launcher) Convert from UTF-8 str to unicode when loading and vice versa
+  when saving config.
+* (Arcade) Game filters: platform, letter and shuffle.
+* (Arcade) Further re-branding to FS-UAE Arcade.
+* (Arcade) Don't display wraparound items if items would be repeat on screen.
+* (Arcade) Can start with --platform argument (--amiga, --cd32 etc).
+
+Version 2.3.11:
+
+* When deleting a directory from a dir HD, remove Thumbs_DB and .DS_Store
+  files first if they exist.
+* (Launcher) Changed where fs-uae-device-helper is stored in FS-UAE.app so
+  it is picked up by the fix-libs script.
+* (Launcher) Removed refresh game database from left "main menu".
+* (Launcher) Fixed a problem with lhafile caused by Python 3-compat changes.
+
+Version 2.3.10:
+
+* Initial support for SDL2 (make sdl=2), does not yet take full adv. of it.
+* Enable SDL2 by default on OS X.
+* New options window_x, window_y and keyboard_input_grab (SDL2 only).
+* New options min_first_line_ntsc, min_first_line_pal.
+* Windows distributions/packaging updated.
+* fs-uae deb package marked as Multi-Arch: foreign, fs-uae:i386 can then be
+  installed on amd64 without breaking fs-uae-launcher dependency.
+* Updated translations: pl [grimi], fi [Goingdown], tr [Decypher],
+  fr [Foul], nb.
+* (Launcher) Fixed dialog centering on OS X.
+* (Launcher) Center main window on desktop when opening.
+* (Launcher) Marked some texts for translation.
+* (Launcher) Use native file/directory dialogs (in most places).
+* (Launcher) Fixed a bug where game info panel wasn't always refreshed.
+* (Launcher) Code update for compatibility with Python 3.
+* (Launcher) Support for PyQT5 in addition to Pyside.
+* (Launcher) Experimental net play UI is available again.
+* (Launcher) Ensure floppy file name is visible when floppy field changes.
+* (Launcher) Support for hd_requirements = workbench (with online database).
+* (Launcher) Game database now in Cache/Games.sqlite.
+* (Launcher) Database now in Data/Database.sqlite.
+* (Launcher) Updated translations: pl [grimi], fi [Goingdown],
+  it [Speedvicio], tr [Decypher], fr [Foul], nb.
+* (Game Center) Renaming to FS-UAE Arcade (not complete).
+* (Game Center) Merged with Launcher distr on some platforms (Windows).
+* (Game Center) Fix joystick selection on input selection screen.
+
+Version 2.3.9:
+
+* Add build support for kFreeBSD [glaubitz].
+* Add generic maccess.h defines for "other" architectures [glaubitz].
+* Better code to disable the JIT compiler on non-i386 architectures [glaubitz].
+* Added contrib/sinc-integral.py to source distribution (Debian compliance).
+* Removed catweasel code from source distribution (Debian compliance).
+* Also check for $executable_path/../../Config.fs-uae on OS X.
+* Gracefully handle it when xrandr executable is not found.
+* New translations: da [tomse].
+* Updated translations: de [TCD].
+* (Launcher) Fixed a rendering issue with the tab panel.
+* (Launcher) Fixed rendering of local config/variant name in config list.
+* (Launcher) CD32 FMV ROM is properly used again when CD32/FMV model is used.
+* (Launcher) Allow server to reset local game database when necessary.
+* (Launcher) Fixed bug when last letter in search term is n.
+* (Launcher) Set explicit min width for ADF/HDF creator size field.
+* (Launcher) Allow (Qt) list items to be activated with enter.
+* (Launcher) OAGD.net Locker Uploader implemented.
+* (Launcher) Fixed bug with indexing files in archives somewhere within
+  a directory called #.
+* (Launcher) SetPatch can be extracted on demand from disk in locker.
+* (Launcher) Minor GUI tweaks and improvements here and there.
+* (Launcher) More code restructuring for sharing between launcher and gc.
+* (Launcher) New translations: da [tomse].
+* (Launcher) Updated translations: de [TCD], it [Speedvicio], nb.
+* (Game Center) Search-as-you type (just start typing to activate search).
+* (Game Center) Only show db configs (local ones don't work now anyway).
+
+Version 2.3.8:
+
+* New option "volume" to specify initial audio volume.
+* (Launcher) New OAGD.net login and logout dialog.
+* (Launcher) New login system (store authentication tokens instead of
+  username and password).
+* (Launcher) Drop-down list for choosing game list (from OAGD.net).
+* (Launcher) Support for synchronizing game lists from OAGD.net.
+* (Launcher) Initial support for OAGD.net locker (only available to a few
+  select users right now).
+* (Launcher) If local files are missing, files will be downloaded on demand
+  from the user's OAGD.net locker, if present there.
+* (Launcher) More compact (OAGD) game database, faster synchronization.
+* (Launcher) Nicer database refresh dialog, stop button works now.
+* (Launcher) Fixed bugs in HDF Creator appearing after split from ADF Creator.
+* (Launcher) Language preferences page now actually works.
+* (Launcher) New language detection code for OS X, not dependent on wx.
+* (Launcher) Fixed bugs preventing info panel from showing some warnings.
+* (Launcher) Settings file moved into FS-UAE/Data, shared with Game Center.
+* (Launcher) Several other minor UI updates, bug fixes, and restructured code.
+* (Launcher) WHDLoad runner installs the file C:OSEmu.400.
+* (Launcher) Load QT stylesheet (if found) from
+  FS-UAE/Plugins/<name>/fs-uae-launcher-theme/stylesheet.qss
+* (Launcher) Added icons to settings dialog, removed close button.
+* (Launcher) QT port now displays application / window icon again.
+* (Launcher) Moved "Custom Settings" to Preferences -> Advanced Settings.
+* (Launcher) Remember last used preferences page.
+* (Launcher) Added preference control for new audio volume option.
+* (Game Center) Now reads and applies (most) FS-UAE Launcher settings.
+
+Version 2.3.7:
+
+* New utility program: fs-uae-device-helper (used by FS-UAE Launcher).
+* (Launcher) pygame is no longer an dependency, joystick event detection for
+  mapping purposes is done via fs-uae-device-helper.
+* (Launcher) Program startup and focus issue should be fixed on OS X.
+* (Launcher) Added language preference page.
+* (Launcher) ADF & HDF Creator split into two, and they are now non-modal.
+* (Launcher) Joystick config tool shows existing config when opening (only
+  when the user has already configured it, bundled config is not shown yet).
+* (Launcher) Joystick device for mapping is selected in joystick prefs.
+* (Launcher) Completed porting to QT (using pyside bindings for Python).
+* (Launcher) Old wxPython GUI layer still exists (--wx) but not 100% updated.
+* (Launcher) Input Settings prefs page split into mouse and keyboard.
+* (Launcher) Fixed bug when choosing a zip with select multiple floppies.
+* (Launcher) Search-as-you type could in some case return multiple entries
+  for the same game.
+* (Launcher) Updated don't checksum BSD device nodes code [vext01].
+
+Version 2.3.6:
+
+* Joystick indices (for use with custom input mapping) were skewed due to
+  the new mouse devices (fixed).
+* Swapped display order of mouse and joystick ports, call them
+  "Joystick Port" and "Mouse Port" instead of Joystick Port 0/1.
+* Fade in when starting FS-UAE, looks better when using themes since the 
+  graphics won't just suddently pop out.
+* (Launcher) Search-as-you type has returned.
+* (Launcher) Show homepage_url, thelegacy_url in links menu.
+* (Launcher) Swapped display order of mouse and joystick ports.
+* (Launcher) Spin controls did not work properly on OS X.
+* (Launcher) Handle importing kickstarts from the kickstarts dir gracefully.
+* (Game Center) Don't create ~/Documents (unless needed) and ~/Games.
+
+Version 2.3.5:
+
+* Can open block devices as HDF files on OpenBSD [Edd Barrett / vext01].
+* Full stereo separation by default (was 70%).
+* Use "enhanced" audio filter when Amiga model is A1200 or A4000.
+* Fixed bug where the new FPS led status would overwrite floppy drive leds.
+* (Launcher) Fixed a bug where new A500 configs could refuse to start
+  because "kickstart was not found" (2.3.4).
+* (Launcher) Better support for .7z (where available), but very inefficient,
+  works best for having a few ADFs in each .7z archive, not WHDLoad archives.
+* (Launcher) Can start WHDLoad slaves from archives where the slave is in
+  the root directory and not in a sub-directory.
+* (Game Center) Create a log file in a similar manner as FS-UAE Launcher.
+* (Game Center) Added python-opengl, python-numpy as Debian dependencies.
+* (Game Center) Was missing from suite installer for Windows (fixed).
+
+Version 2.3.4:
+
+* Support for multiple mice using ManyMouse library by Ryan C. Gordon.
+* New theme bundled: led-bars-edge.
+* Support for some theme digit overlays (cylinder numbers, fps).
+* Initial code for input recording.
+* Fixed a bug when looking up executable path on Unix-like systems.
+* When quitting from fullscreen mode, move cursor to bottom right (so
+  transitioning to a full-screen launcher looks nicer).
+* (Launcher) Support multiple mice.
+* (Launcher) Preference to show downloadable games or not.
+* (Launcher) Don't try to checksum OS X/*BSD device nodes
+  [Edd Barrett / vext01].
+* (Launcher) Fixed bug when closing the config dialog.
+* (Launcher) Support 7z archives when the 7z program is found on PATH.
+* (Launcher) Joystick config tool works with devices having axes with
+  negative or positive rest values.
+* (Launcher) Don't display "Amiga" in game list, only other platform names.
+* (Launcher) More restructuring and smaller changes (no changelog...)
+* (Game Center) Only show locally available games.
+* (Game Center) Only preselect the highest rated variant from local variants.
+* (Game Center) Nicer transition to FS-UAE (remove/reduce cursor flickering).
+* (Game Center) Use LSUIPresentationMode 4 for bundled FS-UAE for seamless
+  transition to FS-UAE on OS X.
+
+Version 2.3.3:
+
+* (Launcher) Don't reload images when changing variants (and same images
+  should be displayed for the new variant).
+* (Launcher) Show joy_emu_conflict from oagd.net in statusbar if applicable.
+* (Launcher) More QT port improvements, almost full-featured now.
+* (Game Center) Locate correct kickstart ROMs via file database.
+* (Game Center) Fixed possible bug in font rendering code.
+
+Version 2.3.2:
+
+* (Launcher) Fixed bug when loading files from archive in a folder named #.
+* (Launcher) Fixed bug when automatically looking up Amiga Forever roms [2.3.1]
+* (Launcher) QT port improvements.
+* (Launcher) Misc bugfixes and minor improvements.
+
+Version 2.3.1:
+
+* On windows, read file name (as program parameter) with MBCS encoding
+  (CP_ACP) so paths with non-ASCII characters are handled correctly.
+* Windows executables are digitally signed by "Frode Solheim".
+* New portable zip file distribution for Windows, "plus" zip file removed,
+  and emulator-only zip exists still with _emulator.zip name.
+* Logs dir is moved into Cache/Logs/, log file renamed to Emulator.log.txt.
+* Always write shader log, in case there's GLSL warnings, etc.
+* (Launcher) New status bar with info about num players, languages,
+  web links, copy protection and warnings.
+* (Launcher) Game variants (from oagd.net) you don't have are also
+  displayed, but greyed out.
+* (Launcher) Buttons to rate game variants on oagd.net directly from UI.
+* (Launcher) Implemented cancel in launch FS-UAE progress dialog.
+* (Launcher) Only add Cloanto "Amiga Files" to search path if directory
+  exists (Windows).
+* (Launcher) Fix slash direction in default search directory on Windows so
+  it does not look weird.
+* (Launcher) More space-efficient screenshot and cover sizes/formats.
+* (Launcher) Internal code rewrite (in progress) to support code sharing
+  with Game Center.
+* (Launcher) Only have start menu icon for FS-UAE Launcher by default.
+* (Launcher) Support new option x_hdinst_args.
+* (Launcher) Better support for portable directory, launcher settings can
+  be saved in portable dir.
+* (Launcher) Non-Cache launcher data files moved to FS-UAE/Data.
+* (Launcher) Download cache dir moved to FS-UAE/Cache/Downloads.
+* (Launcher) Initial support for auto-downloadable games from oagd.net.
+* (Launcher) Initial support for auto-downloadable games from 3rd-party sites.
+* (Launcher) Initial support for manually downloadable games.
+* (Launcher) Moved local file index into its own database file.
+* (Launcher) Extract empty directories as well when extracting archives.
+* (Launcher) Fixed bug when specifying window_width / window_height in
+  custom settings.
+* (Launcher) Partial support for Python 3.x.
+* (Launcher) Partial support for using the Launcher with QT toolkit.
+* (Launcher) Moved file database into its own separate database, also made
+  the file rows more space efficient, and the checksum index smaller.
+* (Launcher) Removed support for old XML game database.
+* (Launcher) Ignore file extension case when checking floppy list from
+  online database.
+* (Launcher) Handle some potentially invalid configs from online database
+  more gracefully.
+* (Launcher) Updated translations: it [speedvicio].
+
+Version 2.3.0
 
 * Show on-screen warning if OpenAL device cannot be opened, log OpenAL
   error code.
@@ -9,15 +305,24 @@ Version 2.3.0:
 * Use CD32 + FMV quickstart for CD32 model, update cd.device in cartridge
   ROM fixes problem with Pirates Gold intro.
 * Removed a couple of left-over / unnecesary log statements.
+* Support language option to override GUI language.
 * New translations: tr [Decypher].
-* (Launcher) Fixed bug when specifying window_width / window_height in
-  custom settings.
+* With video_sync = auto, allow some slack when deciding to enable full
+  sync or not (accept host refresh rate 49 instead of just 50, ..).
+* New option: assume_refresh_rate (int) to manually specify host refresh
+  rate when refresh rate detection fails. This option in combination with
+  video_sync = auto effectively replaces video_sync = full.
+* video_sync = full is now an alias for video_sync = auto.
+* Fixed bug causing FS-UAE to hang when pausing with video_sync = off.
+* New model CD32/FMV (includes FMV ROM), CD32 model reverted to original.
+* Fixed compatibility issues in scanline GLSL shaders.
 * (Launcher) Warn when using A1200 model with < 2 MB chip RAM.
 * (Launcher) Fixed a bug where 0-byte screenshot / covers files could be
   stored if a network error occurs while downloading.
 * (Launcher) Better support for A3000 and A4000 with the game database.
 * (Launcher) Support hiding variants from the database based on _status.
 * (Launcher) Cycle-exact can be disabled from database if abs. necessary.
+* (Launcher) Support language option to override GUI language.
 * (Launcher) New translations: tr [Decypher].
 
 Version 2.1.35 / 2.2.0:

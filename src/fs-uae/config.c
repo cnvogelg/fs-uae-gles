@@ -66,6 +66,19 @@ void fs_uae_init_configs() {
     c->name = "Amiga CD32";
     //c->quickstart = "CD32,,";
     c->quickstart_model = 8;
+    c->quickstart_config = 0;
+#ifdef NEW_ACCURACY_SYSTEM
+    c->fast_on_accuracy_level = -999;
+#else
+    c->fast_on_accuracy_level = 0;
+#endif
+
+    c = g_fs_uae_amiga_configs + CONFIG_CD32_FMV;
+    c->id = "CD32/FMV";
+    c->model = MODEL_CD32;
+    c->name = "Amiga CD32 + FMV ROM";
+    //c->quickstart = "CD32,,";
+    c->quickstart_model = 8;
     c->quickstart_config = 1;
 #ifdef NEW_ACCURACY_SYSTEM
     c->fast_on_accuracy_level = -999;
@@ -84,6 +97,7 @@ void fs_uae_init_configs() {
 #else
     c->fast_on_accuracy_level = 0;
 #endif
+    c->enhanced_audio_filter = 1;
 
     c = g_fs_uae_amiga_configs + CONFIG_A1200_020;
     c->id = "A1200/020";
@@ -96,6 +110,7 @@ void fs_uae_init_configs() {
 #else
     c->fast_on_accuracy_level = 0;
 #endif
+    c->enhanced_audio_filter = 1;
     c->cpu_model = "68020";
     c->cpu_32bit_addressing = 1;
     c->allow_z3_memory = 1;
@@ -134,6 +149,7 @@ void fs_uae_init_configs() {
     c->fast_on_accuracy_level = 1;
     c->no_accuracy_adjustment = 1;
     c->allow_z3_memory = 1;
+    c->enhanced_audio_filter = 1;
 
     c = g_fs_uae_amiga_configs + CONFIG_A3000;
     c->id = "A3000";
@@ -470,6 +486,18 @@ void fs_uae_configure_amiga_hardware() {
 
     if (fs_config_get_const_string("dongle_type")) {
         amiga_set_option("dongle", fs_config_get_const_string("dongle_type"));
+    }
+
+    int stereo_separation = fs_config_get_int_clamped(
+        "stereo_separation", 0, 100);
+    if (stereo_separation == FS_CONFIG_NONE) {
+        stereo_separation = 100;
+    }
+    stereo_separation = stereo_separation / 10;
+    amiga_set_option_and_free("sound_stereo_separation",
+        fs_strdup_printf("%d", stereo_separation), free);
+    if (c->enhanced_audio_filter) {
+        amiga_set_option("sound_filter_type", "enhanced");
     }
 
     /*

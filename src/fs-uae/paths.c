@@ -1,3 +1,4 @@
+#define _GNU_SOURCE 1
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -172,7 +173,7 @@ static char *create_default_dir(const char *name, const char *key1,
     if (path == NULL && key2 != NULL) {
         path = fs_config_get_string(key2);
     }
-    if (path == NULL) {
+    if (path == NULL && dashed_key != NULL) {
         path = read_custom_path(dashed_key);
     }
     if (path == NULL) {
@@ -327,8 +328,30 @@ const char *fs_uae_controllers_dir() {
 const char *fs_uae_logs_dir() {
     static const char *path = NULL;
     if (path == NULL) {
-        path = create_default_dir("Logs", "logs_dir", NULL,
+        path = create_default_dir("Cache/Logs", "logs_dir", NULL,
                 "logs-dir");
+    }
+    return path;
+}
+
+const char *fs_uae_cache_dir() {
+    static const char *path = NULL;
+    if (path == NULL) {
+        path = create_default_dir("Cache", "cache_dir", NULL,
+                "cache-dir");
+    }
+    return path;
+}
+
+const char *fs_uae_kickstarts_cache_dir() {
+    static const char *path = NULL;
+    if (path == NULL) {
+        path = fs_path_join(fs_uae_cache_dir(), "Kickstarts", NULL);
+        int result = fs_mkdir_with_parents(path, 0755);
+        if (result == -1) {
+            fs_emu_warning("Could not create kickstarts cache directory");
+            path = fs_uae_base_dir();
+        }
     }
     return path;
 }

@@ -7,6 +7,15 @@
 extern "C" {
 #endif
 
+int amiga_get_vsync_counter();
+void amiga_set_vsync_counter(int vsync_counter);
+
+typedef void (uae_callback_function)(void *data);
+// old name
+typedef void (amiga_callback_function)(void *data);
+void amiga_on_save_state_finished(uae_callback_function *function);
+void amiga_on_restore_state_finished(uae_callback_function *function);
+
 #ifdef WITH_LUA
 #include <lauxlib.h>
 void amiga_init_lua(void (*lock)(void), void (*unlock)(void));
@@ -53,6 +62,8 @@ int amiga_enable_serial_port(const char *serial_name);
 
 void amiga_set_save_image_dir(const char *path);
 
+int amiga_set_min_first_line(int line, int ntsc);
+
 enum {
     AMIGA_FLOPPY_DRIVE_NONE,
     AMIGA_FLOPPY_DRIVE_35_DD,
@@ -97,6 +108,24 @@ void amiga_set_render_buffer(void *data, int size, int need_redraw,
 #define AMIGA_VIDEO_LOW_RESOLUTION 2
 #define AMIGA_VIDEO_LINE_DOUBLING 4
 
+#define UAE_LED_STATE_ON 1
+#define UAE_LED_STATE_WRITE 2
+#define UAE_LED_STATE_EXTRA 4
+
+typedef struct _uae_led_data {
+    // int df[4];
+    int df_t0[4];
+    int df_t1[4];
+    // int cd;
+    // int hd;
+    // int md;
+    // int power;
+} amiga_led_data;
+
+extern struct _uae_led_data g_uae_led_data;
+
+void amiga_on_update_leds(uae_callback_function *function);
+
 typedef struct _RenderData {
     unsigned char* pixels;
     int width;
@@ -137,6 +166,9 @@ int amiga_set_audio_buffer_size(int size);
 int amiga_set_audio_frequency(int frequency);
 
 int amiga_set_option(const char *option, const char *value);
+typedef void (*amiga_free_function)(void* data);
+int amiga_set_option_and_free(const char *option, char *value,
+    amiga_free_function free_function);
 int amiga_set_hardware_option(const char *option, const char *value);
 int amiga_set_int_option(const char *option, int value);
 
@@ -173,7 +205,7 @@ int amiga_send_input_event(int input_event, int state);
 void amiga_write_config(const char *path);
 
 void amiga_add_key_dir(const char *path);
-int amiga_add_rom_file(const char *path);
+int amiga_add_rom_file(const char *path, const char *cache_path);
 
 void amiga_set_paths(const char **rom_paths, const char **floppy_paths,
         const char **cd_paths, const char **hd_paths);

@@ -1,3 +1,4 @@
+#include <fs/emu.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
@@ -97,6 +98,7 @@ void fs_emu_warning(const char *format, ...) {
         buffer[len] = '\0';
     }
     fs_log("WARNING: %s\n", buffer);
+    printf("WARNING: %s\n", buffer);
     fs_emu_hud_add_console_line(buffer, 0);
     free(buffer);
 }
@@ -158,7 +160,7 @@ static void read_config() {
         g_fs_emu_video_fullscreen = fullscreen;
     }
 
-    g_fs_emu_video_fullscreen_mode = fs_config_get_string("fullscreen_mode");
+    g_fs_emu_video_fullscreen_mode_string = fs_config_get_string("fullscreen_mode");
 
     string_result = fs_config_get_string("title");
     if (string_result) {

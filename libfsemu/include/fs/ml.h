@@ -99,6 +99,8 @@ int fs_ml_get_fullscreen_height();
 int fs_ml_get_windowed_width();
 int fs_ml_get_windowed_height();
 
+char *fs_ml_input_unique_device_name(char *name);
+
 //int fs_ml_main_iteration();
 // FIXME: REMOVE?
 //void fs_ml_swap_buffers();
@@ -126,7 +128,7 @@ typedef enum {
        FS_ML_EVENT_RESERVEDB,
        FS_ML_VIDEORESIZE,
        FS_ML_VIDEOEXPOSE,
-       FS_ML_EVENT_RESERVED2,
+       FS_ML_TEXTINPUT,
        FS_ML_EVENT_RESERVED3,
        FS_ML_EVENT_RESERVED4,
        FS_ML_EVENT_RESERVED5,
@@ -139,7 +141,7 @@ typedef enum {
 typedef struct fs_ml_keysym {
     uint16_t scancode;
     uint16_t sym;
-    uint16_t unicode;
+    // uint16_t unicode;
     uint16_t mod;
 } fs_ml_keysym;
 
@@ -158,7 +160,7 @@ typedef struct fs_ml_KeyboardEvent {
 
 typedef struct fs_ml_MouseMotionEvent {
     uint8_t type;
-    uint8_t which;
+    uint8_t device;
     uint8_t state;
     uint16_t x, y;
     int16_t xrel;
@@ -167,7 +169,7 @@ typedef struct fs_ml_MouseMotionEvent {
 
 typedef struct fs_ml_MouseButtonEvent {
     uint8_t type;
-    uint8_t which;
+    uint8_t device;
     uint8_t button;
     uint8_t state;
     uint16_t x, y;
@@ -230,6 +232,14 @@ typedef struct fs_ml_SysWMEvent {
     fs_ml_SysWMmsg *msg;
 } fs_ml_SysWMEvent;
 
+
+#define TEXTINPUTEVENT_TEXT_SIZE (32)
+
+typedef struct fs_ml_TextInputEvent {
+    uint8_t type;
+    char text[TEXTINPUTEVENT_TEXT_SIZE];
+} fs_ml_TextInputEvent;
+
 typedef union fs_ml_event {
     uint8_t type;
     fs_ml_ActiveEvent active;
@@ -245,6 +255,7 @@ typedef union fs_ml_event {
     fs_ml_QuitEvent quit;
     fs_ml_UserEvent user;
     fs_ml_SysWMEvent syswm;
+    fs_ml_TextInputEvent text;
 } fs_ml_event;
 
 fs_ml_event* fs_ml_alloc_event();
@@ -259,8 +270,13 @@ int fs_ml_has_input_grab();
 
 #define FS_ML_INPUT_DEVICES_MAX 64
 
+#define FS_ML_KEYBOARD 0
+#define FS_ML_MOUSE 1
+#define FS_ML_JOYSTICK 2
+
 typedef struct fs_ml_input_device {
     int index;
+    int type;
     char *name;
     char *alias;
     int buttons;

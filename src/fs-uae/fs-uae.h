@@ -45,6 +45,7 @@ typedef struct amiga_config {
     int fast_on_accuracy_level;
     int no_accuracy_adjustment;
     const char *warning;
+    int enhanced_audio_filter;
 } amiga_config;
 
 void fs_uae_init_configs();
@@ -72,6 +73,8 @@ const char *fs_uae_controllers_dir();
 const char *fs_uae_logs_dir();
 const char *fs_uae_exe_dir();
 const char *fs_uae_themes_dir();
+const char *fs_uae_cache_dir();
+const char *fs_uae_kickstarts_cache_dir();
 
 #define FS_UAE_CONFIG_TYPE_JOYSTICK "amiga"
 #define FS_UAE_CONFIG_TYPE_MOUSE "amiga_mouse"
@@ -123,7 +126,8 @@ void fs_uae_set_uae_paths();
 
 #define CONFIG_A1000 10
 #define CONFIG_A3000 11
-#define CONFIG_LAST 12
+#define CONFIG_CD32_FMV 12
+#define CONFIG_LAST 13
 
 #define MODEL_A500 1
 #define MODEL_A1200 2
@@ -149,8 +153,10 @@ extern int g_fs_uae_state_number;
 extern int g_fs_uae_last_input_event;
 extern int g_fs_uae_last_input_event_state;
 
-void fs_uae_process_input_event(int action, int state);
+void fs_uae_process_input_event(int line, int action, int state, int playback);
 
 #ifdef WITH_LUA
 void fs_uae_init_lua_state(lua_State *L);
 #endif
+
+extern int g_fs_uae_frame;

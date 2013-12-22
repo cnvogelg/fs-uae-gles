@@ -1,3 +1,5 @@
+#include <fs/emu.h>
+#define _GNU_SOURCE 1
 #ifdef WINDOWS
 #define WINVER 0x0502
 #endif
@@ -74,8 +76,8 @@ int g_fs_emu_netplay_connected = 0;
 
 // FIXME: move to emulator
 static int g_fs_emu_netplay_emulation_version_major = 2;
-static int g_fs_emu_netplay_emulation_version_minor = 2;
-static int g_fs_emu_netplay_emulation_version_revision = 1;
+static int g_fs_emu_netplay_emulation_version_minor = 3;
+static int g_fs_emu_netplay_emulation_version_revision = 3;
 
 #define TCP
 

@@ -150,6 +150,9 @@ static int vsynctimeperline;
 static int jitcount = 0;
 static int frameskiptime;
 
+int g_uae_min_first_line_pal = VBLANK_ENDLINE_PAL;
+int g_uae_min_first_line_ntsc = VBLANK_ENDLINE_NTSC;
+
 #define LOF_TOGGLES_NEEDED 4
 #define NLACE_CNT_NEEDED 50
 static int lof_togglecnt_lace, lof_togglecnt_nlace, lof_previous, nlace_cnt;
@@ -345,6 +348,11 @@ unsigned long int frametime = 0, lastframetime = 0, timeframes = 0;
 unsigned long hsync_counter = 0, vsync_counter = 0;
 unsigned long int idletime;
 int bogusframe;
+
+#ifdef FSUAE
+int g_uae_vsync_counter = 0;
+//int g_uae_hsync_counter = 0;
+#endif
 
 /* Recording of custom chip register changes.  */
 static int current_change_set;
@@ -3080,7 +3088,7 @@ void init_hz (bool fullinit)
 	if (!isntsc) {
 		maxvpos = MAXVPOS_PAL;
 		maxhpos = MAXHPOS_PAL;
-		minfirstline = VBLANK_ENDLINE_PAL;
+		minfirstline = g_uae_min_first_line_pal;
 		vblank_hz = VBLANK_HZ_PAL;
 		sprite_vblank_endline = VBLANK_SPRITE_PAL;
 		equ_vblank_endline = EQU_ENDLINE_PAL;
@@ -3088,7 +3096,7 @@ void init_hz (bool fullinit)
 	} else {
 		maxvpos = MAXVPOS_NTSC;
 		maxhpos = MAXHPOS_NTSC;
-		minfirstline = VBLANK_ENDLINE_NTSC;
+		minfirstline = g_uae_min_first_line_ntsc;
 		vblank_hz = VBLANK_HZ_NTSC;
 		sprite_vblank_endline = VBLANK_SPRITE_NTSC;
 		equ_vblank_endline = EQU_ENDLINE_NTSC;
@@ -5940,10 +5948,22 @@ static void vsync_handler_pre (void)
 static void vsync_handler_post (void)
 {
 #ifdef FSUAE
+#if 0
     if (g_frame_debug_logging) {
         write_log("%6d  vsync_handler_post  %08x\n", vsync_counter,
                 uae_get_memory_checksum());
     }
+
+    char *buffer = strdup("/Users/frode/states/0000000000.uss");
+    sprintf(buffer, "/Users/frode/states/%d.uss", g_uae_vsync_counter);
+    if (savestate_state == 0) {
+	    save_state (buffer, _T(""));
+	}
+	else {
+		unlink(buffer);
+	}
+    free(buffer);
+#endif
 #endif
 	static frame_time_t prevtime;
 
@@ -6297,6 +6317,9 @@ static void hsync_handler_pre (bool onvsync)
 	if (onvsync) {
 		vpos = 0;
 		vsync_counter++;
+#ifdef FSUAE
+	g_uae_vsync_counter++;
+#endif
 	}
 	set_hpos ();
 #if 0

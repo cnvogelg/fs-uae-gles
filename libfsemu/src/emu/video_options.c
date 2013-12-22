@@ -1,3 +1,4 @@
+#include <fs/emu.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -37,9 +38,17 @@ void fs_emu_video_init_options(void) {
     fs_ml_video_mode mode;
     memset(&mode, 0, sizeof(fs_ml_video_mode));
     if (fs_ml_video_mode_get_current(&mode) == 0) {
-        fs_log("current display mode is %dx%d@%dhz\n", mode.width,
+        fs_log("current display mode is %dx%d @ %d Hz\n", mode.width,
                 mode.height, mode.fps);
-        g_fs_emu_video_frame_rate_host = mode.fps;
+        int assume_refresh_rate = fs_config_get_int("assume_refresh_rate");
+        if (assume_refresh_rate != FS_CONFIG_NONE) {
+            fs_log("assuming host refresh rate: %d Hz (from config)\n",
+                    assume_refresh_rate);
+            g_fs_emu_video_frame_rate_host = assume_refresh_rate;
+        }
+        else {
+            g_fs_emu_video_frame_rate_host = mode.fps;
+        }
     }
     else {
         fs_log("could not get display mode\n");
@@ -79,7 +88,11 @@ void fs_emu_video_init_options(void) {
         free(sync_mode_str);
     }
     else {
-        fs_log("not specified: using automatic video sync mode\n");
+        //fs_log("not specified: using automatic video sync mode\n");
+
+        fs_log("not specified: no video sync\n");
+        g_fs_emu_video_sync_to_vblank = 0;
+        g_fs_emu_video_allow_full_sync = 0;
     }
 
 /*
