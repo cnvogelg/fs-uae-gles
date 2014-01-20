@@ -10,13 +10,6 @@ all: bindist
 clean:
 	rm -Rf ../macosx/fs-uae*
 
-all: bundle
-
-clean:
-	$(MAKE) -C .. clean
-	rm -Rf fs-uae-$(version)-macosx
-	rm -f fs-uae-$(version)-macosx.tar.gz
-
 bindist: bundle
 	cd fs-uae_$(version)_macosx && GZIP=-9 tar zcfv ../../fs-uae_$(version)_macosx.tar.gz *
 

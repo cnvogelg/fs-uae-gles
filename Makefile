@@ -154,6 +154,7 @@ else ifeq ($(os), macosx)
     arch = ppc
   else
     arch = x86_64
+    # arch = i386
   endif
   cflags += -arch $(arch)
   cxxflags += -arch $(arch)
