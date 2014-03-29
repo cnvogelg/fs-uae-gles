@@ -23,15 +23,16 @@ else ifeq ($(os), windows)
 	cxx = g++
 	ar = ar
 else ifeq ($(os), macosx)
-	cc ?= gcc
-	cxx ?= g++
-	ar ?= ar
+	cc = gcc
+	cxx = g++
+	ar = ar
 else
 	cc = $(CC)
 	cxx = $(CXX)
 	ar = $(AR)
 endif
 
+arch :=
 debug := 0
 noflags := 0
 sdl := 1

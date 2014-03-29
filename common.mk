@@ -1,4 +1,5 @@
 uname := $(shell uname -a)
+arch :=
 
 android := 0
 
@@ -21,17 +22,9 @@ make = make
 else ifneq ($(findstring Darwin,$(uname)),)
 
 os = macosx
-cc ?= gcc
-cxx ?= g++
-ar ?= ar
-make = make
-
-else ifneq ($(findstring kFreeBSD,$(uname)),)
-
-os = kfreebsd
-cc = $(CC)
-cxx = $(CXX)
-ar = $(AR)
+cc = gcc
+cxx = g++
+ar = ar
 make = make
 
 else ifneq ($(findstring kFreeBSD,$(uname)),)
