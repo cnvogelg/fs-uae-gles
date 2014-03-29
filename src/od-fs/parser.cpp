@@ -21,9 +21,12 @@
 #include "autoconf.h"
 #include "newcpu.h"
 #include "traps.h"
+#include "ahidsound.h"
+#include "picasso96_host.h"
 #include "threaddep/thread.h"
 #include "serial.h"
 #include "savestate.h"
+#include "ahidsound_new.h"
 #include "xwin.h"
 #include "drawing.h"
 #include "cia.h"
@@ -204,6 +207,7 @@ void initparallel (void)
 
 #if 0
     if (uae_boot_rom) {
+        write_log("installing ahi_winuae\n");
         uaecptr a = here (); //this install the ahisound
         org (rtarea_base + 0xFFC0);
         calltrap (deftrapres (ahi_demux, 0, _T("ahi_winuae")));
@@ -228,6 +232,73 @@ void exitparallel (void)
         close(par_fd);
         par_fd = -1;
     }
+}
+
+extern int flashscreen;
+
+void doflashscreen (void)
+{
+#if 0
+	flashscreen = 10;
+	init_colors ();
+	picasso_refresh ();
+	reset_drawing ();
+	flush_screen (gfxvidinfo.outbuffer, 0, 0);
+#endif
+}
+
+void hsyncstuff (void)
+	//only generate Interrupts when
+	//writebuffer is complete flushed
+	//check state of lwin rwin
+{
+	//static int keycheck = 0;
+
+#if 0 // DISABLED -- OLD AHI VERSION?
+#ifdef AHI
+	{ //begin ahi_sound
+		static int count;
+		if (ahi_on) {
+			count++;
+			//15625/count freebuffer check
+			if(count > ahi_pollrate) {
+				ahi_updatesound (1);
+				count = 0;
+			}
+		}
+	} //end ahi_sound
+#endif
+#endif
+
+#if 0 // DISABLED FOR NOW
+#ifdef PARALLEL_PORT
+	keycheck++;
+	if(keycheck >= 1000)
+	{
+		if (prtopen)
+			flushprtbuf ();
+		{
+			if (flashscreen > 0) {
+				flashscreen--;
+				if (flashscreen == 0) {
+					init_colors ();
+					reset_drawing ();
+					picasso_refresh ();
+					flush_screen (gfxvidinfo.outbuffer, 0, 0);
+				}
+			}
+		}
+		keycheck = 0;
+	}
+	if (currprefs.parallel_autoflush_time && !currprefs.parallel_postscript_detection) {
+		parflush++;
+		if (parflush / ((currprefs.ntscmode ? MAXVPOS_NTSC : MAXVPOS_PAL) * MAXHPOS_PAL / maxhpos) >= currprefs.parallel_autoflush_time * 50) {
+			flushprinter ();
+			parflush = 0;
+		}
+	}
+#endif
+#endif
 }
 
 int isprinter (void) {
@@ -607,6 +678,10 @@ int parallel_direct_read_data (uae_u8 *v)
     return 0;
 }
 
+void flushprinter (void) {
+    STUB("");
+}
+
 // ----- Paula serial emulation host calls -----
 
 static int ser_fd = -1;
@@ -747,7 +822,10 @@ void writeser (int c)
     }
     
     char b = (char)c;
-    write(ser_fd, &b, 1);
+    if (write(ser_fd, &b, 1) != 1) {
+        write_log("WARNING: writeser - 1 byte was not written (errno %d)\n",
+                  errno);
+    }
 }
 
 void getserstat (int *pstatus)

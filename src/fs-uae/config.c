@@ -189,8 +189,6 @@ void fs_uae_init_configs() {
 };
 
 void fs_uae_configure_amiga_model() {
-    char *path;
-
     fs_emu_log("fs_uae_configure_amiga_model\n");
     fs_uae_init_configs();
     //amiga_set_option("kickstart_rom_file", "aa:AROS");
@@ -308,7 +306,13 @@ static void configure_accuracy(amiga_config *c) {
 static void configure_memory(amiga_config *c) {
     int chip_memory = fs_config_get_int("chip_memory");
     if (chip_memory != FS_CONFIG_NONE) {
-        if (chip_memory % 512 == 0) {
+        if (chip_memory == 128) {
+            amiga_set_int_option("chipmem_size", -1);
+        }
+        else if (chip_memory == 256) {
+            amiga_set_int_option("chipmem_size", 0);
+        }
+        else if (chip_memory % 512 == 0) {
             amiga_set_int_option("chipmem_size", chip_memory / 512);
         }
         else {
@@ -598,10 +602,6 @@ void fs_uae_configure_cdrom() {
 static void configure_hard_drive_directory (int index, const char *path,
         const char *device, int read_only, int boot_priority) {
     char *type = fs_strdup("dir");
-    int surfaces = 1;
-    int reserved = 2;
-    int sectors = 32;
-    int block_size = 512;
 
     char *mount_name;
     char *label_option_name = fs_strdup_printf(
@@ -753,11 +753,10 @@ static void configure_hard_drive_image (int index, const char *path,
 }
 
 void fs_uae_configure_hard_drives() {
-    char *key = NULL;
     fs_emu_log("fs_uae_configure_hard_drives\n");
 
     for (int i = 0; i < 10; i++) {
-        key = fs_strdup_printf("hard_drive_%d", i);
+        char *key = fs_strdup_printf("hard_drive_%d", i);
         char *path = fs_config_get_string(key);
         free(key);
         if (path == NULL) {

@@ -1,8 +1,27 @@
-Version 2.3.99beta1:
+Version 2.5.1dev:
 
-* Updated translations: it [Speedvicio].
-* (Launcher) Replaced fengestad.no/fs-uae URLs with fs-uae.net ones.
-* (Launcher) Updated translations: it [Speedvicio].
+* Merged code from WinUAE 2710b12.
+* Support for .scp floppy images [keirf].
+* Drive sound and CDDA fixes for big-endian platforms.
+* Fixed left trigger = toggle autofire.
+
+Version 2.5.0dev:
+
+* UAE core code updated from WinUAE 2.7.1b9.
+* FS-UAE can use 256 kB chip RAM (and also 128 if you *really* want to).
+* Inhibit screen saver / power saving when running FS-UAE on OS X.
+* Allow short-hand --video-sync(=1/0) option
+* Use floating point control register, output compiler warning when not.
+* Added flush_log boolean option to flush log output after each log line.
+* New UAE Native Interface (via built-in uaenative.library).
+* Enforcer / AHI interface is added (but with a dummy AHI backend).
+* Support for old WinUAE-style native calls.
+* Code cleanup in UAE code to reduce the number of compiler warnings.
+* Removed some unused source files from the source archive.
+* Auto-generated source files are now auto-generated when compiling on all
+  platforms, and not cached in the source archives any longer.
+* Fixes to allow FS-UAE to be compiled with the lastest MinGW version.
+* Updated translations: it [Speedvicio], es [albconde], da [tomse], nb.
 
 Version 2.3.17:
 
@@ -14,7 +33,6 @@ Version 2.3.17:
 * (Launcher) Fixed bug with selecting multiple files [2.3.16].
 * (Launcher) Fixed trailing colon in translatiion of option description.
 * (Launcher) Updated translations: fi [Goingdown], pl [grimi], fr [Foul].
-
 
 Version 2.3.16:
 

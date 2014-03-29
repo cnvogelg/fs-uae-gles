@@ -1,22 +1,16 @@
-# Czech translations for fs-uae package.
-# Copyright (C) 2013 Frode Solheim
-# This file is distributed under the same license as the fs-uae package.
-# Frode Solheim <fs-uae@fengestad.no>, 2013.
-# z551693 <spajdr@centrum.cz>, 2013.
 msgid ""
-msgstr ""
-"Project-Id-Version: fs-uae\n"
-"Report-Msgid-Bugs-To: fs-uae@fengestad.no\n"
-"POT-Creation-Date: 2013-02-24 22:16+0100\n"
-"PO-Revision-Date: 2013-02-25 08:34+0200\n"
-"Last-Translator: z551693 <spajdr@centrum.cz>\n"
-"Language-Team: FS-UAE translation team\n"
-"Language: cs\n"
+msgstr "Project-Id-Version: fs-uae\n"
+"Report-Msgid-Bugs-To: frode@fs-uae.net\n"
+"POT-Creation-Date: 2014-03-14 19:32+0100\n"
+"PO-Revision-Date: 2014-03-22 07:32-0400\n"
+"Last-Translator: FrodeSolheim <frode-crowdin@fsolheim.net>\n"
+"Language-Team: Czech\n"
+"Language: cs_CZ\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=3; plural=(n==1) ? 0 : (n>=2 && n<=4) ? 1 : 2;\n"
-"X-Generator: Virtaal 0.7.1\n"
+"X-Generator: crowdin.net\n"
 
 msgid "Activated debugger"
 msgstr "Debugger aktivován"
@@ -106,7 +100,9 @@ msgstr "Uveden špatný počet CD-ROM mechanik"
 msgid "Joystick Mode"
 msgstr "Mód Joysticku"
 
-#. / TRANSLATORS: This is a menu entry and must not be too long
+msgid "Joystick Port"
+msgstr "Joystick Port"
+
 #, c-format
 msgid "Joystick Port %d"
 msgstr "Joystick Port %d"
@@ -121,12 +117,6 @@ msgstr "Joystick Port %d zařízení"
 msgid "Joystick Port %d Mode"
 msgstr "Joystick Port %d mód"
 
-msgid "Joystick Port 0"
-msgstr "Joystick Port 0"
-
-msgid "Joystick Port 1"
-msgstr "Joystick Port 1"
-
 msgid "Joystick Port 2"
 msgstr "Joystick Port 2"
 
@@ -136,14 +126,14 @@ msgstr "Joystick Port 3"
 msgid "Joystick Port 4"
 msgstr "Joystick Port 4"
 
-msgid "Joystick Ports"
-msgstr "Joystick porty"
-
 msgid "Keyboard"
 msgstr "Klávesnice"
 
 msgid "Load"
 msgstr "Načíst"
+
+msgid "Load State"
+msgstr "Load State"
 
 msgid "More..."
 msgstr "Více..."
@@ -153,6 +143,9 @@ msgstr "Myš"
 
 msgid "Mouse Mode"
 msgstr "Mód myši"
+
+msgid "Mouse Port"
+msgstr "Mouse Port"
 
 #. / TRANSLATORS: This is a menu entry and must not be too long: If you struggle
 #. / to get in short enough, just translate "No Device" instead.
@@ -216,8 +209,8 @@ msgstr "Obnovit"
 msgid "Save"
 msgstr "Uložit"
 
-msgid "Save States"
-msgstr "Uložit pozice"
+msgid "Save State"
+msgstr "Save State"
 
 #. / TRANSLATORS: Soft reset reboots the computer without a power cycle
 msgid "Soft Reset"
@@ -239,3 +232,4 @@ msgstr "Přiblížení: %s"
 #, c-format
 msgid "Zoom: %s + Border"
 msgstr "Přiblížení: %s + okraje"
+

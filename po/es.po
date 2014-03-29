@@ -1,22 +1,16 @@
-# Spanish translations for fs-uae package.
-# Copyright (C) 2012 Frode Solheim and translators.
-# This file is distributed under the same license as the fs-uae package.
-# Frode Solheim <fs-uae@fengestad.no>, 2012.
-#
 msgid ""
-msgstr ""
-"Project-Id-Version: fs-uae\n"
-"Report-Msgid-Bugs-To: fs-uae@fengestad.no\n"
-"POT-Creation-Date: 2013-03-09 17:22+0100\n"
-"PO-Revision-Date: 2013-03-10 21:59+0100\n"
-"Last-Translator: \n"
+msgstr "Project-Id-Version: fs-uae\n"
+"Report-Msgid-Bugs-To: frode@fs-uae.net\n"
+"POT-Creation-Date: 2014-03-14 19:32+0100\n"
+"PO-Revision-Date: 2014-03-22 07:32-0400\n"
+"Last-Translator: FrodeSolheim <frode-crowdin@fsolheim.net>\n"
 "Language-Team: Spanish\n"
-"Language: es\n"
+"Language: es_ES\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
-"X-Generator: Poedit 1.5.4\n"
+"X-Generator: crowdin.net\n"
 
 msgid "Activated debugger"
 msgstr "Debugger activado"
@@ -106,7 +100,9 @@ msgstr "Numero inválido de disco CD-ROM especificado"
 msgid "Joystick Mode"
 msgstr "Modo Joystick"
 
-#. / TRANSLATORS: This is a menu entry and must not be too long
+msgid "Joystick Port"
+msgstr "Puerto Joystick"
+
 #, c-format
 msgid "Joystick Port %d"
 msgstr "Puerto Joystick %d"
@@ -121,12 +117,6 @@ msgstr "Puerto Dispositivo Joystick %d"
 msgid "Joystick Port %d Mode"
 msgstr "Modo Puerto Joystick %d"
 
-msgid "Joystick Port 0"
-msgstr "Puerto Joystick 0"
-
-msgid "Joystick Port 1"
-msgstr "Puerto Joystick 1"
-
 msgid "Joystick Port 2"
 msgstr "Puerto Joystick 2"
 
@@ -136,14 +126,14 @@ msgstr "Puerto Joystick 3"
 msgid "Joystick Port 4"
 msgstr "Puerto Joystick 4"
 
-msgid "Joystick Ports"
-msgstr "Puertos Joystick"
-
 msgid "Keyboard"
 msgstr "Teclado"
 
 msgid "Load"
 msgstr "Cargar"
+
+msgid "Load State"
+msgstr "Cargar Estado"
 
 msgid "More..."
 msgstr "Mas..."
@@ -153,6 +143,9 @@ msgstr "Ratón"
 
 msgid "Mouse Mode"
 msgstr "Modo Ratón"
+
+msgid "Mouse Port"
+msgstr "Puerto Ratón"
 
 #. / TRANSLATORS: This is a menu entry and must not be too long: If you struggle
 #. / to get in short enough, just translate "No Device" instead.
@@ -216,7 +209,7 @@ msgstr "Continuar"
 msgid "Save"
 msgstr "Guardar"
 
-msgid "Save States"
+msgid "Save State"
 msgstr "Guardar Estado"
 
 #. / TRANSLATORS: Soft reset reboots the computer without a power cycle
@@ -239,3 +232,4 @@ msgstr "Zoom: %s"
 #, c-format
 msgid "Zoom: %s + Border"
 msgstr "Zoom: %s + Borde"
+

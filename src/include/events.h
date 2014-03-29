@@ -21,10 +21,12 @@ extern int vsynctimebase, syncbase;
 extern void reset_frame_rate_hack (void);
 extern unsigned long int vsync_cycles;
 extern unsigned long start_cycles;
+extern int event2_count;
 
 extern void compute_vsynctime (void);
 extern void init_eventtab (void);
 extern void do_cycles_ce (unsigned long cycles);
+extern void do_cycles_ce020 (unsigned long cycles);
 extern void events_schedule (void);
 extern void do_cycles_slow (unsigned long cycles_to_add);
 extern void do_cycles_fast (unsigned long cycles_to_add);
@@ -108,9 +110,20 @@ STATIC_INLINE void set_cycles (unsigned long int x)
 #endif
 }
 
+STATIC_INLINE int current_hpos_safe (void)
+{
+    int hp = (get_cycles () - eventtab[ev_hsync].oldcycles) / CYCLE_UNIT;
+	return hp;
+}
+
 STATIC_INLINE int current_hpos (void)
 {
-    return (get_cycles () - eventtab[ev_hsync].oldcycles) / CYCLE_UNIT;
+    int hp = current_hpos_safe ();
+	if (hp < 0 || hp >= 256) {
+		gui_message(_T("hpos = %d!?\n"), hp);
+		hp = 0;
+	}
+	return hp;
 }
 
 STATIC_INLINE bool cycles_in_range (unsigned long endcycles)

@@ -23,6 +23,7 @@ unsigned long start_cycles;
 
 frame_time_t vsyncmintime, vsyncmaxtime, vsyncwaittime;
 int vsynctimebase;
+int event2_count;
 
 void events_schedule (void)
 {
@@ -81,7 +82,12 @@ void do_cycles_slow (unsigned long cycles_to_add)
 
 		for (i = 0; i < ev_max; i++) {
 			if (eventtab[i].active && eventtab[i].evtime == currcycle) {
-				(*eventtab[i].handler)();
+				if (eventtab[i].handler == NULL) {
+					gui_message(_T("eventtab[%d].handler is null!\n"), i);
+					eventtab[i].active = 0;
+				} else {
+					(*eventtab[i].handler)();
+				}
 			}
 		}
 		events_schedule ();
@@ -114,6 +120,7 @@ void MISC_handler (void)
 			if (eventtab2[i].active) {
 				if (eventtab2[i].evtime == ct) {
 					eventtab2[i].active = false;
+					event2_count--;
 					eventtab2[i].handler (eventtab2[i].data);
 					if (dorecheck || eventtab2[i].active) {
 						recheck = true;
@@ -146,8 +153,10 @@ void event2_newevent_xx (int no, evt t, uae_u32 data, evfunc2 func)
 	if (no < 0) {
 		no = next;
 		for (;;) {
-			if (!eventtab2[no].active)
+			if (!eventtab2[no].active) {
+				event2_count++;
 				break;
+			}
 			if (eventtab2[no].evtime == et && eventtab2[no].handler == func && eventtab2[no].data == data)
 				break;
 			no++;

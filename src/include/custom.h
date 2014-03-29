@@ -6,6 +6,9 @@
 * (c) 1995 Bernd Schmidt
 */
 
+#ifndef CUSTOM_H
+#define CUSTOM_H
+
 #include "machdep/rpt.h"
 
 /* These are the masks that are ORed together in the chipset_mask option.
@@ -17,6 +20,11 @@
 
 #define CHIPSET_CLOCK_PAL  3546895
 #define CHIPSET_CLOCK_NTSC 3579545
+
+#define MAXHPOS_ROWS 256
+#define MAXVPOS_LINES_ECS 2048
+#define MAXVPOS_LINES_OCS 512
+#define HPOS_SHIFT 3
 
 uae_u32 get_copper_address (int copno);
 
@@ -44,7 +52,7 @@ extern void set_picasso_hack_rate (int hz);
 extern int bogusframe;
 extern unsigned long int hsync_counter, vsync_counter;
 
-#ifdef FSUAE
+#ifdef FSUAE // NL
 extern int g_uae_vsync_counter;
 // extern int g_uae_hsync_counter;
 #endif
@@ -52,7 +60,7 @@ extern int g_uae_vsync_counter;
 extern uae_u16 dmacon;
 extern uae_u16 intena, intreq, intreqr;
 
-extern int vpos;
+extern int vpos, lof_store;
 
 extern int find_copper_record (uaecptr, int *, int *);
 
@@ -85,7 +93,7 @@ extern unsigned int joy0dir, joy1dir;
 extern int joy0button, joy1button;
 
 extern void INTREQ (uae_u16);
-extern void INTREQ_0 (uae_u16);
+extern bool INTREQ_0 (uae_u16);
 extern void INTREQ_f (uae_u16);
 extern void send_interrupt (int num, int delay);
 extern uae_u16 INTREQR (void);
@@ -104,20 +112,25 @@ extern uae_u16 INTREQR (void);
 
 #define MAXHPOS_PAL 227
 #define MAXHPOS_NTSC 227
+// short field maxvpos
 #define MAXVPOS_PAL 312
 #define MAXVPOS_NTSC 262
+// following endlines = first visible line
 #define VBLANK_ENDLINE_PAL 26
 #define VBLANK_ENDLINE_NTSC 21
+// line when sprite DMA fetches first control words
 #define VBLANK_SPRITE_PAL 25
 #define VBLANK_SPRITE_NTSC 20
 #define VBLANK_HZ_PAL 50
 #define VBLANK_HZ_NTSC 60
+#define VSYNC_ENDLINE_PAL 5
+#define VSYNC_ENDLINE_NTSC 6
 #define EQU_ENDLINE_PAL 8
 #define EQU_ENDLINE_NTSC 10
 
 extern int maxhpos, maxhpos_short;
-extern int maxvpos, maxvpos_nom;
-extern int hsyncstartpos;
+extern int maxvpos, maxvpos_nom, maxvpos_display;
+extern int hsyncstartpos, hsyncendpos;
 extern int minfirstline, vblank_endline, numscrlines;
 extern double vblank_hz, fake_vblank_hz;
 extern int vblank_skip, doublescan;
@@ -190,13 +203,13 @@ STATIC_INLINE int GET_RES_DENISE (uae_u16 con0)
 {
 	if (!(currprefs.chipset_mask & CSMASK_ECS_DENISE))
 		con0 &= ~0x40; // SUPERHIRES
-	return ((con0) & 0x8000) ? RES_HIRES : ((con0) & 0x40) ? RES_SUPERHIRES : RES_LORES;
+	return ((con0) & 0x40) ? RES_SUPERHIRES : ((con0) & 0x8000) ? RES_HIRES : RES_LORES;
 }
 STATIC_INLINE int GET_RES_AGNUS (uae_u16 con0)
 {
 	if (!(currprefs.chipset_mask & CSMASK_ECS_AGNUS))
 		con0 &= ~0x40; // SUPERHIRES
-	return ((con0) & 0x8000) ? RES_HIRES : ((con0) & 0x40) ? RES_SUPERHIRES : RES_LORES;
+	return ((con0) & 0x40) ? RES_SUPERHIRES : ((con0) & 0x8000) ? RES_HIRES : RES_LORES;
 }
 /* get sprite width from FMODE */
 #define GET_SPRITEWIDTH(FMODE) ((((FMODE) >> 2) & 3) == 3 ? 64 : (((FMODE) >> 2) & 3) == 0 ? 16 : 32)
@@ -212,7 +225,7 @@ STATIC_INLINE int GET_PLANES(uae_u16 bplcon0)
 
 extern void fpscounter_reset (void);
 extern unsigned long idletime;
-extern int lightpen_x, lightpen_y, lightpen_cx, lightpen_cy, lightpen_active;
+extern int lightpen_x, lightpen_y, lightpen_cx, lightpen_cy, lightpen_active, lightpen_enabled;
 
 struct customhack {
 	uae_u16 v;
@@ -226,3 +239,5 @@ extern bool ispal (void);
 extern int current_maxvpos (void);
 extern struct chipset_refresh *get_chipset_refresh (void);
 extern void compute_framesync (void);
+
+#endif /* CUSTOM_H */
