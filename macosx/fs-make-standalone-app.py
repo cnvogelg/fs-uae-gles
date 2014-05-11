@@ -16,16 +16,16 @@ def fix_binary(path, frameworks_dir):
     changes = 0
     if not os.path.exists(path):
         raise Exception("could not find " + repr(path))
-    args = ["otool", "-L", path] 
+    args = ["otool", "-L", path]
     p = subprocess.Popen(args, stdout=subprocess.PIPE)
-    data = p.stdout.read()
+    data = p.stdout.read().decode('utf-8')
     p.wait()
     for line in data.split('\n'):
         line = line.strip()
         if not line:
             continue
         #if not line.startswith("/opt/local/lib/"):
-	if line.startswith("/usr/lib") or line.startswith("/System"):
+        if line.startswith("/usr/lib") or line.startswith("/System"):
             old = line.split(' ')[0]
             # print("ignoring", old)
             continue
@@ -42,7 +42,7 @@ def fix_binary(path, frameworks_dir):
         if not os.path.exists(dst):
             print("copying", old)
             shutil.copy(old, dst)
-            os.chmod(dst, 0644)
+            os.chmod(dst, 0o644)
             changes += 1
         if os.path.basename(path) == os.path.basename(old):
             args = ["install_name_tool", "-id", new, path]
@@ -54,6 +54,7 @@ def fix_binary(path, frameworks_dir):
 
     return changes
 
+
 def fix_iteration(app):
     binaries = []
     macos_dir = os.path.join(app, "Contents", "MacOS")
@@ -64,7 +65,7 @@ def fix_iteration(app):
         binaries.append(os.path.join(frameworks_dir, name))
     changes = 0
     for binary in binaries:
-       changes += fix_binary(binary, frameworks_dir)
+        changes += fix_binary(binary, frameworks_dir)
     return changes
 
 app = sys.argv[1]
