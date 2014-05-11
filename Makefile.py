@@ -246,6 +246,7 @@ fs_uae_sources = [
     "src/crc32.cpp",
     "src/custom.cpp",
     "src/debug.cpp",
+    "src/debuginfo.cpp",  # cv
     "src/disk.cpp",
     "src/diskutil.cpp",
     "src/dongle.cpp",
@@ -341,6 +342,7 @@ fs_uae_sources = [
     "src/od-fs/util.cpp",
     "src/od-fs/version.cpp",
     "src/od-fs/video.cpp",
+    "src/patch.cpp",  # cv
     "src/qemuvga/cirrus_vga.cpp",
     "src/qemuvga/lsi53c895a.cpp",
     "src/qemuvga/qemuuaeglue.cpp",
@@ -352,6 +354,7 @@ fs_uae_sources = [
     "src/scsi.cpp",
     "src/scsiemul.cpp",
     "src/scsitape.cpp",
+    "src/segtracker.cpp",  # cv
     "src/specialmonitors.cpp",
     "src/statusline.cpp",
     "src/traps.cpp",
