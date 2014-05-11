@@ -1,3 +1,7 @@
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 #ifdef USE_SDL_VIDEO
 
 // FIXME: make libfsml independent of libfsemu
@@ -247,6 +251,12 @@ static void set_video_mode() {
             // state
             w = g_window_width;
             h = g_window_height;
+
+            // x = 0;
+            // y = 0;
+            // w = g_fullscreen_width;
+            // h = g_fullscreen_height;
+
             flags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
         }
         else {
@@ -263,6 +273,8 @@ static void set_video_mode() {
         //SDL_putenv("SDL_VIDEO_WINDOW_POS=");
         fs_log("setting (windowed) video mode %d %d\n", w, h);
     }
+
+    // SDL_SetHint(SDL_HINT_VIDEO_MAC_FULLSCREEN_SPACES, "0");
 
     g_fs_ml_video_width = w;
     g_fs_ml_video_height = h;
@@ -317,6 +329,11 @@ static void set_video_mode() {
     log_opengl_information();
 }
 
+#ifdef USE_SDL2
+// When using SDL 2, the OpenGL context does not need to be recreated when
+// resizing the window and/or toggling fullscreen.
+#else
+
 static void destroy_opengl_state() {
     fs_log("destroy_opengl_state\n");
     fs_gl_send_context_notification(FS_GL_CONTEXT_DESTROY);
@@ -327,6 +344,8 @@ static void recreate_opengl_state() {
     fs_gl_reset_client_state();
     fs_gl_send_context_notification(FS_GL_CONTEXT_CREATE);
 }
+
+#endif
 
 void fs_ml_toggle_fullscreen() {
     fs_log("fs_ml_toggle_fullscreen\n");
@@ -557,7 +576,11 @@ int fs_ml_video_create_window(const char *title) {
     fs_emu_video_init_opengl();
 
 #ifdef WINDOWS
+#ifdef USE_SDL2
+    // we use only SDL functions with SDL2
+#else
     fs_ml_init_raw_input();
+#endif
 #else
 #ifdef USE_SDL2
     SDL_StartTextInput();

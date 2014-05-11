@@ -1,3 +1,7 @@
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
@@ -107,7 +111,7 @@ void fs_log_string(const char *str) {
 void fs_log(const char *format, ...) {
     va_list ap;
     va_start(ap, format);
-    char *buffer = fs_strdup_vprintf(format, ap);
+    char *buffer = g_strdup_vprintf(format, ap);
     va_end(ap);
     fs_log_string(buffer);
     free(buffer);

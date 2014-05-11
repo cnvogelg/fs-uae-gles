@@ -3742,14 +3742,12 @@ static void
 	xfree (x2);
 
 	put_long (info + 116, fsdb_can ? aino->amigaos_mode : fsdb_mode_supported (aino));
+	if (statbuf.size > MAXFILESIZE32) {
+		write_log("WARNING statbuf.size = %llu\n", statbuf.size);
+	}
 	put_long (info + 124, statbuf.size > MAXFILESIZE32 ? MAXFILESIZE32 : (uae_u32)statbuf.size);
-#ifdef HAVE_ST_BLOCKS
-#ifdef FSUAE
-	// FIXME: check this
-	put_long (info + 128, statbuf.blocks);
-#else
+#ifdef HAVE_STRUCT_STAT_ST_BLOCKS
 	put_long (info + 128, statbuf.st_blocks);
-#endif
 #else
 	blocksize = (unit->volflags & MYVOLUMEINFO_CDFS) ? 2048 : 512;
 	put_long (info + 128, (statbuf.size + blocksize - 1) / blocksize);
@@ -5773,7 +5771,7 @@ static void action_change_file_position64 (Unit *unit, dpacket packet)
 	PUT_PCK64_RES0 (packet, DP64_INIT);
 
 	if (k == 0) {
-		PUT_PCK64_RES1 (packet, DOS_FALSE);
+		PUT_PCK64_RES1 (packet, -1);
 		PUT_PCK64_RES2 (packet, ERROR_INVALID_LOCK);
 		return;
 	}
@@ -5825,7 +5823,7 @@ static void action_get_file_position64 (Unit *unit, dpacket packet)
 	PUT_PCK64_RES0 (packet, DP64_INIT);
 
 	if (k == 0) {
-		PUT_PCK64_RES1 (packet, DOS_FALSE);
+		PUT_PCK64_RES1 (packet, -1);
 		PUT_PCK64_RES2 (packet, ERROR_INVALID_LOCK);
 		return;
 	}
@@ -5910,7 +5908,7 @@ static void action_get_file_size64 (Unit *unit, dpacket packet)
 		PUT_PCK64_RES2 (packet, 0);
 		return;
 	}
-	PUT_PCK64_RES1 (packet, DOS_FALSE);
+	PUT_PCK64_RES1 (packet, -1);
 	PUT_PCK64_RES2 (packet, ERROR_SEEK_ERROR);
 }
 
@@ -6065,7 +6063,11 @@ static int handle_packet (Unit *unit, dpacket pck, uae_u32 msg)
 	uae_s32 type = GET_PCK_TYPE (pck);
 	PUT_PCK_RES2 (pck, 0);
 
+#ifdef FSUAE
+	TRACE((_T("handle_packet packet=%d\n"), type));
+#else
 	TRACE((_T("unit=%p packet=%d\n"), unit, type));
+#endif
 	if (unit->inhibited && filesys_isvolume (unit)
 		&& type != ACTION_INHIBIT && type != ACTION_MORE_CACHE
 		&& type != ACTION_DISK_INFO) {
@@ -6460,14 +6462,14 @@ static uae_u32 REGPARAM2 filesys_diagentry (TrapContext *context)
 	while (tmp < residents && tmp > start) {
 		if (get_word (tmp) == 0x4AFC &&
 			get_long (tmp + 0x2) == tmp) {
-				put_word (resaddr, 0x227C);         /* movea.l #tmp,a1 */
+				put_word (resaddr, 0x227C);         /* move.l #tmp,a1 */
 				put_long (resaddr + 2, tmp);
-				put_word (resaddr + 6, 0x7200);     /* moveq.l #0,d1 */
+				put_word (resaddr + 6, 0x7200);     /* moveq #0,d1 */
 				put_long (resaddr + 8, 0x4EAEFF9A); /* jsr -$66(a6) ; InitResident */
 				resaddr += 12;
 				tmp = get_long (tmp + 0x6);
 		} else {
-			tmp++;
+			tmp += 2;
 		}
 	}
 	/* call setup_exter */
@@ -6476,7 +6478,7 @@ static uae_u32 REGPARAM2 filesys_diagentry (TrapContext *context)
 	put_word (resaddr +  6, 0xd1fc);
 	put_long (resaddr +  8, rtarea_base + bootrom_header); /* add.l #RTAREA_BASE+bootrom_header,a0 */
 	put_word (resaddr + 12, 0x4e90); /* jsr (a0) */
-	put_word (resaddr + 14, 0x7001); /* moveq.l #1,d0 */
+	put_word (resaddr + 14, 0x7001); /* moveq #1,d0 */
 	put_word (resaddr + 16, RTS);
 
 	m68k_areg (regs, 0) = residents;

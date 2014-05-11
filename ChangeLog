@@ -1,3 +1,27 @@
+Version 2.5.4dev:
+
+* Some more autoconf / build updates.
+
+Version 2.5.3dev:
+
+* Merged code from WinUAE 2800.
+* Update AROS ROM from WinUAE 2800.
+* Debian compat set to 9, allow harding flags.
+* Migrated build system to autoconf (not automake).
+* Some source code clean to detect features / functions from autoconf.
+* Remove use of deprecated Glib function, require Glib >= 2.32.
+* Properly fixed build dependencies on auto-generated source code.
+* Fixed a problem preventing mouse from working with SDL2 on Windows.
+
+Version 2.5.2dev:
+
+* Merged code from WinUAE 2800b18.
+* SDL2 is now default on all platforms (make sdl=1 to override for now).
+* Fixes to make the windows version compile with SDL2.
+* Fixes for FS-UAE compilation with mingw-w32 4.6.3.
+* fs-uae-device-helper has a new --events mode which continuously prints
+  joystick events to stdout.
+
 Version 2.5.1dev:
 
 * Merged code from WinUAE 2710b12.
@@ -31,7 +55,7 @@ Version 2.3.17:
 * (Launcher) Option download_file from DB does not have to be an archive.
 * (Launcher) Fixed bug when doubleclicking on an URI in the floppy list.
 * (Launcher) Fixed bug with selecting multiple files [2.3.16].
-* (Launcher) Fixed trailing colon in translatiion of option description.
+* (Launcher) Fixed trailing colon in translation of option description.
 * (Launcher) Updated translations: fi [Goingdown], pl [grimi], fr [Foul].
 
 Version 2.3.16:

@@ -19,7 +19,7 @@ BuildRequires:  pkgconfig(glib-2.0)
 BuildRequires:  pkgconfig(glu)
 BuildRequires:  pkgconfig(gthread-2.0)
 BuildRequires:  pkgconfig(openal)
-BuildRequires:  pkgconfig(sdl)
+BuildRequires:  pkgconfig(sdl2)
 BuildRequires:  pkgconfig(x11)
 BuildRequires:  pkgconfig(zlib)
 BuildRequires:  pkgconfig(freetype2)
@@ -51,13 +51,14 @@ libfs-capsimage is needed for IPF floppy image support.
 %setup -q
 
 %build
-CFLAGS='%{optflags}'
-CXXFLAGS='%{optflags}'
-%if 0%{?mandriva_version}
-CFLAGS="${CFLAGS} -Wno-error=format-security"
-CXXFLAGS="${CXXFLAGS} -Wno-error=format-security"
-%endif
-export CFLAGS; export CXXFLAGS
+%configure
+# CFLAGS='%{optflags}'
+# CXXFLAGS='%{optflags}'
+# %if 0%{?mandriva_version}
+# CFLAGS="${CFLAGS} -Wno-error=format-security"
+# CXXFLAGS="${CXXFLAGS} -Wno-error=format-security"
+# %endif
+# export CFLAGS; export CXXFLAGS
 make %{?_smp_mflags}
 
 %install
