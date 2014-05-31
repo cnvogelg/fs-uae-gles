@@ -1,0 +1,3 @@
+#!/bin/bash
+ipcs -s | grep ^s | awk '{ print $2 }' | xargs -n 1 ipcrm -s
+ipcs -m | grep ^m | awk '{ print $2 }' | xargs -n 1 ipcrm -m

@@ -33,6 +33,7 @@
 #include "gayle.h"
 #include "debug.h"
 #include "gfxboard.h"
+#include "clockport.h"
 
 #ifdef FSUAE // NL
 #undef _WIN32
@@ -2422,6 +2423,8 @@ void memory_reset (void)
 #endif
 #endif
 
+	clockport_map();
+
 	if (currprefs.custom_memory_sizes[0]) {
 		map_banks (&custmem1_bank,
 			currprefs.custom_memory_addrs[0] >> 16,
@@ -2476,6 +2479,8 @@ void memory_init (void)
 	hrtmon_load ();
 #endif
 #endif
+
+	clockport_init();
 }
 
 void memory_cleanup (void)
@@ -2511,6 +2516,8 @@ void memory_cleanup (void)
 #ifdef ARCADIA
 	arcadia_unmap ();
 #endif
+
+	clockport_cleanup();
 }
 
 void memory_hardreset (int mode)

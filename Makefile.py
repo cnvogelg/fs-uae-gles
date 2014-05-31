@@ -240,6 +240,7 @@ fs_uae_sources = [
     "src/cdtv.cpp",
     "src/cfgfile.cpp",
     "src/cia.cpp",
+    "src/clockport.cpp",
     "src/consolehook.cpp",
     "src/cpummu30.cpp",
     "src/cpummu.cpp",
