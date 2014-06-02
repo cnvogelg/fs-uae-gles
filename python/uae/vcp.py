@@ -5,6 +5,7 @@ import sysv_ipc
 import time
 import struct
 
+Error = sysv_ipc.Error
 
 class VCP:
     """wraps the virtual clockport protocol"""

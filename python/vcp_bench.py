@@ -44,7 +44,15 @@ class BenchHandler(uae.vcp.VCPHandler):
         mi = self._map(mi)
         ma = self._map(ma)
         avg = self._map(avg)
-        print("min=%d max=%d avg=%d" % (mi, ma, avg))
+        print("min=%s max=%s avg=%s" %
+              (self._c(mi),
+               self._c(ma),
+               self._c(avg)))
+
+    def _c(self, ticks):
+        clk = 7090000  # PAL A500
+        us = ticks * 1000000 / clk
+        return "%3d %3.2f" % (ticks, us)
 
     def _map(self, v):
         # convert to Amiga cycles
@@ -53,6 +61,9 @@ class BenchHandler(uae.vcp.VCPHandler):
         return v
 
 if __name__ == '__main__':
-    handler = BenchHandler()
-    vcp = uae.vcp.VCP(handler)
-    vcp.main_loop()
+    try:
+        handler = BenchHandler()
+        vcp = uae.vcp.VCP(handler)
+        vcp.main_loop()
+    except uae.vcp.Error as e:
+        print("semaphore problem... no fs-uae started?")
