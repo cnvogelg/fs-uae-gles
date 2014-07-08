@@ -2,16 +2,23 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.67])
-AC_INIT([FS-UAE], [m4_esyscmd([cat VERSION | tr -d \\r\\n])],
-	[frode@fs-uae.net], [fs-uae], [http://fs-uae.net])
+AC_INIT([FS-UAE], [2.5.6dev],
+        [frode@fs-uae.net], [fs-uae], [http://fs-uae.net])
 AC_CONFIG_AUX_DIR([.])
 AC_CANONICAL_SYSTEM
 AC_CONFIG_SRCDIR([src/main.cpp])
 AM_INIT_AUTOMAKE
 AC_CONFIG_HEADERS([config.h])
 
-echo $target_os
+AC_SUBST([PACKAGE_SERIES], [devel])
+AC_SUBST([UAE_BASE_VERSION], [WinUAE 2.8.0])
 
+PACKAGE_MAJOR=`echo ${PACKAGE_VERSION} | sed -e 's,\(\.*\)\..*\..*,\1,g'`
+PACKAGE_MINOR=`echo ${PACKAGE_VERSION} | sed -e 's,.*\.\(.*\)\..*,\1,g'`
+PACKAGE_REVISION=`echo ${PACKAGE_VERSION} | sed -e 's,.*\..*\.\([[0-9]]*\).*,\1,g'`
+AC_SUBST(PACKAGE_MAJOR)
+AC_SUBST(PACKAGE_MINOR)
+AC_SUBST(PACKAGE_REVISION)
 
 # Checks for programs.
 
@@ -24,7 +31,7 @@ AC_PROG_LN_S
 AC_PROG_MAKE_SET
 AC_PROG_RANLIB
 AM_PROG_CC_C_O
-
+AC_CHECK_TOOL(OBJCOPY, objcopy)
 
 # Misc system checks.
 
@@ -463,5 +470,13 @@ AC_TRY_LINK([
 
 # Write Makefile
 
-AC_CONFIG_FILES([Makefile])
+AC_CONFIG_FILES([
+    build/linux-dist/Makefile
+    build/steamos-dist/Makefile
+    macosx/Info.plist
+    macosx/Makefile
+    Makefile
+    windows/fs-uae.iss
+    windows/Makefile
+])
 AC_OUTPUT

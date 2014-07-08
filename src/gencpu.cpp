@@ -50,6 +50,7 @@ static int count_read_ea, count_write_ea, count_cycles_ea;
 static const char *mmu_postfix;
 static int memory_cycle_cnt;
 static int did_prefetch;
+static int ipl_fetched;
 
 static int optimized_flags;
 
@@ -132,7 +133,9 @@ static void read_counts (void)
 	count = 0;
 	file = fopen ("frequent.68k", "r");
 	if (file) {
-		fscanf (file, "Total: %u\n", &total);
+		if (fscanf (file, "Total: %u\n", &total) == 0) {
+			abort ();
+		}
 		while (fscanf (file, "%x: %u %s\n", &opcode, &count, name) == 3) {
 			opcode_next_clev[nr] = 5;
 			opcode_last_postfix[nr] = -1;
@@ -531,8 +534,11 @@ static void makefromsr (void)
 
 static void check_ipl (void)
 {
+	if (ipl_fetched)
+		return;
 	if (using_ce || using_ce020)
 		printf ("\tipl_fetch ();\n");
+	ipl_fetched = true;
 }
 
 static void irc2ir (bool dozero)
@@ -2281,9 +2287,8 @@ static void genflags_normal (flagtypes type, wordsizes size, const char *value, 
 	case flag_logical_noclobber:
 	case flag_logical:
 #ifdef FSUAE
-    // FIXME: Compiled warning about flag_z not being handled, hopefully
-    // was not meant to be handled, adding it here to silence warning.
 	case flag_z:
+		break;
 #endif
 	case flag_zn:
 		break;
@@ -3497,6 +3502,7 @@ static void gen_opcode (unsigned int opcode)
 		fill_prefetch_full ();
 		break;
 	case i_RTE:
+		addop_ce020 (curi, 0);
 		next_level_000 ();
 		if (cpu_level == 0) {
 			genamode (NULL, Aipi, "7", sz_word, "sr", 1, 0, GF_NOREFILL);
@@ -3583,6 +3589,7 @@ static void gen_opcode (unsigned int opcode)
 		fill_prefetch_full ();
 		break;
 	case i_RTD:
+		addop_ce020 (curi, 0);
 		if (using_mmu) {
 			genamode (curi, curi->smode, "srcreg", curi->size, "offs", GENA_GETV_FETCH, GENA_MOVEM_DO_INC, 0);
 			genamode (NULL, Aipi, "7", sz_long, "pc", GENA_GETV_FETCH, GENA_MOVEM_DO_INC, 0);
@@ -5061,6 +5068,7 @@ static void gen_opcode (unsigned int opcode)
 		fill_prefetch_finish ();
 	sync_m68k_pc ();
 	did_prefetch = 0;
+	ipl_fetched = 0;
 }
 
 static void generate_includes (FILE * f, int id)
@@ -5417,7 +5425,9 @@ static void generate_cpu (int id, int mode)
 			fprintf (stblfile, "#ifdef CPUEMU_%d%s\n", postfix, extraup);
 		postfix2 = postfix;
 		sprintf (fname, "cpuemu_%d%s.cpp", postfix, extra);
-		freopen (fname, "wb", stdout);
+		if (freopen (fname, "wb", stdout) == NULL) {
+			abort ();
+		}
 		generate_includes (stdout, id);
 	}
 

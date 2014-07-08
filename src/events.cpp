@@ -134,7 +134,7 @@ void MISC_handler (void)
 			}
 		}
 	}
-	if (mintime != ~0L) {
+	if (mintime != ~0UL) {
 		eventtab[ev_misc].active = true;
 		eventtab[ev_misc].oldcycles = ct;
 		eventtab[ev_misc].evtime = ct + mintime;
@@ -174,5 +174,15 @@ void event2_newevent_xx (int no, evt t, uae_u32 data, evfunc2 func)
 	eventtab2[no].handler = func;
 	eventtab2[no].data = data;
 	MISC_handler ();
+}
+
+int current_hpos (void)
+{
+	int hp = current_hpos_safe ();
+	if (hp < 0 || hp > 256) {
+		gui_message(_T("hpos = %d!?\n"), hp);
+		hp = 0;
+	}
+	return hp;
 }
 
