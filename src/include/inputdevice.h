@@ -7,6 +7,14 @@
   * Copyright 2001-2002 Toni Wilen
   */
 
+#ifndef UAE_INPUTDEVICE_H
+#define UAE_INPUTDEVICE_H
+
+#ifdef FSUAE // NL
+#include "uae/types.h"
+#include "options.h"
+#endif
+
 #define DIR_LEFT_BIT 0
 #define DIR_RIGHT_BIT 1
 #define DIR_UP_BIT 2
@@ -278,7 +286,8 @@ extern void inputdevice_close (void);
 extern void inputdevice_default_prefs (struct uae_prefs *p);
 
 extern void inputdevice_acquire (int allmode);
-extern void inputdevice_unacquire (void);
+extern void inputdevice_unacquire(void);
+extern void inputdevice_unacquire(bool emulationactive, int inputmask);
 
 extern void indicator_leds (int num, int state);
 
@@ -334,3 +343,4 @@ extern int inputdevice_istest (void);
 extern void inputdevice_settest (int);
 extern int inputdevice_testread_count (void);
 
+#endif // UAE_INPUTDEVICE_H

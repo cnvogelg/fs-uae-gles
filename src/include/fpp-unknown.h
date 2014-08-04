@@ -8,13 +8,14 @@
   * Copyright 1996 Herman ten Brugge
   */
 
+#ifndef UAE_FPP_UNKNOWN_H
+#define UAE_FPP_UNKNOWN_H
+
 #ifdef FSUAE // NL
+#include "uae/types.h"
+#include "uae/inline.h"
 #include <math.h>
 #endif
-
-// FIXME: review and sync fpp code from od-win32/md-fpp.h,
-// consider merging fpp-unknown.h and od-fs/md-fpp.h, or even better,
-// be able to share md-fpp.h with od-win32.
 
 #ifndef HAVE_to_single
 STATIC_INLINE double to_single (uae_u32 value)
@@ -54,10 +55,6 @@ STATIC_INLINE uae_u32 from_single (double src)
     return (tmp | (((expon + 127 - 1) & 0xff) << 23) |
 	    (((int) (frac * 16777216.0)) & 0x7fffff));
 }
-#endif
-
-#ifdef FSUAE // NL
-// FIXME: compare with od-win32/md-fpp.cpp
 #endif
 
 #ifndef HAVE_to_exten
@@ -149,3 +146,5 @@ STATIC_INLINE void from_double(double src, uae_u32 * wrd1, uae_u32 * wrd2)
     *wrd2 = (uae_u32) (frac * 9007199254740992.0 - tmp * 4294967296.0);
 }
 #endif
+
+#endif // UAE_FPP_UNKNOWN_H

@@ -1,3 +1,12 @@
+#ifndef UAE_ZARCHIVE_H
+#define UAE_ZARCHIVE_H
+
+#ifdef FSUAE // NL
+#include "uae/types.h"
+#include "zfile.h"
+#include <stdio.h>
+#include <stddef.h>
+#endif
 
 typedef uae_s64 (*ZFILEREAD)(void*, uae_u64, uae_u64, struct zfile*);
 typedef uae_s64 (*ZFILEWRITE)(const void*, uae_u64, uae_u64, struct zfile*);
@@ -84,21 +93,21 @@ struct zarchive_info
 	struct mytimeval tv;
 };
 
-#define LE_CHR(a,b,c,d) (((a)<<24) | ((b)<<16) | ((c)<<8) | (d))
+#define MCC(a,b,c,d) (((a)<<24) | ((b)<<16) | ((c)<<8) | (d))
 
-#define ArchiveFormat7Zip  LE_CHR('7', 'z', ' ', ' ')
-#define ArchiveFormatRAR   LE_CHR('r', 'a', 'r', ' ')
-#define ArchiveFormatZIP   LE_CHR('z', 'i', 'p', ' ')
-#define ArchiveFormatLHA   LE_CHR('l', 'h', 'a', ' ')
-#define ArchiveFormatLZX   LE_CHR('l', 'z', 'x', ' ')
-#define ArchiveFormatPLAIN LE_CHR('-', '-', '-', '-')
-#define ArchiveFormatDIR   LE_CHR('D', 'I', 'R', ' ')
-#define ArchiveFormatAA    LE_CHR('a', 'a', ' ', ' ') // method only
-#define ArchiveFormatADF   LE_CHR('D', 'O', 'S', ' ')
-#define ArchiveFormatRDB   LE_CHR('R', 'D', 'S', 'K')
-#define ArchiveFormatMBR   LE_CHR('M', 'B', 'R', ' ')
-#define ArchiveFormatFAT   LE_CHR('F', 'A', 'T', ' ')
-#define ArchiveFormatTAR   LE_CHR('t', 'a', 'r', ' ')
+#define ArchiveFormat7Zip  MCC('7', 'z', ' ', ' ')
+#define ArchiveFormatRAR   MCC('r', 'a', 'r', ' ')
+#define ArchiveFormatZIP   MCC('z', 'i', 'p', ' ')
+#define ArchiveFormatLHA   MCC('l', 'h', 'a', ' ')
+#define ArchiveFormatLZX   MCC('l', 'z', 'x', ' ')
+#define ArchiveFormatPLAIN MCC('-', '-', '-', '-')
+#define ArchiveFormatDIR   MCC('D', 'I', 'R', ' ')
+#define ArchiveFormatAA    MCC('a', 'a', ' ', ' ') // method only
+#define ArchiveFormatADF   MCC('D', 'O', 'S', ' ')
+#define ArchiveFormatRDB   MCC('R', 'D', 'S', 'K')
+#define ArchiveFormatMBR   MCC('M', 'B', 'R', ' ')
+#define ArchiveFormatFAT   MCC('F', 'A', 'T', ' ')
+#define ArchiveFormatTAR   MCC('t', 'a', 'r', ' ')
 
 #define PEEK_BYTES 1024
 #define FILE_PEEK 1
@@ -143,3 +152,5 @@ extern struct zfile *archive_getzfile (struct znode *zn, unsigned int id, int fl
 extern struct zfile *archive_unpackzfile (struct zfile *zf);
 
 extern struct zfile *decompress_zfd (struct zfile*);
+
+#endif // UAE_ZARCHIVE_H

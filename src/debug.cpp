@@ -16,7 +16,7 @@
 
 #include "options.h"
 #include "uae.h"
-#include "uae/memory.h"
+#include "memory_uae.h"
 #include "custom.h"
 #include "newcpu.h"
 #include "cpu_prefetch.h"
@@ -2433,11 +2433,8 @@ static void memwatch_reset (void)
 	}
 	for (int i = 0; membank_stores[i].addr; i++) {
 		struct membank_store *ms = &membank_stores[i];
-#ifdef FSUAE
-		printf("WARNING: Cannot free ms->newbank.name (const char*)\n");
-#else
-		xfree (ms->newbank.name);
-#endif
+		// name was allocated in memwatch_remap
+		xfree ((char*)ms->newbank.name);
 		memset (ms, 0, sizeof (struct membank_store));
 		ms->addr = NULL;
 	}
@@ -2485,6 +2482,7 @@ static void memwatch_remap (uaecptr addr)
 		newbank->xlateaddr = debug_xlate;
 		newbank->wgeti = mode ? mmu_wgeti : debug_wgeti;
 		newbank->lgeti = mode ? mmu_lgeti : debug_lgeti;
+		// name will be freed by memwatch_reset
 		newbank->name = my_strdup (tmp);
 		if (!newbank->mask)
 			newbank->mask = -1;
@@ -2926,7 +2924,7 @@ static void memory_map_dump_2 (int log)
 		if (i < max)
 			a2 = mem_banks[i];
 		if (a1 != a2) {
-			int k, mirrored, size, size_out;
+			int k, mirrored, mirrored2, size, size_out;
 			TCHAR size_ext;
 			uae_u8 *caddr;
 			const TCHAR *name;
@@ -2945,10 +2943,13 @@ static void memory_map_dump_2 (int log)
 					mirrored++;
 				k++;
 			}
+			mirrored2 = mirrored;
+			if (mirrored2 == 0)
+				mirrored2 = 1;
 			size = (i - j) << (16 - 10);
 			size_out = size;
 			size_ext = 'K';
-			if (j >= 256) {
+			if (j >= 256 && (size_out / mirrored2 >= 1024) && !((size_out / mirrored2) & 1023)) {
 				size_out /= 1024;
 				size_ext = 'M';
 			}
@@ -2969,12 +2970,12 @@ static void memory_map_dump_2 (int log)
 			}
 			_tcscat (txt, _T("\n"));
 			if (log)
-				write_log (_T("%s"),txt);
+				write_log (_T("%s"), txt);
 			else
 				console_out (txt);
 			if (tmp[0]) {
 				if (log)
-					write_log (_T("%s"),tmp);
+					write_log (_T("%s"), tmp);
 				else
 					console_out (tmp);
 			}
@@ -3091,6 +3092,35 @@ static TCHAR *getfrombstr(uaecptr pp)
 	return au_copy (s, p[0] + 1, (char*)p + 1);
 }
 
+// read one byte from expansion autoconfig ROM
+static void copyromdata(uae_u8 bustype, uaecptr rom, uae_u8 *out, int size)
+{
+	int offset = 0;
+
+	switch (bustype & 0xc0)
+	{
+	case 0x00: // nibble
+		while (size-- > 0) {
+			*out++ = (get_byte_debug(rom + offset * 4 + 0) & 0xf0) | ((get_byte_debug(rom + offset * 4 + 2) & 0xf0) >> 4);
+			offset++;
+		}
+		break;
+	case 0x40: // byte
+		while (size-- > 0) {
+			*out++ = get_byte_debug(rom + offset * 2);
+			offset++;
+		}
+		break;
+	case 0x80: // word
+	default:
+		while (size-- > 0) {
+			*out++ = get_byte_debug(rom + offset);
+			offset++;
+		}
+		break;
+	}
+}
+
 static void show_exec_lists (TCHAR *t)
 {
 	uaecptr execbase = get_long_debug (4);
@@ -3110,10 +3140,36 @@ static void show_exec_lists (TCHAR *t)
 				TCHAR *name = getfrombstr (get_long_debug (doslist + 40));
 				console_out_f (_T("%08x: %d %08x '%s'\n"), doslist, type, msgport, name);
 				if (type == 0) {
+					uaecptr fssm = get_long_debug(doslist + 28) << 2;
 					console_out_f (_T(" - H=%08x Stack=%5d Pri=%2d Start=%08x Seg=%08x GV=%08x\n"),
 						get_long_debug (doslist + 16) << 2, get_long_debug (doslist + 20),
-						get_long_debug (doslist + 24), get_long_debug (doslist + 28),
+						get_long_debug (doslist + 24), fssm,
 						get_long_debug (doslist + 32) << 2, get_long_debug (doslist + 36));
+					if (fssm >= 0x100 && (fssm & 3) == 0) {
+						TCHAR *unitname = getfrombstr(get_long_debug(fssm + 4));
+						console_out_f (_T("   %s:%d %08x\n"), unitname, get_long_debug(fssm), get_long_debug(fssm + 8));
+						uaecptr de = get_long_debug(fssm + 8) << 2;
+						if (de) {
+							console_out_f (_T("    TableSize       %u\n"), get_long_debug(de + 0));
+							console_out_f (_T("    SizeBlock       %u\n"), get_long_debug(de + 4));
+							console_out_f (_T("    SecOrg          %u\n"), get_long_debug(de + 8));
+							console_out_f (_T("    Surfaces        %u\n"), get_long_debug(de + 12));
+							console_out_f (_T("    SectorPerBlock  %u\n"), get_long_debug(de + 16));
+							console_out_f (_T("    BlocksPerTrack  %u\n"), get_long_debug(de + 20));
+							console_out_f (_T("    Reserved        %u\n"), get_long_debug(de + 24));
+							console_out_f (_T("    PreAlloc        %u\n"), get_long_debug(de + 28));
+							console_out_f (_T("    Interleave      %u\n"), get_long_debug(de + 32));
+							console_out_f (_T("    LowCyl          %u\n"), get_long_debug(de + 36));
+							console_out_f (_T("    HighCyl         %u (Total %u)\n"), get_long_debug(de + 40), get_long_debug(de + 40) - get_long_debug(de + 36) + 1);
+							console_out_f (_T("    NumBuffers      %u\n"), get_long_debug(de + 44));
+							console_out_f (_T("    BufMemType      0x%08x\n"), get_long_debug(de + 48));
+							console_out_f (_T("    MaxTransfer     0x%08x\n"), get_long_debug(de + 52));
+							console_out_f (_T("    Mask            0x%08x\n"), get_long_debug(de + 56));
+							console_out_f (_T("    BootPri         %d\n"), get_long_debug(de + 60));
+							console_out_f (_T("    DosType         0x%08x\n"), get_long_debug(de + 64));
+						}
+						xfree(unitname);
+					}
 				}
 				xfree (name);
 				doslist = get_long_debug (doslist) << 2;
@@ -3173,15 +3229,55 @@ static void show_exec_lists (TCHAR *t)
 			list += 12;
 		}
 		return;
+	} else if (c == 'e') { // expansion
+		uaecptr expbase = get_base("expansion.library", 378);
+		if (expbase) {
+			list = get_long_debug(expbase + 60);
+			while (list && get_long_debug(list)) {
+				uae_u32 addr = get_long_debug(list + 32);
+				uae_u16 rom_vector = get_word_debug(list + 16 + 10);
+				uae_u8 type = get_byte_debug(list + 16 + 0);
+				console_out_f(_T("%02x %02x %08x %08x %04x %02x %08x %04x (%u/%u)\n"),
+					type, get_byte_debug(list + 16 + 2),
+					addr, get_long_debug(list + 36),
+					get_word_debug(list + 16 + 4), get_byte_debug(list + 16 + 1),
+					get_long_debug(list + 16 + 6), rom_vector,
+					get_word_debug(list + 16 + 4), get_byte_debug(list + 16 + 1));
+				if (type & 0x10) {
+					uae_u8 diagarea[32];
+					uae_u16 nameoffset;
+					uaecptr rom = addr + rom_vector;
+					uae_u8 config = get_byte_debug(rom);
+					copyromdata(config, rom, diagarea, 16);
+					nameoffset = (diagarea[8] << 8) | diagarea[9];
+					console_out_f(_T(" %02x %02x Size %04x Diag %04x Boot %04x Name %04x %04x %04x\n"),
+						diagarea[0], diagarea[1],
+						(diagarea[2] << 8) | diagarea[3],
+						(diagarea[4] << 8) | diagarea[5],
+						(diagarea[6] << 8) | diagarea[7],
+						nameoffset,
+						(diagarea[10] << 8) | diagarea[11],
+						(diagarea[12] << 8) | diagarea[13]);
+					if (nameoffset != 0 && nameoffset != 0xffff) {
+						copyromdata(config, rom + nameoffset, diagarea, 32);
+						diagarea[31] = 0;
+						TCHAR *str = au((char*)diagarea);
+						console_out_f(_T(" '%s'"), str);
+						xfree(str);
+					}
+				}
+				list = get_long_debug(list);
+			}
+		}
 	} else if (c == 'R') { // residents
-		list = get_long (execbase + 300);
+		list = get_long_debug(execbase + 300);
 		while (list) {
 			uaecptr resident = get_long_debug (list);
 			if (!resident)
 				break;
 			if (resident & 0x80000000) {
-				write_log (_T("-> %08X\n"), resident & ~0x7fffffff);
-				list = resident & ~0x7fffffff;
+				console_out_f (_T("-> %08X\n"), resident & 0x7fffffff);
+				list = resident & 0x7fffffff;
 				continue;
 			}
 			uae_u8 *addr;

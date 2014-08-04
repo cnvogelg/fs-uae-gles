@@ -64,11 +64,7 @@ extern FILE *g_fs_uae_sync_debug_file;
 
 #define DEBUGGER 1
 
-#define A_DMS
-#define A_ZIP
 //#define A2065
-#define A2091
-#define ACTION_REPLAY
 #define AGA
 #define AHI
 #define ARCADIA
@@ -78,26 +74,21 @@ extern FILE *g_fs_uae_sync_debug_file;
 #define BSDSOCKET
 #endif
 
-#define CD32
-#define CDTV
 #define ECS_DENISE
-#define CAPS
 #define CPUEMU_0 /* generic 680x0 emulation */
 #define CPUEMU_11 /* 68000/68010 prefetch emulation */
 #define CPUEMU_13 /* 68000/68010 cycle-exact cpu&blitter */
 #define CPUEMU_20 /* 68020 prefetch */
 #define CPUEMU_21 /* 68020 "cycle-exact" + blitter */
 #define CPUEMU_22 /* 68030 (040/060) "cycle-exact" + blitter */
+#define CPUEMU_23
 #define CPUEMU_31 /* Aranym 68040 MMU */
 #define CPUEMU_32 /* Previous 68030 MMU */
 #define CPUEMU_33 /* 68060 MMU */
 //#define DEBUGGER
-#define DRIVESOUND
 //#define ENFORCER
 #define FDI2RAW
 #define FILESYS
-#define FPUEMU /* FPU emulation */
-#define FPU_UAE
 #define GFXFILTER
 
 #define MMU
@@ -126,16 +117,7 @@ extern FILE *g_fs_uae_sync_debug_file;
 #define XARCADE
 #define GNU_SOURCE 1
 
-// needed several places in the code
-#define MAX_DPATH 1024
-#ifndef MAX_PATH
-#define MAX_PATH PATH_MAX
-//#ifdef WINDOWS
-//#define MAX_PATH 512
-//#else
-//define MAX_PATH 1024
-//#endif
-#endif
+#include "uae/limits.h"
 
 // needed by serial.cpp
 #ifdef WINDOWS
@@ -178,13 +160,10 @@ typedef unsigned short USHORT;
 
 #include "../include/sysdeps.h"
 
-// make use of enums compatible with C++: in C++ you cannot assign an
-// enum value to an int
-
 #undef ENUMNAME
 #undef ENUMDECL
-#define ENUMDECL enum
-#define ENUMNAME(name) ; typedef int name ;
+
+#include "uae/enum.h"
 
 #include "machdep/machdep.h"
 
@@ -220,11 +199,6 @@ extern int uae_start_thread_fast (void *(*f)(void *), void *arg,
 
 
 #define Sleep sleep_millis
-typedef unsigned int WPARAM;
-typedef long LPARAM;
-typedef int BOOL;
-#define TRUE 1
-#define FALSE 0
 
 // needed to compile gencpu.cpp as C code (which is needed because
 // of int to enum conversions (illegal in C++)

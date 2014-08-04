@@ -5,7 +5,7 @@
 *
 * Copyright 1995-2002 Bernd Schmidt
 * Copyright 1995 Alessandro Bissacco
-* Copyright 2000-2010 Toni Wilen
+* Copyright 2000-2014 Toni Wilen
 */
 
 #include "sysconfig.h"
@@ -21,7 +21,7 @@
 #include "audio.h"
 #include "sounddep/sound.h"
 #include "events.h"
-#include "uae/memory.h"
+#include "memory_uae.h"
 #include "custom.h"
 #include "newcpu.h"
 #include "cia.h"
@@ -44,23 +44,28 @@
 #endif
 #include "debug.h"
 #include "akiko.h"
+#include "cd32_fmv.h"
 #include "cdtv.h"
 #if defined(ENFORCER)
 #include "enforcer.h"
 #endif
 #include "gayle.h"
 #include "gfxfilter.h"
+#include "threaddep/thread.h"
 #include "a2091.h"
 #include "a2065.h"
 #include "gfxboard.h"
 #include "ncr_scsi.h"
+#include "ncr9x_scsi.h"
 #include "blkdev.h"
 #include "sampler.h"
 #include "clipboard.h"
+#include "cpuboard.h"
 #ifdef RETROPLATFORM
 #include "rp.h"
 #endif
 #include "luascript.h"
+#include "statusline.h"
 
 #define CUSTOM_DEBUG 0
 #define SPRITE_DEBUG 0
@@ -73,6 +78,8 @@
 #define AUTOSCALE_SPRITES 1
 
 #define SPRBORDER 0
+
+extern uae_u16 serper;
 
 #ifdef FSUAE // NL
 int g_frame_debug_logging = 0;
@@ -152,7 +159,6 @@ static bool bplcon0_interlace_seen;
 static int scandoubled_line;
 static bool vsync_rendered, frame_rendered, frame_shown;
 static int vsynctimeperline;
-static int jitcount = 0;
 static int frameskiptime;
 static bool genlockhtoggle;
 static bool genlockvtoggle;
@@ -207,9 +213,11 @@ int maxvpos_display = MAXVPOS_PAL; // value used for display size
 int hsyncendpos, hsyncstartpos;
 static int maxvpos_total = 511;
 int minfirstline = VBLANK_ENDLINE_PAL;
+int firstblankedline;
 static int equ_vblank_endline = EQU_ENDLINE_PAL;
 static bool equ_vblank_toggle = true;
 double vblank_hz = VBLANK_HZ_PAL, fake_vblank_hz, vblank_hz_stored, vblank_hz_nom;
+double hblank_hz;
 static float vblank_hz_lof, vblank_hz_shf, vblank_hz_lace;
 static int vblank_hz_mult, vblank_hz_state;
 static struct chipset_refresh *stored_chipset_refresh;
@@ -465,7 +473,6 @@ uae_u32 get_copper_address (int copno)
 
 void reset_frame_rate_hack (void)
 {
-	jitcount = 0;
 	if (currprefs.m68k_speed >= 0)
 		return;
 
@@ -551,7 +558,10 @@ static void docols (struct color_entry *colentry)
 	int i;
 
 #ifdef AGA
-	if (currprefs.chipset_mask & CSMASK_AGA) {
+	// if (currprefs.chipset_mask & CSMASK_AGA) {
+	// color_reg_get checks aga_mode, so use that here too so
+	// static analyzers don't complain about out-of-bounds accesses
+	if (aga_mode) {
 		for (i = 0; i < 256; i++) {
 			int v = color_reg_get (colentry, i);
 			if (v < 0 || v > 16777215)
@@ -635,7 +645,7 @@ STATIC_INLINE int get_equ_vblank_endline (void)
 	return equ_vblank_endline + (equ_vblank_toggle ? (lof_current ? 1 : 0) : 0);
 }
 
-#define HARD_DDF_LIMITS_DISABLED ((beamcon0 & 0x80) || (bplcon0 & 0x40))
+#define HARD_DDF_LIMITS_DISABLED ((beamcon0 & 0x80) || (beamcon0 & 0x4000) || (bplcon0 & 0x40))
 /* The HRM says 0xD8, but that can't work... */
 #define HARD_DDF_STOP (HARD_DDF_LIMITS_DISABLED ? 0xff : 0xd6)
 #define HARD_DDF_START_REAL 0x18
@@ -2554,20 +2564,6 @@ static void start_bpl_dma (int hpos, int hstart)
 	estimate_last_fetch_cycle (hstart);
 
 	last_fetch_hpos = hstart;
-
-
-#if 0
-	/* If someone already wrote BPL1DAT, clear the area between that point and
-	the real fetch start.  */
-	if (!nodraw ()) {
-		if (thisline_decision.plfleft >= 0) {
-			out_nbits = (plfstrt - thisline_decision.plfleft) << (1 + toscr_res);
-			out_offs = out_nbits >> 5;
-			out_nbits &= 31;
-		}
-		update_toscr_planes ();
-	}
-#endif
 }
 
 #if 0
@@ -3532,6 +3528,9 @@ int vsynctimebase_orig;
 
 void compute_vsynctime (void)
 {
+	double svpos = maxvpos_nom;
+	double shpos = maxhpos_short;
+
 	fake_vblank_hz = 0;
 	vblank_hz_mult = 0;
 	vblank_hz_state = 1;
@@ -3557,21 +3556,20 @@ void compute_vsynctime (void)
 		updatedisplayarea ();
 	}
 #endif
+	if (islinetoggle ()) {
+		shpos += 0.5;
+	}
+	if (interlace_seen) {
+		svpos += 0.5;
+	} else if (lof_current) {
+		svpos += 1.0;
+	}
 	if (currprefs.produce_sound > 1) {
-		double svpos = maxvpos_nom;
-		double shpos = maxhpos_short;
-		if (islinetoggle ()) {
-			shpos += 0.5;
-		}
-		if (interlace_seen) {
-			svpos += 0.5;
-		} else if (lof_current) {
-			svpos += 1.0;
-		}
 		double clk = svpos * shpos * fake_vblank_hz;
 		//write_log (_T("SNDRATE %.1f*%.1f*%.6f=%.6f\n"), svpos, shpos, fake_vblank_hz, clk);
 		update_sound (clk);
 	}
+	cd32_fmv_set_sync(svpos);
 }
 
 
@@ -3758,7 +3756,7 @@ void compute_framesync (void)
 		gfxvidinfo.drawbuffer.extrawidth = 0;
 		gfxvidinfo.drawbuffer.inwidth2 = gfxvidinfo.drawbuffer.inwidth;
 
-		gfxvidinfo.drawbuffer.inheight = (maxvpos - minfirstline + 1) << vres2;
+		gfxvidinfo.drawbuffer.inheight = ((firstblankedline < maxvpos ? firstblankedline : maxvpos) - minfirstline + 1) << vres2;
 		gfxvidinfo.drawbuffer.inheight2 = gfxvidinfo.drawbuffer.inheight;
 
 	} else {
@@ -3798,12 +3796,14 @@ void compute_framesync (void)
 
 	compute_vsynctime ();
 
+	hblank_hz = (double)(currprefs.ntscmode ? CHIPSET_CLOCK_NTSC : CHIPSET_CLOCK_PAL) / (maxhpos + (islinetoggle() ? 0.5 : 0));
+
 	write_log (_T("%s mode%s%s V=%.4fHz H=%0.4fHz (%dx%d+%d) IDX=%d (%s) D=%d RTG=%d/%d\n"),
 		isntsc ? _T("NTSC") : _T("PAL"),
 		islace ? _T(" lace") : (lof_lace ? _T(" loflace") : _T("")),
 		doublescan > 0 ? _T(" dblscan") : _T(""),
 		vblank_hz,
-		(double)(currprefs.ntscmode ? CHIPSET_CLOCK_NTSC : CHIPSET_CLOCK_PAL) / (maxhpos + (islinetoggle () ? 0.5 : 0)),
+		hblank_hz,
 		maxhpos, maxvpos, lof_store ? 1 : 0,
 		cr ? cr->index : -1,
 		cr != NULL && cr->label != NULL ? cr->label : _T("<?>"),
@@ -3899,12 +3899,14 @@ void init_hz (bool fullinit)
 		vpos_count = maxvpos;
 		vpos_count_diff = maxvpos;
 	}
+	firstblankedline = maxvpos + 1;
 
 	if (beamcon0 & 0x80) {
 		// programmable scanrates (ECS Agnus)
 		if (vtotal >= MAXVPOS)
 			vtotal = MAXVPOS - 1;
 		maxvpos = vtotal + 1;
+		firstblankedline = maxvpos + 1;
 		if (htotal >= MAXHPOS)
 			htotal = MAXHPOS - 1;
 		maxhpos = htotal + 1;
@@ -3912,13 +3914,31 @@ void init_hz (bool fullinit)
 		vblank_hz_shf = vblank_hz;
 		vblank_hz_lof = 227.0 * 313.0 * 50.0 / (maxvpos * maxhpos);;
 		vblank_hz_lace = 227.0 * 312.5 * 50.0 / (maxvpos * maxhpos);;
-		minfirstline = vsstop > vbstop ? vsstop : vbstop;
-		if (minfirstline > maxvpos / 2) 
-			minfirstline = vsstop > vbstop ? vbstop : vsstop;
+
+		if ((beamcon0 & 0x1000) && (beamcon0 & 0x0200)) { // VARVBEN + VARVSYEN
+			minfirstline = vsstop > vbstop ? vsstop : vbstop;
+			if (minfirstline > maxvpos / 2) 
+				minfirstline = vsstop > vbstop ? vbstop : vsstop;
+			firstblankedline = vbstrt;
+		} else if (beamcon0 & 0x0200) {
+			minfirstline = vsstop;
+			if (minfirstline > maxvpos / 2) 
+				minfirstline = 0;
+		} else if (beamcon0 & 0x1000) {
+			minfirstline = vbstop;
+			if (minfirstline > maxvpos / 2) 
+				minfirstline = 0;
+			firstblankedline = vbstrt;
+		}
+		
 		if (minfirstline < 2)
 			minfirstline = 2;
 		if (minfirstline >= maxvpos)
 			minfirstline = maxvpos - 1;
+
+		if (firstblankedline < minfirstline)
+			firstblankedline = maxvpos + 1;
+
 		sprite_vblank_endline = minfirstline - 2;
 		maxvpos_nom = maxvpos;
 		maxvpos_display = maxvpos;
@@ -3948,15 +3968,35 @@ void init_hz (bool fullinit)
 		vblank_hz = 300;
 	maxhpos_short = maxhpos;
 	set_delay_lastcycle ();
-	if (beamcon0 & 0x80) {
-		if (hbstrt > maxhpos)
-			hsyncstartpos = hbstrt;
-		else
-			hsyncstartpos = maxhpos + hbstrt;
-		if (hbstop > maxhpos)
-			hsyncendpos = maxhpos - hbstop - 2;
-		else
-			hsyncendpos = hbstop - 2;
+	if ((beamcon0 & 0x80) && (beamcon0 & 0x0100)) {
+
+		hsyncstartpos = hsstrt;
+		hsyncendpos = hsstop;
+
+		if ((bplcon0 & 1) && (bplcon3 & 1)) {
+
+			if (hbstrt > maxhpos / 2) {
+				if (hsyncstartpos < hbstrt)
+					hsyncstartpos = hbstrt;
+			} else {
+				if (hsyncstartpos > hbstrt)
+					hsyncstartpos = hbstrt;
+			}
+
+			if (hbstop > maxhpos / 2) {
+				if (hsyncendpos > hbstop)
+					hsyncendpos = hbstop;
+			} else {
+				if (hsyncendpos < hbstop)
+					hsyncendpos = hbstop;
+			}
+		}
+
+		if (hsyncstartpos < hsyncendpos)
+			hsyncstartpos = maxhpos + hsyncstartpos;
+
+		hsyncendpos--;
+
 		if (hsyncendpos < 2)
 			hsyncendpos = 2;
 	} else {
@@ -4607,7 +4647,15 @@ static void rethink_intreq (void)
 #endif
 #ifdef CD32
 	rethink_akiko ();
+	rethink_cd32fmv();
 #endif
+#ifdef NCR
+	ncr_rethink();
+#endif
+#ifdef NCR9X
+	ncr9x_rethink();
+#endif
+	cpuboard_rethink();
 	rethink_gayle ();
 }
 
@@ -4752,6 +4800,7 @@ static void BEAMCON0 (uae_u16 v)
 			if (v & ~0x20)
 				write_log (_T("warning: %04X written to BEAMCON0 PC=%08X\n"), v, M68K_GETPC);
 		}
+		calcdiw();
 	}
 }
 
@@ -4862,14 +4911,6 @@ static void BPLCON0_Denise (int hpos, uae_u16 v, bool immediate)
 	// fake unused 0x0080 bit as an EHB bit (see below)
 	if (isehb (bplcon0d, bplcon2))
 		v |= 0x80;
-#if 0
-	if (hpos >= 0x18 && is_bitplane_dma (hpos - 2) == 1) {
-		for (int i = 0; i < MAX_PLANES; i++) {
-			if (i >= GET_PLANES (bplcon0))
-				todisplay[i][0] = 0;
-		}
-	}
-#endif
 	if (immediate) {
 		record_register_change (hpos, 0x100, v);
 	} else {
@@ -5023,7 +5064,7 @@ static void BPL2MOD (int hpos, uae_u16 v)
  */
 static void BPLxDAT (int hpos, int num, uae_u16 v)
 {
-	// only BPL0DAT access can do anything visible
+	// only BPL1DAT access can do anything visible
 	if (num == 0 && hpos >= 8) {
 		decide_line (hpos);
 		decide_fetch_safe (hpos);
@@ -6859,7 +6900,6 @@ static bool framewait (void)
 			}
 
 			frame_shown = true;
-
 		}
 		return status != 0;
 	}
@@ -6869,7 +6909,7 @@ static bool framewait (void)
 	int clockadjust = 0;
 	int vstb = vsynctimebase;
 
-	if (currprefs.m68k_speed < 0) {
+	if (currprefs.m68k_speed < 0 && !currprefs.cpu_cycle_exact) {
 
 #if 0
 		static uae_u32 prevtick;
@@ -6967,6 +7007,7 @@ static bool framewait (void)
 			vsynctimeperline = vstb / 3;
 		
 		frame_shown = true;
+
 	}
 	return status != 0;
 }
@@ -7053,10 +7094,6 @@ void fpscounter_reset (void)
 
 static void fpscounter (bool frameok)
 {
-#ifdef FSUAE
-	// the following code can crash with 0div error when running in benchmark
-    // mode
-#else
 	frame_time_t now, last;
 
 	now = read_processor_time ();
@@ -7073,6 +7110,10 @@ static void fpscounter (bool frameok)
 	frametime += last;
 	timeframes++;
 
+#ifdef FSUAE
+	// the following code can crash with 0div error when running in benchmark
+	// mode
+#else
 	if ((timeframes & 7) == 0) {
 		double idle = 1000 - (idle_mavg.mavg == 0 ? 0.0 : (double)idle_mavg.mavg * 1000.0 / vsynctimebase);
 		int fps = fps_mavg.mavg == 0 ? 0 : syncbase * 10 / fps_mavg.mavg;
@@ -7141,6 +7182,11 @@ static void vsync_handler_pre (void)
 #ifdef RETROPLATFORM
 	rp_vsync ();
 #endif
+#ifdef CD32
+	cd32_fmv_vsync_handler();
+#endif
+	cpuboard_vsync();
+	statusline_vsync();
 
 	if (!vsync_rendered) {
 		frame_time_t start, end;
@@ -7578,6 +7624,7 @@ static void hsync_handler_pre (bool onvsync)
 #endif
 #ifdef CD32
 	AKIKO_hsync_handler ();
+	cd32_fmv_hsync_handler();
 #endif
 #ifdef CDTV
 	CDTV_hsync_handler ();
@@ -7588,12 +7635,10 @@ static void hsync_handler_pre (bool onvsync)
 	picasso_handle_hsync ();
 #endif
 #ifdef AHI
-#ifdef AHI_V2
 	{
 		void ahi_hsync (void);
 		ahi_hsync ();
 	}
-#endif
 #endif
 	DISK_hsync ();
 	if (currprefs.produce_sound)
@@ -7766,7 +7811,7 @@ static void hsync_handler_post (bool onvsync)
 		port_get_custom (1, out);
 	}
 #endif
-	if (currprefs.m68k_speed < 0) {
+	if (currprefs.m68k_speed < 0 && !currprefs.cpu_cycle_exact) {
 		if (is_last_line ()) {
 			/* really last line, just run the cpu emulation until whole vsync time has been used */
 			if (currprefs.m68k_speed_throttle) {
@@ -7871,8 +7916,6 @@ static void hsync_handler_post (bool onvsync)
 	}
 
 	{
-		extern int volatile uaenet_int_requested;
-		extern int volatile uaenet_vsync_requested;
 		if (uaenet_int_requested || (uaenet_vsync_requested && vpos == 10)) {
 			INTREQ (0x8000 | 0x0008);
 		}
@@ -8114,7 +8157,11 @@ void custom_reset (bool hardreset, bool keyboardreset)
 	gfxboard_reset ();
 #endif
 #ifdef NCR
-	ncr_reset ();
+	ncr710_reset();
+	ncr_reset();
+#endif
+#ifdef NCR9X
+	ncr9x_reset();
 #endif
 #ifdef JIT
 	compemu_reset ();
@@ -8200,6 +8247,9 @@ void custom_reset (bool hardreset, bool keyboardreset)
 		CLXCON (clxcon);
 		CLXCON2 (clxcon2);
 		calcdiw ();
+		v = serper;
+		serper = 0;
+		SERPER(v);
 		for (i = 0; i < 8; i++) {
 			SPRxCTLPOS (i);
 			nr_armed += spr[i].armed != 0;
@@ -8713,7 +8763,7 @@ static int REGPARAM2 custom_wput_1 (int hpos, uaecptr addr, uae_u32 value, int n
 	case 0x1C0: if (htotal != value) { htotal = value & (MAXHPOS_ROWS - 1); varsync (); } break;
 	case 0x1C2: if (hsstop != value) { hsstop = value & (MAXHPOS_ROWS - 1); varsync (); } break;
 	case 0x1C4: if (hbstrt != value) { hbstrt = value & (MAXHPOS_ROWS - 1); varsync (); } break;
-	case 0x1C6: if (hbstop != value) { hbstop = value & (MAXHPOS_ROWS - 1); varsync (); } break;
+	case 0x1C6:	if (hbstop != value) { hbstop = value & (MAXHPOS_ROWS - 1); varsync ();} break;
 	case 0x1C8: if (vtotal != value) { vtotal = value & (MAXVPOS_LINES_ECS - 1); varsync (); } break;
 	case 0x1CA: if (vsstop != value) { vsstop = value & (MAXVPOS_LINES_ECS - 1); varsync (); } break;
 	case 0x1CC: if (vbstrt < value || vbstrt > (value & (MAXVPOS_LINES_ECS - 1)) + 1) { vbstrt = value & (MAXVPOS_LINES_ECS - 1); varsync (); } break;
@@ -8864,7 +8914,7 @@ uae_u8 *restore_custom (uae_u8 *src)
 	RW;						/* 02C VHPOSW */
 	COPCON (RW);			/* 02E COPCON */
 	RW;						/* 030 SERDAT* */
-	RW;						/* 032 SERPER* */
+	serper = RW;			/* 032 SERPER* */
 	potgo_value = 0; POTGO (RW); /* 034 POTGO */
 	RW;						/* 036 JOYTEST* */
 	RW;						/* 038 STREQU */
@@ -8980,8 +9030,6 @@ uae_u8 *restore_custom (uae_u8 *src)
 #define SW save_u16
 #define SL save_u32
 
-extern uae_u16 serper;
-
 uae_u8 *save_custom (int *len, uae_u8 *dstptr, int full)
 {
 	uae_u8 *dstbak, *dst;
@@ -9020,8 +9068,8 @@ uae_u8 *save_custom (int *len, uae_u8 *dstptr, int full)
 	SW ((lof_store ? 0x8001 : 0) | (lol ? 0x0080 : 0));/* 02A VPOSW */
 	SW (0);					/* 02C VHPOSW */
 	SW (copcon);			/* 02E COPCON */
-	SW (serper);			/* 030 SERDAT * */
-	SW (serdat);			/* 032 SERPER * */
+	SW (serdat);			/* 030 SERDAT * */
+	SW (serper);			/* 032 SERPER * */
 	SW (potgo_value);		/* 034 POTGO */
 	SW (0);					/* 036 JOYTEST * */
 	SW (0);					/* 038 STREQU */
@@ -9275,6 +9323,7 @@ uae_u8 *restore_custom_extra (uae_u8 *src)
 	currprefs.cs_ksmirror_a8 = changed_prefs.cs_ksmirror_a8 = RBB;
 	currprefs.cs_ksmirror_e0 = changed_prefs.cs_ksmirror_e0 = RBB;
 	currprefs.cs_resetwarning = changed_prefs.cs_resetwarning = RBB;
+	currprefs.cs_z3autoconfig = changed_prefs.cs_z3autoconfig = RBB;
 
 	return src;
 }
@@ -9326,6 +9375,7 @@ uae_u8 *save_custom_extra (int *len, uae_u8 *dstptr)
 	SB (currprefs.cs_ksmirror_a8 ? 1 : 0);
 	SB (currprefs.cs_ksmirror_e0 ? 1 : 0);
 	SB (currprefs.cs_resetwarning ? 1 : 0);
+	SB (currprefs.cs_z3autoconfig ? 1 : 0);
 
 	*len = dst - dstbak;
 	return dstbak;
@@ -9440,6 +9490,7 @@ void check_prefs_changed_custom (void)
 	currprefs.cs_slowmemisfast = changed_prefs.cs_slowmemisfast;
 	currprefs.cs_dipagnus = changed_prefs.cs_dipagnus;
 	currprefs.cs_denisenoehb = changed_prefs.cs_denisenoehb;
+	currprefs.cs_z3autoconfig = changed_prefs.cs_z3autoconfig;
 
 	if (currprefs.chipset_mask != changed_prefs.chipset_mask ||
 		currprefs.picasso96_nocustom != changed_prefs.picasso96_nocustom ||

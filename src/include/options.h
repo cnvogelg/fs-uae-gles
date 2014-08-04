@@ -7,12 +7,17 @@
 * Copyright 1995-2001 Bernd Schmidt
 */
 
-#ifndef OPTIONS_H
-#define OPTIONS_H
+#ifndef UAE_OPTIONS_H
+#define UAE_OPTIONS_H
+
+#ifdef FSUAE // NL
+#include "uae/types.h"
+#include "uae/limits.h"
+#endif
 
 #define UAEMAJOR 2
 #define UAEMINOR 8
-#define UAESUBREV 1
+#define UAESUBREV 2
 
 typedef enum { KBD_LANG_US, KBD_LANG_DK, KBD_LANG_DE, KBD_LANG_SE, KBD_LANG_FR, KBD_LANG_IT, KBD_LANG_ES } KbdLang;
 
@@ -149,7 +154,8 @@ struct uaedev_config_info {
 	int sectors;
 	int reserved;
 	int blocksize;
-	int controller;
+	int controller_type;
+	int controller_unit;
 	// zero if default
 	int pcyls, pheads, psecs;
 	int flags;
@@ -328,6 +334,7 @@ struct uae_prefs {
 	bool comp_midopt;
 	bool comp_lowopt;
 	bool fpu_strict;
+	bool fpu_softfloat;
 
 	bool comp_hardflush;
 	bool comp_constjump;
@@ -407,6 +414,7 @@ struct uae_prefs {
 	int filesys_limit;
 	int filesys_max_name;
 	int filesys_max_file_size;
+	bool reset_delay;
 
 	int cs_compatible;
 	int cs_ciaatod;
@@ -419,6 +427,7 @@ struct uae_prefs {
 	bool cs_cd32cd;
 	bool cs_cd32c2p;
 	bool cs_cd32nvram;
+	bool cs_cd32fmv;
 	bool cs_cdtvcd;
 	bool cs_cdtvram;
 	int cs_cdtvcard;
@@ -438,6 +447,7 @@ struct uae_prefs {
 	bool cs_dipagnus;
 	bool cs_agnusbltbusybug;
 	bool cs_ciatodbug;
+	bool cs_z3autoconfig;
 	int cs_hacks;
 
 	TCHAR romfile[MAX_DPATH];
@@ -448,9 +458,13 @@ struct uae_prefs {
 	TCHAR romextident[256];
 	TCHAR a2091romfile[MAX_DPATH];
 	TCHAR a2091romident[256];
+	TCHAR a2091romfile2[MAX_DPATH];
+	TCHAR a2091romident2[256];
 	bool a2091;
 	TCHAR a4091romfile[MAX_DPATH];
 	TCHAR a4091romident[256];
+	TCHAR a4091romfile2[MAX_DPATH];
+	TCHAR a4091romident2[256];
 	bool a4091;
 	TCHAR flashfile[MAX_DPATH];
 	TCHAR rtcfile[MAX_DPATH];
@@ -498,6 +512,9 @@ struct uae_prefs {
 	uae_u32 mbresmem_low_size;
 	uae_u32 mbresmem_high_size;
 	uae_u32 rtgmem_size;
+	int cpuboard_type;
+	uae_u32 cpuboardmem1_size;
+	uae_u32 cpuboardmem2_size;
 	bool rtg_hardwareinterrupt;
 	bool rtg_hardwaresprite;
 	int rtgmem_type;
@@ -514,6 +531,7 @@ struct uae_prefs {
 	bool native_code;
 	bool uae_hide_autoconfig;
 	bool jit_direct_compatible_memory;
+	bool force_0x10000000_z3;
 
 	int mountitems;
 	struct uaedev_config_data mountconfig[MOUNT_CONFIG_SIZE];
@@ -546,9 +564,11 @@ struct uae_prefs {
 	int win32_inactive_priority;
 	bool win32_inactive_pause;
 	bool win32_inactive_nosound;
+	int win32_inactive_input;
 	int win32_iconified_priority;
 	bool win32_iconified_pause;
 	bool win32_iconified_nosound;
+	int win32_iconified_input;
 
 	bool win32_rtgmatchdepth;
 	bool win32_rtgallowscaling;
@@ -693,4 +713,4 @@ extern struct uae_prefs currprefs, changed_prefs;
 extern int machdep_init (void);
 extern void machdep_free (void);
 
-#endif /* OPTIONS_H */
+#endif // UAE_OPTIONS_H

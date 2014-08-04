@@ -6,6 +6,13 @@
   * Copyright 1996 Bernd Schmidt
   */
 
+#ifndef UAE_GUI_H
+#define UAE_GUI_H
+
+#ifdef FSUAE // NL
+#include "uae/types.h"
+#endif
+
 extern int gui_init (void);
 extern int gui_update (void);
 extern void gui_exit (void);
@@ -55,7 +62,7 @@ struct gui_info
     uae_s8 hd;					/* harddrive */
     uae_s8 cd;					/* CD */
 	uae_s8 md;					/* CD32 or CDTV internal storage */
-    bool cpu_halted;
+    int cpu_halted;
 	int fps, idle;
 	int fps_color;
     int sndbuf, sndbuf_status;
@@ -83,3 +90,4 @@ typedef enum {
 	NUMSG_KS68030PLUS
 } notify_user_msg;
 
+#endif // UAE_GUI_H

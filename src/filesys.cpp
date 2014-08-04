@@ -28,7 +28,7 @@
 #include "threaddep/thread.h"
 #include "options.h"
 #include "uae.h"
-#include "uae/memory.h"
+#include "memory_uae.h"
 #include "custom.h"
 #include "events.h"
 #include "newcpu.h"
@@ -46,6 +46,7 @@
 #include "savestate.h"
 #include "a2091.h"
 #include "ncr_scsi.h"
+#include "ncr9x_scsi.h"
 #include "cdtv.h"
 #include "sana2.h"
 #include "bsdsocket.h"
@@ -60,6 +61,7 @@
 #include "scsi.h"
 #include "uaenative.h"
 #include "tabletlibrary.h"
+#include "cpuboard.h"
 #ifdef RETROPLATFORM
 #include "rp.h"
 #endif
@@ -167,7 +169,8 @@ typedef struct {
 	bool unknown_media; /* ID_UNREADABLE_DISK */
 	int bootpri; /* boot priority. -128 = no autoboot, -129 = no mount */
 	int devno;
-	int controller;
+	int controller_type;
+	int controller_unit;
 	bool wasisempty; /* if true, this unit was created empty */
 	bool canremove; /* if true, this unit can be safely ejected and remounted */
 	bool configureddrive; /* if true, this is drive that was manually configured */
@@ -222,12 +225,12 @@ int nr_directory_units (struct uae_prefs *p)
 	int i, cnt = 0;
 	if (p) {
 		for (i = 0; i < p->mountitems; i++) {
-			if (p->mountconfig[i].ci.controller == 0)
+			if (p->mountconfig[i].ci.controller_type == HD_CONTROLLER_TYPE_UAE)
 				cnt++;
 		}
 	} else {
 		for (i = 0; i < MAX_FILESYSTEM_UNITS; i++) {
-			if (mountinfo.ui[i].open > 0 && mountinfo.ui[i].controller == 0)
+			if (mountinfo.ui[i].open > 0 && mountinfo.ui[i].controller_type == HD_CONTROLLER_TYPE_UAE)
 				cnt++;
 		}
 	}
@@ -367,7 +370,7 @@ int get_filesys_unitconfig (struct uae_prefs *p, int index, struct mountedinfo *
 #endif
 		}
 	} else if (uci->ci.type != UAEDEV_TAPE) {
-		if (!ui->controller || (ui->controller && p->cs_ide)) {
+		if (ui->controller_type == HD_CONTROLLER_TYPE_UAE) { // what is this? || (ui->controller && p->cs_ide)) {
 			mi->ismounted = 1;
 			if (uci->ci.type == UAEDEV_HDF)
 				mi->ismedia = ui->hf.drive_empty ? false : true;
@@ -588,7 +591,7 @@ static int set_filesys_unit_1 (int nr, struct uaedev_config_info *ci)
 		}
 	}
 
-	if (ci->controller || ci->type == UAEDEV_TAPE) {
+	if (ci->controller_type != HD_CONTROLLER_TYPE_UAE || ci->type == UAEDEV_TAPE) {
 		ui = &mountinfo.ui[nr];
 		memset (ui, 0, sizeof (UnitInfo));
 		memcpy (&ui->hf.ci, &c, sizeof (struct uaedev_config_info));
@@ -729,7 +732,7 @@ int kill_filesys_unitconfig (struct uae_prefs *p, int nr)
 		return 0;
 	uci = getuci (p->mountconfig, nr);
 	hardfile_do_disk_change (uci, 0);
-	if (uci->configoffset >= 0 && uci->ci.controller == 0)
+	if (uci->configoffset >= 0 && uci->ci.controller_type == HD_CONTROLLER_TYPE_UAE)
 		filesys_media_change (uci->ci.rootdir, 0, uci);
 	while (nr < MOUNT_CONFIG_SIZE) {
 		memmove (&p->mountconfig[nr], &p->mountconfig[nr + 1], sizeof (struct uaedev_config_data));
@@ -785,7 +788,7 @@ static void initialize_mountinfo (void)
 
 	for (nr = 0; nr < currprefs.mountitems; nr++) {
 		struct uaedev_config_data *uci = &currprefs.mountconfig[nr];
-		if (uci->ci.controller == HD_CONTROLLER_UAE && (uci->ci.type == UAEDEV_DIR || uci->ci.type == UAEDEV_HDF)) {
+		if (uci->ci.controller_type == HD_CONTROLLER_TYPE_UAE && (uci->ci.type == UAEDEV_DIR || uci->ci.type == UAEDEV_HDF)) {
 			struct uaedev_config_info ci;
 			memcpy (&ci, &uci->ci, sizeof (struct uaedev_config_info));
 			ci.flags = MYVOLUMEINFO_REUSABLE;
@@ -818,7 +821,7 @@ static void initialize_mountinfo (void)
 
 	for (nr = 0; nr < currprefs.mountitems; nr++) {
 		struct uaedev_config_data *uci = &currprefs.mountconfig[nr];
-		if (uci->ci.controller == HD_CONTROLLER_UAE) {
+		if (uci->ci.controller_type == HD_CONTROLLER_TYPE_UAE) {
 			if (uci->ci.type == UAEDEV_TAPE) {
 				struct uaedev_config_info ci;
 				memcpy (&ci, &uci->ci, sizeof (struct uaedev_config_info));
@@ -833,50 +836,123 @@ static void initialize_mountinfo (void)
 
 	for (nr = 0; nr < currprefs.mountitems; nr++) {
 		struct uaedev_config_info *uci = &currprefs.mountconfig[nr].ci;
-		if (uci->controller == HD_CONTROLLER_UAE) {
+		int type = uci->controller_type;
+		int unit = uci->controller_unit;
+		bool added = false;
+		if (type == HD_CONTROLLER_TYPE_UAE) {
 			continue;
-		} else if (uci->controller <= HD_CONTROLLER_IDE3) {
-			gayle_add_ide_unit (uci->controller - HD_CONTROLLER_IDE0, uci);
-			allocuci (&currprefs, nr, -1);
-		} else if (uci->controller <= HD_CONTROLLER_SCSI6) {
+		} else if (type >= HD_CONTROLLER_TYPE_IDE_FIRST && type <= HD_CONTROLLER_TYPE_IDE_LAST) {
+			gayle_add_ide_unit (unit, uci);
+			added = true;
+		} else if (type == HD_CONTROLLER_TYPE_SCSI_A2091) {
+#ifdef A2091
+			if (currprefs.a2091) {
+				a2091_add_scsi_unit (unit, uci, 0);
+				added = true;
+			}
+#endif
+		} else if (type == HD_CONTROLLER_TYPE_SCSI_A2091_2) {
+#ifdef A2091
+			if (currprefs.a2091) {
+				a2091_add_scsi_unit (unit, uci, 1);
+				added = true;
+			}
+#endif
+		} else if (type == HD_CONTROLLER_TYPE_SCSI_A3000) {
+#ifdef A2091
+			if (currprefs.cs_mbdmac == 1) {
+				a3000_add_scsi_unit (unit, uci);
+				added = true;
+			}
+#endif
+		} else if (type == HD_CONTROLLER_TYPE_SCSI_A4091) {
+#ifdef NCR
+			if (currprefs.a4091) {
+				a4091_add_scsi_unit (unit, uci, 0);
+				added = true;
+			}
+#endif
+		} else if (type == HD_CONTROLLER_TYPE_SCSI_A4091_2) {
+#ifdef NCR
+			if (currprefs.a4091) {
+				a4091_add_scsi_unit (unit, uci, 1);
+				added = true;
+			}
+#endif
+		} else if (type == HD_CONTROLLER_TYPE_SCSI_CPUBOARD) {
+#ifdef NCR
+			if (currprefs.cpuboard_type == BOARD_WARPENGINE_A4000) {
+				warpengine_add_scsi_unit(unit, uci);
+				added = true;
+			} else if (currprefs.cpuboard_type == BOARD_CSMK3 || currprefs.cpuboard_type == BOARD_CSPPC) {
+				cyberstorm_add_scsi_unit(unit, uci);
+				added = true;
+			} else if (currprefs.cpuboard_type == BOARD_BLIZZARDPPC) {
+				blizzardppc_add_scsi_unit(unit, uci);
+				added = true;
+			} else if (currprefs.cpuboard_type == BOARD_BLIZZARD_2060 ||
+				currprefs.cpuboard_type == BOARD_BLIZZARD_1230_IV_SCSI ||
+				currprefs.cpuboard_type == BOARD_BLIZZARD_1260_SCSI ||
+				currprefs.cpuboard_type == BOARD_CSMK1 ||
+				currprefs.cpuboard_type == BOARD_CSMK2) {
+					cpuboard_ncr9x_add_scsi_unit(unit, uci);
+					added = true;
+			}
+#endif
+		} else if (type == HD_CONTROLLER_TYPE_SCSI_A4000T) {
+#ifdef NCR
+			if (currprefs.cs_mbdmac == 2) {
+				a4000t_add_scsi_unit (unit, uci);
+				added = true;
+			}
+#endif
+		} else if (type == HD_CONTROLLER_TYPE_SCSI_CDTV) {
+#ifdef CDTV
+			if (currprefs.cs_cdtvscsi) {
+				cdtv_add_scsi_hd_unit (unit, uci);
+				added = true;
+			}
+#endif
+		} else if (type == HD_CONTROLLER_TYPE_SCSI_AUTO) {
 			if (currprefs.cs_mbdmac == 1) {
 #ifdef A2091
-				a3000_add_scsi_unit (uci->controller - HD_CONTROLLER_SCSI0, uci);
-				allocuci (&currprefs, nr, -1);
+				a3000_add_scsi_unit (unit, uci);
+				added = true;
 #endif
 			} else if (currprefs.cs_mbdmac == 2) {
 #ifdef NCR
-				a4000t_add_scsi_unit (uci->controller - HD_CONTROLLER_SCSI0, uci);	
-				allocuci (&currprefs, nr, -1);
+				a4000t_add_scsi_unit (unit, uci);	
+				added = true;
 #endif
 			} else if (currprefs.a2091) {
 #ifdef A2091
-				a2091_add_scsi_unit (uci->controller - HD_CONTROLLER_SCSI0, uci);
-				allocuci (&currprefs, nr, -1);
+				a2091_add_scsi_unit (unit, uci, 0);
+				added = true;
 #endif
 			} else if (currprefs.a4091) {
 #ifdef NCR
-				a4091_add_scsi_unit (uci->controller - HD_CONTROLLER_SCSI0, uci);
-				allocuci (&currprefs, nr, -1);
+				a4091_add_scsi_unit (unit, uci, 0);
+				added = true;
 #endif
 			} else if (currprefs.cs_cdtvscsi) {
 #ifdef CDTV
-				cdtv_add_scsi_hd_unit (uci->controller - HD_CONTROLLER_SCSI0, uci);
-				allocuci (&currprefs, nr, -1);
+				cdtv_add_scsi_hd_unit (unit, uci);
+				added = true;
 #endif
 			}
-		} else if (uci->controller == HD_CONTROLLER_PCMCIA_SRAM) {
+		} else if (type == HD_CONTROLLER_TYPE_PCMCIA_SRAM) {
 			gayle_add_pcmcia_sram_unit (uci->rootdir, uci->readonly);
-			allocuci (&currprefs, nr, -1);
-		} else if (uci->controller == HD_CONTROLLER_PCMCIA_IDE) {
+			added = true;
+		} else if (type == HD_CONTROLLER_TYPE_PCMCIA_IDE) {
 			gayle_add_pcmcia_ide_unit (uci->rootdir, uci->readonly);
-			allocuci (&currprefs, nr, -1);
+			added = true;
 		}
+		if (added)
+			allocuci (&currprefs, nr, -1);
 	}
 	
 
 }
-
 
 int sprintf_filesys_unit (TCHAR *buffer, int num)
 {
@@ -2570,7 +2646,7 @@ static a_inode *lookup_child_aino_for_exnext (Unit *unit, a_inode *base, TCHAR *
 	init_child_aino (unit, base, c);
 
 	recycle_aino (unit, c);
-	TRACE((_T("created aino %x, exnext\n"), c->uniq));
+	TRACE((_T("created aino %s:%d, exnext\n"), c->nname, c->uniq));
 
 	return c;
 }
@@ -3623,89 +3699,18 @@ static void
 	action_dup_lock_2 (unit, packet, k->aino->uniq);
 }
 
-static void free_exkey (Unit *unit, ExamineKey *ek)
+static void free_exkey (Unit *unit, a_inode *aino)
 {
-	if (--ek->aino->exnext_count == 0) {
+	if (--aino->exnext_count == 0) {
 		TRACE ((_T("Freeing ExKey and reducing total_locked from %d by %d\n"),
-			unit->total_locked_ainos, ek->aino->locked_children));
-		unit->total_locked_ainos -= ek->aino->locked_children;
-		ek->aino->locked_children = 0;
+			unit->total_locked_ainos, aino->locked_children));
+		unit->total_locked_ainos -= aino->locked_children;
+		aino->locked_children = 0;
 	}
-	ek->aino = 0;
-	ek->uniq = 0;
-}
-
-static ExamineKey *lookup_exkey (Unit *unit, uae_u32 uniq)
-{
-	ExamineKey *ek;
-	int i;
-
-	ek = unit->examine_keys;
-	for (i = 0; i < EXKEYS; i++, ek++) {
-		/* Did we find a free one? */
-		if (ek->uniq == uniq)
-			return ek;
-	}
-	write_log (_T("Houston, we have a BIG problem.\n"));
-	return 0;
-}
-
-/* This is so sick... who invented ACTION_EXAMINE_NEXT? What did he THINK??? */
-static ExamineKey *new_exkey (Unit *unit, a_inode *aino)
-{
-	uae_u32 uniq;
-	uae_u32 oldest = 0xFFFFFFFE;
-	ExamineKey *ek, *oldest_ek = 0;
-	int i;
-
-	ek = unit->examine_keys;
-	for (i = 0; i < EXKEYS; i++, ek++) {
-		/* Did we find a free one? */
-		if (ek->aino == 0)
-			continue;
-		if (ek->uniq < oldest)
-			oldest = (oldest_ek = ek)->uniq;
-	}
-	ek = unit->examine_keys;
-	for (i = 0; i < EXKEYS; i++, ek++) {
-		/* Did we find a free one? */
-		if (ek->aino == 0)
-			goto found;
-	}
-	/* This message should usually be harmless. */
-	write_log (_T("Houston, we have a problem (%s).\n"), aino->nname);
-	free_exkey (unit, oldest_ek);
-	ek = oldest_ek;
-found:
-
-	uniq = unit->next_exkey;
-	if (uniq >= 0xFFFFFFFE) {
-		/* Things will probably go wrong, but most likely the Amiga will crash
-		* before this happens because of something else. */
-		uniq = 1;
-	}
-	unit->next_exkey = uniq + 1;
-	ek->aino = aino;
-	ek->curr_file = 0;
-	ek->uniq = uniq;
-	return ek;
 }
 
 static void move_exkeys (Unit *unit, a_inode *from, a_inode *to)
 {
-	int i;
-	unsigned long tmp = 0;
-	for (i = 0; i < EXKEYS; i++) {
-		ExamineKey *k = unit->examine_keys + i;
-		if (k->uniq == 0)
-			continue;
-		if (k->aino == from) {
-			k->aino = to;
-			tmp++;
-		}
-	}
-	if (tmp != from->exnext_count)
-		write_log (_T("filesys.c: Bug in ExNext bookkeeping.  BAD.\n"));
 	to->exnext_count = from->exnext_count;
 	to->locked_children = from->locked_children;
 	from->exnext_count = 0;
@@ -3743,6 +3748,7 @@ static void
 		return;
 	}
 
+	put_long(info + 0, aino->uniq);
 	if (aino->parent == 0) {
 		/* Guru book says ST_ROOT = 1 (root directory, not currently used)
 		* but some programs really expect 2 from root dir..
@@ -4442,10 +4448,6 @@ static void action_examine_object (Unit *unit, dpacket packet)
 		aino = &unit->rootnode;
 
 	get_fileinfo (unit, packet, info, aino, false);
-	if (aino->dir) {
-		put_long (info, 0xFFFFFFFF);
-	} else
-		put_long (info, 0);
 }
 
 /* Read a directory's contents, create a_inodes for each file, and
@@ -4467,8 +4469,8 @@ static void populate_directory (Unit *unit, a_inode *base)
 		base->locked_children++;
 		unit->total_locked_ainos++;
 	}
-	TRACE3((_T("Populating directory, child %p, locked_children %d\n"),
-		base->child, base->locked_children));
+	TRACE3((_T("Populating directory, child %s, locked_children %d\n"),
+		base->child->nname, base->locked_children));
 	for (;;) {
 		uae_u64 uniq = 0;
 		TCHAR fn[MAX_DPATH];
@@ -4496,34 +4498,32 @@ static void populate_directory (Unit *unit, a_inode *base)
 	fs_closedir (d);
 }
 
-static void do_examine (Unit *unit, dpacket packet, ExamineKey *ek, uaecptr info, bool longfilesize)
+static bool do_examine (Unit *unit, dpacket packet, a_inode *aino, uaecptr info, bool longfilesize)
 {
 	for (;;) {
 		TCHAR *name;
-		if (ek->curr_file == 0)
+		if (!aino)
 			break;
-		name = ek->curr_file->nname;
-		get_fileinfo (unit, packet, info, ek->curr_file, longfilesize);
-		ek->curr_file = ek->curr_file->sibling;
+		name = aino->nname;
+		get_fileinfo (unit, packet, info, aino, longfilesize);
 		if (!(unit->volflags & (MYVOLUMEINFO_ARCHIVE | MYVOLUMEINFO_CDFS)) && !fsdb_exists(name)) {
 			TRACE ((_T("%s orphaned"), name));
-			continue;
+			return false;
 		}
-		TRACE ((_T("curr_file set to %p %s\n"), ek->curr_file,
-			ek->curr_file ? ek->curr_file->aname : _T("NULL")));
-		return;
+		return true;
 	}
 	TRACE((_T("no more entries\n")));
-	free_exkey (unit, ek);
+	free_exkey (unit, aino->parent);
 	PUT_PCK_RES1 (packet, DOS_FALSE);
 	PUT_PCK_RES2 (packet, ERROR_NO_MORE_ENTRIES);
+	return true;
 }
 
 static void action_examine_next (Unit *unit, dpacket packet, bool largefilesize)
 {
 	uaecptr lock = GET_PCK_ARG1 (packet) << 2;
 	uaecptr info = GET_PCK_ARG2 (packet) << 2;
-	a_inode *aino = 0;
+	a_inode *aino = 0, *daino = 0;
 	ExamineKey *ek;
 	uae_u32 uniq;
 
@@ -4535,50 +4535,48 @@ static void action_examine_next (Unit *unit, dpacket packet, bool largefilesize)
 		aino = aino_from_lock (unit, lock);
 	if (aino == 0)
 		aino = &unit->rootnode;
-	for(;;) {
-		uniq = get_long (info);
-		if (uniq == 0) {
-			write_log (_T("ExNext called for a file! (Houston?)\n"));
-			goto no_more_entries;
-		} else if (uniq == 0xFFFFFFFE)
-			goto no_more_entries;
-		else if (uniq == 0xFFFFFFFF) {
-			TRACE((_T("Creating new ExKey\n")));
-			ek = new_exkey (unit, aino);
-			if (ek) {
-				if (aino->exnext_count++ == 0)
-#ifdef FSUAE
-				{
-				    g_packet_delay = 320;
-#endif
-					populate_directory (unit, aino);
-#ifdef FSUAE
-				}
-#endif
-				ek->curr_file = aino->child;
-				TRACE((_T("Initial curr_file: %p %s\n"), ek->curr_file,
-					ek->curr_file ? ek->curr_file->aname : _T("NULL")));
+	uniq = get_long(info);
+	for (;;) {
+		if (uniq == aino->uniq) {
+			// first exnext
+			if (!aino->dir) {
+				write_log (_T("ExNext called for a file! %s:%d (Houston?)\n"), aino->nname, uniq);
+				goto no_more_entries;
 			}
+			if (aino->exnext_count++ == 0)
+				populate_directory (unit, aino);
+			if (!aino->child)
+				goto no_more_entries;
+			daino = aino->child;
 		} else {
-			TRACE((_T("Looking up ExKey\n")));
-			ek = lookup_exkey (unit, get_long (info));
+			daino = lookup_aino(unit, uniq);
+			if (!daino) {
+				// deleted? Look for next larger uniq in same directory
+				daino = aino->child;
+				while (daino && daino->uniq < uniq) {
+					daino = daino->sibling;
+				}
+			} else {
+				daino = daino->sibling;
+			}
 		}
-		if (ek == 0) {
-			write_log (_T("Couldn't find a matching ExKey. Prepare for trouble.\n"));
-			goto no_more_entries;
+		if (!daino)
+ 			goto no_more_entries;
+		if (daino->parent != aino) {
+			write_log(_T("Houston, we have a BIG problem. %s is not parent of %s\n"), daino->nname, aino->nname);
+ 			goto no_more_entries;
 		}
-		put_long (info, ek->uniq);
-		if (!ek->curr_file || ek->curr_file->mountcount == unit->mountcount)
-			break;
-		ek->curr_file = ek->curr_file->sibling;
-		if (!ek->curr_file)
-			goto no_more_entries;
+		uniq = daino->uniq;
+		if (daino->mountcount != unit->mountcount)
+			continue;
+		if (!do_examine (unit, packet, daino, info, largefilesize))
+			continue;
+		return;
 	}
-	do_examine (unit, packet, ek, info, largefilesize);
-	return;
 
 no_more_entries:
-	PUT_PCK_RES1 (packet, DOS_FALSE);
+	free_exkey(unit, aino);
+	PUT_PCK_RES1(packet, DOS_FALSE);
 	PUT_PCK_RES2 (packet, ERROR_NO_MORE_ENTRIES);
 }
 
@@ -5392,10 +5390,6 @@ static void
 		aino = &unit->rootnode;
 
 	get_fileinfo (unit, packet, info, aino, largefilesize);
-	if (aino->dir)
-		put_long (info, 0xFFFFFFFF);
-	else
-		put_long (info, 0);
 }
 
 /* For a nice example of just how contradictory documentation can be, see the
@@ -5986,10 +5980,6 @@ static void action_examine_object64(Unit *unit, dpacket packet)
 		aino = &unit->rootnode;
 
 	get_fileinfo (unit, packet, info, aino, true);
-	if (aino->dir) {
-		put_long (info, 0xFFFFFFFF);
-	} else
-		put_long (info, 0);
 }
 
 static void action_set_file_size64(Unit *unit, dpacket packet)
@@ -7045,6 +7035,7 @@ static void dump_partinfo (struct hardfiledata *hfd, uae_u8 *pp)
 		spt, reserved, lowcyl, highcyl, (uae_u32)(size >> 20));
 	write_log (_T("Buffers: %d, BufMemType: %08x, MaxTransfer: %08x, Mask: %08x, BootPri: %d\n"),
 		rl (pp + 44), rl (pp + 48), rl (pp + 52), rl (pp + 56), rl (pp + 60));
+	write_log (_T("Total blocks: %d, Total disk blocks: %lld\n"), surfaces * spt * (highcyl - lowcyl + 1), hfd->virtsize / blocksize);
 
 	if (hfd->drive_empty) {
 		write_log (_T("Empty drive\n"));
@@ -7989,7 +7980,7 @@ static uae_u8 *restore_filesys_hardfile (UnitInfo *ui, uae_u8 *src)
 	_tcscpy (hfd->product_rev, s);
 	xfree (s);
 	s = restore_string ();
-	_tcscpy (hfd->device_name, s);
+	_tcscpy (hfd->ci.devname, s);
 	xfree (s);
 	return src;
 }
@@ -8013,7 +8004,7 @@ static uae_u8 *save_filesys_hardfile (UnitInfo *ui, uae_u8 *dst)
 	save_string (hfd->vendor_id);
 	save_string (hfd->product_id);
 	save_string (hfd->product_rev);
-	save_string (hfd->device_name);
+	save_string (hfd->ci.devname);
 	return dst;
 }
 

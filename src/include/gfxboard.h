@@ -1,10 +1,13 @@
+#ifndef UAE_GFXBOARD_H
+#define UAE_GFXBOARD_H
 
-extern addrbank gfxboard_bank_memory;
-extern addrbank gfxboard_bank_registers;
+#ifdef FSUAE // NL
+#include "uae/memory.h"
+#endif
 
-extern void gfxboard_init_memory (void);
-extern void gfxboard_init_memory_p4_z2 (void);
-extern void gfxboard_init_registers (void);
+extern addrbank *gfxboard_init_memory (void);
+extern addrbank *gfxboard_init_memory_p4_z2(void);
+extern addrbank *gfxboard_init_registers(void);
 extern void gfxboard_free (void);
 extern void gfxboard_reset (void);
 extern void gfxboard_vsync_handler (void);
@@ -21,3 +24,5 @@ extern int gfxboard_num_boards (int type);
 #define GFXBOARD_UAE_Z2 0
 #define GFXBOARD_UAE_Z3 1
 #define GFXBOARD_HARDWARE 2
+
+#endif // UAE_GFXBOARD_H

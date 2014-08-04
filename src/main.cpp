@@ -17,7 +17,7 @@
 #include "audio.h"
 #include "sounddep/sound.h"
 #include "events.h"
-#include "uae/memory.h"
+#include "memory_uae.h"
 #include "custom.h"
 #include "serial.h"
 #include "newcpu.h"
@@ -38,6 +38,7 @@
 #include "scsidev.h"
 #include "uaeserial.h"
 #include "akiko.h"
+#include "cd32_fmv.h"
 #include "cdtv.h"
 #include "savestate.h"
 #include "filesys.h"
@@ -45,6 +46,7 @@
 #include "a2091.h"
 #include "a2065.h"
 #include "ncr_scsi.h"
+#include "ncr9x_scsi.h"
 #include "scsi.h"
 #include "sana2.h"
 #include "blkdev.h"
@@ -60,6 +62,7 @@
 #include "luascript.h"
 #include "uaenative.h"
 #include "tabletlibrary.h"
+#include "cpuboard.h"
 #ifdef RETROPLATFORM
 #include "rp.h"
 #endif
@@ -218,9 +221,15 @@ void fixup_prefs_dimensions (struct uae_prefs *prefs)
 		if (prefs->gf[i].gfx_filter == 0 && ((prefs->gf[i].gfx_filter_autoscale && !prefs->gfx_api) || (prefs->gfx_apmode[APMODE_NATIVE].gfx_vsyncmode))) {
 			prefs->gf[i].gfx_filter = 1;
 		}
-		if (i == 0 && prefs->gf[i].gfx_filter == 0 && prefs->monitoremu) {
-			error_log (_T("A2024 and Graffiti require at least null filter enabled."));
-			prefs->gf[i].gfx_filter = 1;
+		if (i == 0) {
+			if (prefs->gf[i].gfx_filter == 0 && prefs->monitoremu) {
+				error_log(_T("A2024 and Graffiti require at least null filter enabled."));
+				prefs->gf[i].gfx_filter = 1;
+			}
+			if (prefs->gf[i].gfx_filter == 0 && prefs->cs_cd32fmv) {
+				error_log(_T("CD32 MPEG module overlay support require at least null filter enabled."));
+				prefs->gf[i].gfx_filter = 1;
+			}
 		}
 	}
 }
@@ -269,11 +278,6 @@ void fixup_cpu (struct uae_prefs *p)
 	if (p->cpu_model >= 68040 && p->cachesize && p->cpu_compatible)
 		p->cpu_compatible = false;
 
-	if (p->cpu_model >= 68040 && p->cpu_cycle_exact) {
-		p->cpu_cycle_exact = 0;
-		error_log (_T("68040/060 cycle-exact is not supported."));
-	}
-
 	if ((p->cpu_model < 68030 || p->cachesize) && p->mmu_model) {
 		error_log (_T("MMU emulation requires 68030/040/060 and it is not JIT compatible."));
 		p->mmu_model = 0;
@@ -288,19 +292,38 @@ void fixup_cpu (struct uae_prefs *p)
 		p->fpu_no_unimplemented = p->int_no_unimplemented = false;
 	}
 
-	if (p->cpu_cycle_exact && p->m68k_speed < 0)
+#if 0
+	if (p->cpu_cycle_exact && p->m68k_speed < 0 && currprefs.cpu_model <= 68020)
 		p->m68k_speed = 0;
+#endif
 
+#if 0
 	if (p->immediate_blits && p->blitter_cycle_exact) {
 		error_log (_T("Cycle-exact and immediate blitter can't be enabled simultaneously.\n"));
 		p->immediate_blits = false;
 	}
+#endif
 	if (p->immediate_blits && p->waiting_blits) {
 		error_log (_T("Immediate blitter and waiting blits can't be enabled simultaneously.\n"));
 		p->waiting_blits = 0;
 	}
 	if (p->cpu_cycle_exact)
 		p->cpu_compatible = true;
+
+	if (p->cpuboard_type && !p->comptrustbyte) {
+		error_log(_T("JIT direct is not compatible with emulated accelerator boards."));
+		p->comptrustbyte = 1;
+		p->comptrustlong = 1;
+		p->comptrustlong = 1;
+		p->comptrustnaddr = 1;
+	}
+	if (!p->jit_direct_compatible_memory && !p->comptrustbyte) {
+		error_log(_T("JIT direct compatible memory option is disabled, disabling JIT direct."));
+		p->comptrustbyte = 1;
+		p->comptrustlong = 1;
+		p->comptrustlong = 1;
+		p->comptrustnaddr = 1;
+	}
 }
 
 void fixup_prefs (struct uae_prefs *p)
@@ -310,6 +333,9 @@ void fixup_prefs (struct uae_prefs *p)
 	built_in_chipset_prefs (p);
 	fixup_cpu (p);
 
+	if (cpuboard_08000000(p))
+		p->mbresmem_high_size = p->cpuboardmem1_size;
+
 	if (((p->chipmem_size & (p->chipmem_size - 1)) != 0 && p->chipmem_size != 0x180000)
 		|| p->chipmem_size < 0x20000
 		|| p->chipmem_size > 0x800000)
@@ -318,13 +344,27 @@ void fixup_prefs (struct uae_prefs *p)
 		p->chipmem_size = 0x200000;
 		err = 1;
 	}
+
 	if ((p->fastmem_size & (p->fastmem_size - 1)) != 0
-		|| (p->fastmem_size != 0 && (p->fastmem_size < 0x100000 || p->fastmem_size > 0x800000)))
-{
+		|| (p->fastmem_size != 0 && (p->fastmem_size < 0x10000 || p->fastmem_size > 0x800000)))
+	{
 		error_log (_T("Unsupported fastmem size %d (0x%x)."), p->fastmem_size, p->fastmem_size);
 		p->fastmem_size = 0;
 		err = 1;
 	}
+	if ((p->fastmem2_size & (p->fastmem2_size - 1)) != 0 || (p->fastmem_size + p->fastmem2_size) > 0x800000 + 262144
+		|| (p->fastmem2_size != 0 && (p->fastmem2_size < 0x10000 || p->fastmem_size > 0x800000)))
+	{
+		error_log (_T("Unsupported fastmem2 size %d (0x%x)."), p->fastmem2_size, p->fastmem2_size);
+		p->fastmem2_size = 0;
+		err = 1;
+	}
+	if (p->fastmem2_size > p->fastmem_size) {
+		error_log (_T("fastmem2 size can't be larger than fastmem1."));
+		p->fastmem2_size = 0;
+		err = 1;
+	}
+
 	if (p->rtgmem_size > max_z3fastmem && p->rtgmem_type == GFXBOARD_UAE_Z3) {
 		error_log (_T("Graphics card memory size %d (0x%x) larger than maximum reserved %d (0x%x)."), p->rtgmem_size, p->rtgmem_size, max_z3fastmem, max_z3fastmem);
 		p->rtgmem_size = max_z3fastmem;
@@ -372,9 +412,9 @@ void fixup_prefs (struct uae_prefs *p)
 		p->z3chipmem_size = max_z3fastmem;
 		err = 1;
 	}
-	if ((p->z3chipmem_size & (p->z3chipmem_size - 1)) != 0 || (p->z3chipmem_size != 0 && p->z3chipmem_size < 0x100000))
+	if (((p->z3chipmem_size & (p->z3chipmem_size - 1)) != 0 &&  p->z3chipmem_size != 0x18000000 && p->z3chipmem_size != 0x30000000) || (p->z3chipmem_size != 0 && p->z3chipmem_size < 0x100000))
 	{
-		error_log (_T("Unsupported Zorro III fake chipmem size %d (0x%x)."), p->z3chipmem_size, p->z3chipmem_size);
+		error_log (_T("Unsupported 32-bit chipmem size %d (0x%x)."), p->z3chipmem_size, p->z3chipmem_size);
 		p->z3chipmem_size = 0;
 		err = 1;
 	}
@@ -394,7 +434,7 @@ void fixup_prefs (struct uae_prefs *p)
 		p->bogomem_size = 0x180000;
 		error_log (_T("Possible Gayle bogomem conflict fixed."));
 	}
-	if (p->chipmem_size > 0x200000 && p->fastmem_size != 0) {
+	if (p->chipmem_size > 0x200000 && p->fastmem_size > 262144) {
 		error_log (_T("You can't use fastmem and more than 2MB chip at the same time."));
 		p->fastmem_size = 0;
 		err = 1;
@@ -533,6 +573,9 @@ void fixup_prefs (struct uae_prefs *p)
 		error_log (_T("Genlock and A2024 or Graffiti can't be active simultaneously."));
 		p->genlock = false;
 	}
+	if (p->cs_hacks) {
+		error_log (_T("chipset_hacks is nonzero (0x%04x)."), p->cs_hacks);
+	}
 
 	fixup_prefs_dimensions (p);
 
@@ -587,10 +630,12 @@ void fixup_prefs (struct uae_prefs *p)
 			error_log (_T("Cycle-exact and JIT can't be active simultaneously."));
 			p->cachesize = 0;
 		}
+#if 0
 		if (p->m68k_speed) {
 			error_log (_T("Adjustable CPU speed is not available in cycle-exact mode."));
 			p->m68k_speed = 0;
 		}
+#endif
 	}
 #endif
 	if (p->maprom && !p->address_space_24)
@@ -963,10 +1008,15 @@ void do_leave_program (void)
 	a3000scsi_free ();
 #endif
 #ifdef NCR
-	ncr_free ();
+	ncr710_free();
+	ncr_free();
+#endif
+#ifdef NCR9X
+	ncr9x_free();
 #endif
 #ifdef CD32
 	akiko_free ();
+	cd32_fmv_free();
 #endif
 	if (! no_gui)
 		gui_exit ();
@@ -1042,6 +1092,13 @@ void virtualdevice_init (void)
 #endif
 #ifdef WITH_TABLETLIBRARY
 	tabletlib_install ();
+#endif
+#ifdef NCR
+	ncr710_init();
+	ncr_init();
+#endif
+#ifdef NCR9X
+	ncr9x_init();
 #endif
 }
 

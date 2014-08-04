@@ -14,7 +14,7 @@
 
 #include "threaddep/thread.h"
 #include "options.h"
-#include "uae/memory.h"
+#include "memory_uae.h"
 #include "custom.h"
 #include "events.h"
 #include "newcpu.h"
@@ -25,8 +25,23 @@
 #include "blkdev.h"
 #include "uae.h"
 #include "sana2.h"
+#if defined(_WIN32) && defined(WITH_UAENET_PCAP)
 #include "win32_uaenet.h"
+#else
+#include "ethernet.h"
+#endif
 #include "execio.h"
+
+// these variables are referenced by custom.cpp and newcpu.cpp also when
+// WITH_UAENET is not defined
+
+volatile int uaenet_int_requested = 0;
+volatile int uaenet_vsync_requested = 0;
+
+#ifdef WITH_UAENET
+
+void uaenet_gotdata (struct s2devstruct *dev, const uae_u8 *data, int len);
+int uaenet_getdata (struct s2devstruct *dev, uae_u8 *d, int *len);
 
 #define SANA2NAME _T("uaenet.device")
 
@@ -139,8 +154,6 @@ struct s2packet {
 	int len;
 };
 
-volatile int uaenet_int_requested;
-volatile int uaenet_vsync_requested;
 static int uaenet_int_late;
 
 static uaecptr timerdevname;
@@ -149,7 +162,7 @@ static uaecptr ROM_netdev_resname = 0,
 	ROM_netdev_resid = 0,
 	ROM_netdev_init = 0;
 
-static TCHAR *getdevname (void)
+static const TCHAR *getdevname (void)
 {
 	return _T("uaenet.device");
 }
@@ -881,7 +894,7 @@ static struct s2packet *createwritepacket (TrapContext *ctx, uaecptr request)
 	return s2p;
 }
 
-static int uaenet_getdata (struct s2devstruct *dev, uae_u8 *d, int *len)
+int uaenet_getdata (struct s2devstruct *dev, uae_u8 *d, int *len)
 {
 	int gotit;
 	struct asyncreq *ar;
@@ -1731,3 +1744,5 @@ void netdev_reset (void)
 		return;
 	dev_reset ();
 }
+
+#endif // WITH_UAENET

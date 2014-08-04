@@ -1,5 +1,5 @@
-#ifndef _UAE_OD_FS_UAE_FS_H_
-#define _UAE_OD_FS_UAE_FS_H_
+#ifndef UAE_OD_FS_UAE_FS_H
+#define UAE_OD_FS_UAE_FS_H
 
 #include "uae/uae.h"
 #include "../od-fs/callbacks.h"
@@ -20,7 +20,6 @@ extern int g_amiga_paused;
 
 int amiga_handle_input_event (int nr, int state, int max,
         int autofire, bool canstopplayback, bool playbackevent);
-const char *get_libamiga_base_version();
 
 void amiga_configure_port_from_input_event(int input_event);
 
@@ -33,4 +32,4 @@ extern int g_uae_min_first_line_ntsc;
 
 void od_fs_update_leds(void);
 
-#endif // _UAE_OD_FS_UAE_FS_H_
+#endif // UAE_OD_FS_UAE_FS_H

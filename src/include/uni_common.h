@@ -6,8 +6,8 @@
 * Copyright 2013-2014 Frode Solheim
 */
 
-#ifndef _UAE_UNI_COMMON_H_
-#define _UAE_UNI_COMMON_H_
+#ifndef UAE_UNI_COMMON_H
+#define UAE_UNI_COMMON_H
 
 #define UNI_VERSION 1
 
@@ -15,6 +15,18 @@
 // MIN_UNI_VERSION decides which callback functions are declared available.
 // The default, unless overridden is to require the current UNI version.
 #define UNI_MIN_VERSION UNI_VERSION
+#endif
+
+#ifdef _WIN32
+#ifdef UNI_IMPORT
+#define UNIAPI __declspec(dllimport)
+#else
+#define UNIAPI __declspec(dllexport)
+#endif
+#define UNICALL __cdecl
+#else
+#define UNIAPI
+#define UNICALL
 #endif
 
 #define UNI_ERROR_NOT_ENABLED            0x70000001
@@ -82,4 +94,4 @@ struct uni {
 #endif
 };
 
-#endif // _UAE_UNI_COMMON_H_
+#endif // UAE_UNI_COMMON_H

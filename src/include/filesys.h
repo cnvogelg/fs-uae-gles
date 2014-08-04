@@ -6,8 +6,14 @@
   * Copyright 1997 Bernd Schmidt
   */
 
-#ifndef FILESYS_H
-#define FILESYS_H
+#ifndef UAE_FILESYS_H
+#define UAE_FILESYS_H
+
+#ifdef FSUAE // NL
+#include "uae/types.h"
+#include "options.h"
+#include <time.h>
+#endif
 
 struct hardfilehandle;
 
@@ -39,7 +45,6 @@ struct hardfiledata {
     TCHAR vendor_id[8 + 1];
     TCHAR product_id[16 + 1];
     TCHAR product_rev[4 + 1];
-    TCHAR device_name[256];
     /* geometry from possible RDSK block */
     int rdbcylinders;
     int rdbsectors;
@@ -88,20 +93,25 @@ struct hd_hardfiledata {
     int ansi_version;
 };
 
-#define HD_CONTROLLER_UAE 0
-#define HD_CONTROLLER_IDE0 1
-#define HD_CONTROLLER_IDE1 2
-#define HD_CONTROLLER_IDE2 3
-#define HD_CONTROLLER_IDE3 4
-#define HD_CONTROLLER_SCSI0 5
-#define HD_CONTROLLER_SCSI1 6
-#define HD_CONTROLLER_SCSI2 7
-#define HD_CONTROLLER_SCSI3 8
-#define HD_CONTROLLER_SCSI4 9
-#define HD_CONTROLLER_SCSI5 10
-#define HD_CONTROLLER_SCSI6 11
-#define HD_CONTROLLER_PCMCIA_SRAM 12
-#define HD_CONTROLLER_PCMCIA_IDE 13
+#define HD_CONTROLLER_TYPE_UAE 0
+#define HD_CONTROLLER_TYPE_IDE_AUTO 1
+#define HD_CONTROLLER_TYPE_IDE_MB 1
+#define HD_CONTROLLER_TYPE_SCSI_AUTO 2
+#define HD_CONTROLLER_TYPE_SCSI_A2091 3
+#define HD_CONTROLLER_TYPE_SCSI_A2091_2 4
+#define HD_CONTROLLER_TYPE_SCSI_A4091 5
+#define HD_CONTROLLER_TYPE_SCSI_A4091_2 6
+#define HD_CONTROLLER_TYPE_SCSI_A3000 7
+#define HD_CONTROLLER_TYPE_SCSI_A4000T 8
+#define HD_CONTROLLER_TYPE_SCSI_CDTV 9
+#define HD_CONTROLLER_TYPE_SCSI_CPUBOARD 10
+#define HD_CONTROLLER_TYPE_PCMCIA_SRAM 11
+#define HD_CONTROLLER_TYPE_PCMCIA_IDE 12
+
+#define HD_CONTROLLER_TYPE_IDE_FIRST 1
+#define HD_CONTROLLER_TYPE_IDE_LAST 1
+#define HD_CONTROLLER_TYPE_SCSI_FIRST 2
+#define HD_CONTROLLER_TYPE_SCSI_LAST 10
 
 #define FILESYS_VIRTUAL 0
 #define FILESYS_HARDFILE 1
@@ -149,4 +159,4 @@ extern void getchsgeometry (uae_u64 size, int *pcyl, int *phead, int *psectorspe
 extern void getchsgeometry_hdf (struct hardfiledata *hfd, uae_u64 size, int *pcyl, int *phead, int *psectorspertrack);
 extern void getchspgeometry (uae_u64 total, int *pcyl, int *phead, int *psectorspertrack, bool idegeometry);
 
-#endif /* MEMORY_H */
+#endif // UAE_FILESYS_H

@@ -12,7 +12,7 @@
 
 #include "threaddep/thread.h"
 #include "options.h"
-#include "uae/memory.h"
+#include "memory_uae.h"
 #include "custom.h"
 #include "newcpu.h"
 #include "disk.h"
@@ -168,8 +168,9 @@ static void getchsgeometry2 (uae_u64 size, int *pcyl, int *phead, int *psectorsp
 		sptt[3] = -1;
 
 		for (i = 0; sptt[i] >= 0; i++) {
+			int maxhead = sptt[i] < 255 ? 16 : 255;
 			spt = sptt[i];
-			for (head = 4; head <= 16;head++) {
+			for (head = 4; head <= maxhead; head++) {
 				cyl = total / (head * spt);
 				if (size <= 512 * 1024 * 1024) {
 					if (cyl <= 1023)
@@ -182,12 +183,18 @@ static void getchsgeometry2 (uae_u64 size, int *pcyl, int *phead, int *psectorsp
 					if (cyl <= 65535)
 						break;
 				}
+				if (maxhead > 16) {
+					head *= 2;
+					head--;
+				}
 			}
 			if (head <= 16)
 				break;
 		}
 
 	}
+	if (head > 16)
+		head--;
 
 	*pcyl = cyl;
 	*phead = head;
@@ -334,9 +341,9 @@ static void create_virtual_rdb (struct hardfiledata *hfd)
 	pl(rdb, 37, 0); // autopark
 	pl(rdb, 38, 2); // highrdskblock
 	pl(rdb, 39, -1); // res
-	ua_copy ((char*)rdb + 40 * 4, -1, hfd->vendor_id);
-	ua_copy ((char*)rdb + 42 * 4, -1, hfd->product_id);
-	ua_copy ((char*)rdb + 46 * 4, -1, _T("UAE"));
+	ua_copy ((char*)rdb + 40 * 4, 8, hfd->vendor_id);
+	ua_copy ((char*)rdb + 42 * 4, 16, hfd->product_id);
+	ua_copy ((char*)rdb + 46 * 4, 4, _T("UAE"));
 	rdb_crc (rdb);
 
 	pl(part, 0, 0x50415254);
@@ -348,8 +355,8 @@ static void create_virtual_rdb (struct hardfiledata *hfd)
 	pl(part, 6, -1);
 	pl(part, 7, -1);
 	pl(part, 8, 0); // devflags
-	part[9 * 4] = _tcslen (hfd->device_name);
-	ua_copy ((char*)part + 9 * 4 + 1, -1, hfd->device_name);
+	part[9 * 4] = _tcslen (hfd->ci.devname);
+	ua_copy ((char*)part + 9 * 4 + 1, 30, hfd->ci.devname);
 
 	denv = part + 128;
 	pl(denv, 0, 80);
@@ -1587,10 +1594,10 @@ void hardfile_do_disk_change (struct uaedev_config_data *uci, bool insert)
 	int fsid = uci->configoffset;
 	struct hardfiledata *hfd;
 
-	if (uci->ci.controller == HD_CONTROLLER_PCMCIA_SRAM) {
+	if (uci->ci.controller_type == HD_CONTROLLER_TYPE_PCMCIA_SRAM) {
 		gayle_modify_pcmcia_sram_unit (uci->ci.rootdir, uci->ci.readonly, insert);
 		return;
-	} else if (uci->ci.controller == HD_CONTROLLER_PCMCIA_IDE) {
+	} else if (uci->ci.controller_type == HD_CONTROLLER_TYPE_PCMCIA_IDE) {
 		gayle_modify_pcmcia_ide_unit (uci->ci.rootdir, uci->ci.readonly, insert);
 		return;
 	}
@@ -1699,7 +1706,6 @@ static uae_u32 REGPARAM2 hardfile_open (TrapContext *context)
 {
 	uaecptr ioreq = m68k_areg (regs, 1); /* IOReq */
 	int unit = mangleunit (m68k_dreg (regs, 0));
-	struct hardfileprivdata *hfpd = &hardfpd[unit];
 	int err = IOERR_OPENFAIL;
 
 	/* boot device port size == 0!? KS 1.x size = 12???
@@ -1707,7 +1713,8 @@ static uae_u32 REGPARAM2 hardfile_open (TrapContext *context)
 	 * int size = get_word (ioreq + 0x12);
 	 */
 	/* Check unit number */
-	if (unit >= 0) {
+	if (unit >= 0 && unit < MAX_FILESYSTEM_UNITS) {
+		struct hardfileprivdata *hfpd = &hardfpd[unit];
 		struct hardfiledata *hfd = get_hardfile_data (unit);
 		if (hfd && (hfd->handle_valid || hfd->drive_empty) && start_thread (context, unit)) {
 			put_word (hfpd->base + 32, get_word (hfpd->base + 32) + 1);
@@ -1730,6 +1737,9 @@ static uae_u32 REGPARAM2 hardfile_close (TrapContext *context)
 {
 	uaecptr request = m68k_areg (regs, 1); /* IOReq */
 	int unit = mangleunit (get_long (request + 24));
+	if (unit < 0 || unit >= MAX_FILESYSTEM_UNITS) {
+		return 0;
+	}
 	struct hardfileprivdata *hfpd = &hardfpd[unit];
 
 	if (!hfpd)

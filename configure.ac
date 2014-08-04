@@ -7,11 +7,14 @@ AC_INIT([FS-UAE], [2.5.6dev],
 AC_CONFIG_AUX_DIR([.])
 AC_CANONICAL_SYSTEM
 AC_CONFIG_SRCDIR([src/main.cpp])
-AM_INIT_AUTOMAKE
 AC_CONFIG_HEADERS([config.h])
+# AC_CONFIG_MACRO_DIRS([m4])
+AM_INIT_AUTOMAKE([tar-ustar subdir-objects])
 
 AC_SUBST([PACKAGE_SERIES], [devel])
-AC_SUBST([UAE_BASE_VERSION], [WinUAE 2.8.0])
+
+AC_DEFINE_UNQUOTED([UAE_BASE_VERSION], ["WinUAE 2.8.2 beta 8"],
+[Which UAE core this version is based on.])
 
 PACKAGE_MAJOR=`echo ${PACKAGE_VERSION} | sed -e 's,\(\.*\)\..*\..*,\1,g'`
 PACKAGE_MINOR=`echo ${PACKAGE_VERSION} | sed -e 's,.*\.\(.*\)\..*,\1,g'`
@@ -31,7 +34,9 @@ AC_PROG_LN_S
 AC_PROG_MAKE_SET
 AC_PROG_RANLIB
 AM_PROG_CC_C_O
-AC_CHECK_TOOL(OBJCOPY, objcopy)
+# AC_PATH_TOOL(OBJCOPY, objcopy)
+AC_PATH_PROG([MSGFMT], [msgfmt])
+AC_PATH_PROG([ZIP], [zip])
 
 # Misc system checks.
 
@@ -58,6 +63,8 @@ AC_CHECK_LIB([gdi32], [main])
 
 AC_DEFINE([USE_GLIB], [1], [Define to 1 to use GLib])
 PKG_CHECK_MODULES([GLIB], [glib-2.0 >= 2.32 gthread-2.0])
+
+PKG_CHECK_MODULES([LIBMPEG2], [libmpeg2 libmpeg2convert])
 
 # The built-in Lua has been sandboxed
 # AC_DEFINE([USE_LUA], [1], [Define to 1 to use LUA])
@@ -91,7 +98,8 @@ PKG_CHECK_MODULES([OPENAL], [openal], [
 	AS_CASE([$target_os],
 	[darwin*], [
 		AC_MSG_NOTICE([Using OpenAL.framework])
-		OPENAL_CFLAGS="-I/System/Library/Frameworks/OpenAL.framework/Headers"
+		#OPENAL_CFLAGS="-I/System/Library/Frameworks/OpenAL.framework/Headers"
+		OPENAL_CFLAGS="-I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.9.sdk/System/Library/Frameworks/OpenAL.framework/Headers"
 		OPENAL_LIBS="-framework OpenAL"
 
 	],
@@ -173,7 +181,7 @@ AS_CASE([$target_os],
 	OS_NAME="macosx"
 	OS_CPPFLAGS="-DMACOSX"
 	LOADABLE_MODULE_EXT=".so"
-	OS_LDFLAGS="-headerpad_max_install_names"
+	OS_LDFLAGS="-headerpad_max_install_names -pagezero_size 0x2000"
 ],
 [freebsd*], [
 	OS_NAME="freebsd"
@@ -251,6 +259,14 @@ AC_C_INLINE
 AC_C_RESTRICT
 AC_C_VOLATILE
 
+AX_GCC_FUNC_ATTRIBUTE(always_inline)
+AX_GCC_FUNC_ATTRIBUTE(fastcall)
+AX_GCC_FUNC_ATTRIBUTE(noinline)
+AX_GCC_FUNC_ATTRIBUTE(noreturn)
+AX_GCC_FUNC_ATTRIBUTE(regparm)
+AX_GCC_FUNC_ATTRIBUTE(unused)
+AX_GCC_VAR_ATTRIBUTE(unused)
+
 # FIXME: not found on the mingw box
 # AC_CHECK_HEADER_STDBOOL
 
@@ -258,6 +274,8 @@ AC_CHECK_MEMBERS([struct stat.st_rdev])
 AC_CHECK_MEMBERS([struct stat.st_mtim.tv_nsec])
 AC_CHECK_MEMBERS([struct stat.st_mtimespec.tv_nsec])
 AC_CHECK_MEMBERS([struct stat.st_mtime_nsec])
+AC_CHECK_MEMBERS([struct in_addr.S_un])
+
 AC_CHECK_TYPES([ptrdiff_t])
 AC_STRUCT_ST_BLOCKS
 AC_TYPE_INT16_T
@@ -273,7 +291,14 @@ AC_TYPE_UINT16_T
 AC_TYPE_UINT32_T
 AC_TYPE_UINT64_T
 AC_TYPE_UINT8_T
+AC_TYPE_LONG_LONG_INT
 
+AC_CHECK_SIZEOF(short)
+AC_CHECK_SIZEOF(long)
+AC_CHECK_SIZEOF(int)
+AC_CHECK_SIZEOF(void *)
+AC_CHECK_SIZEOF(long long)
+AC_CHECK_SIZEOF(long long int)
 
 # Checks for library functions.
 
@@ -307,6 +332,7 @@ AC_CHECK_FUNCS([gethostbyname])
 AC_CHECK_FUNCS([gethostname])
 AC_CHECK_FUNCS([getpagesize])
 AC_CHECK_FUNCS([gmtime_r])
+AC_CHECK_FUNCS([index])
 AC_CHECK_FUNCS([inet_ntoa])
 AC_CHECK_FUNCS([localeconv])
 AC_CHECK_FUNCS([localtime_r])
@@ -330,6 +356,7 @@ AC_CHECK_FUNCS([strchr])
 AC_CHECK_FUNCS([strcspn])
 AC_CHECK_FUNCS([strdup])
 AC_CHECK_FUNCS([strerror])
+AC_CHECK_FUNCS([strlcpy])
 AC_CHECK_FUNCS([strncasecmp])
 AC_CHECK_FUNCS([strpbrk])
 AC_CHECK_FUNCS([strrchr])
@@ -365,8 +392,7 @@ AS_CASE([$target_os],
 
 # JIT support
 
-AC_ARG_ENABLE([jit], [
-    AS_HELP_STRING([--enable-jit],
+AC_ARG_ENABLE([jit], [AS_HELP_STRING([--enable-jit],
         [enable support for JIT compilation @<:@default=check@:>@])
     ], [], [enable_jit=check])
 
@@ -390,53 +416,24 @@ AS_IF([test "x$enable_jit" != xno], [
 ], [])
 
 
-# Netplay feature.
+# Udis86
 
-AC_ARG_ENABLE([netplay], [
-    AS_HELP_STRING([--disable-netplay],
-        [disable netplay support])
-    ], [], [enable_netplay=yes])
-
-AS_IF([test "x$enable_netplay" != xno], [
-    AC_DEFINE([WITH_NETPLAY], [1], [Define to 1 to enable net play])
-], [])
-
-
-# LUA scripting feature.
-
-AC_ARG_ENABLE([lua], [
-    AS_HELP_STRING([--enable-lua],
-        [enable Lua scripting support]
-    )], [], [enable_lua=no])
-
-AS_IF([test "x$enable_lua" != xno], [
-    AC_DEFINE([WITH_LUA], [1], [Define to 1 to enable LUA scripting])
-], [])
-
-
-# Optional uaenative.library support.
-
-AC_ARG_ENABLE([uaenative], [
-    AS_HELP_STRING([--disable-uaenative],
-        [disable UAE native library interface]
-    )], [], [enable_uaenative=yes])
-
-AS_IF([test "x$enable_uaenative" != xno], [
-    AC_DEFINE([WITH_UAENATIVE], [1], [Define to 1 to enable uaenative.library])
-], [])
-
-
-# XML shader feature.
-
-AC_ARG_ENABLE([xml-shader], [
-    AS_HELP_STRING([--disable-xml-shader],
-        [disable XML shader support]
-    )], [], [enable_xml_shader=yes])
-
-AS_IF([test "x$enable_xml_shader" != xno], [
-    AC_DEFINE([WITH_XML_SHADER], [1], [Define to 1 to enable XML shaders])
-], [])
-
+#AC_ARG_ENABLE(
+#    [udis86],
+#    [AS_HELP_STRING(
+#            [--enable-udis86],
+#            [enable support for JIT compilation @<:@default=no@:>@]
+#    )],
+#    [],
+#    [enable_udis86=no]
+#)
+#AS_IF(
+#    [test "x$enable_udis86" != xno],
+#    [
+#        AC_CHECK_LIB([udis86], [ud_init])
+#    ],
+#    []
+#)
 
 # Byte swapping
 
@@ -466,6 +463,69 @@ AC_TRY_LINK([
 ], [
 	AC_MSG_RESULT(no)
 ])
+
+
+# More feature macros. Many of these are generally always enabled, and
+# compiling without them may not work (without further changes to
+# source code).
+
+AC_DEFUN([OPT_FEATURE], [
+
+# AS_IF([test "x$5" = "xyes"], [
+#	AC_ARG_ENABLE([$3],
+#	[AS_HELP_STRING([--disable-$3], [$4])],
+#	[enable_$2=no],
+#	[enable_$2=yes])
+# ], [
+#	AC_ARG_ENABLE([$3],
+#	[AS_HELP_STRING([--enable-$3], [$4])],
+#	[enable_$2=yes],
+#	[enable_$2=no])
+# ])
+AC_ARG_ENABLE([$3],
+	[AS_HELP_STRING([--enable-$3], [$4 @<:@default=$5@:>@])],
+	[], [enable_$2=$5])
+AS_IF([test x$enable_$2 = xyes], [
+	AC_DEFINE([$1], [1], [Define to 1 to $4])
+])
+AM_CONDITIONAL([$1], [test x$enable_$2 = xyes])
+])
+
+OPT_FEATURE([A2065], [a2065], [a2065],
+	[enable A2065 ethernet card], [no])
+OPT_FEATURE([A2091], [a2091], [a2091],
+	[enable A590/A2091 SCSI], [yes])
+OPT_FEATURE([ACTION_REPLAY], [action_replay], [action-replay],
+	[enable Action Replay 1/2/3 support], [yes])
+OPT_FEATURE([CAPS], [caps], [caps],
+	[enable IPF support via libcapsimage], [yes])
+OPT_FEATURE([CD32], [cd32], [cd32],
+	[enable CD32 emulation], [yes])
+OPT_FEATURE([CDTV], [cdtv], [cdtv],
+	[enable CDTV emulation], [yes])
+OPT_FEATURE([DRIVESOUND], [drivesound], [drivesound],
+	[enable drive sound emulation], [yes])
+OPT_FEATURE([FPUEMU], [fpuemu], [fpuemu],
+	[enable FPU emulation], [yes])
+OPT_FEATURE([WITH_LUA], [lua], [lua],
+	[enable LUA scripting], [no])
+OPT_FEATURE([WITH_NETPLAY], [netplay], [netplay],
+	[enable netplay support], [yes])
+OPT_FEATURE([NCR9X], [ncr9x], [ncr9x],
+	[enable 53C9X SCSI], [yes])
+OPT_FEATURE([WITH_SLIRP], [slirp], [slirp],
+	[enable SLIRP (user mode NAT)], [no])
+OPT_FEATURE([WITH_UAENATIVE], [uaenative], [uaenative],
+	[enable uaenative.library], [yes])
+OPT_FEATURE([WITH_UAENET], [uaenet], [uaenet],
+	[enable uaenet.device], [no])
+OPT_FEATURE([WITH_XML_SHADER], [xml_shader], [xml-shader],
+	[enable XML shader support], [yes])
+OPT_FEATURE([A_ZIP], [zip], [zip],
+	[enable ZIP archive support], [yes])
+
+
+AC_DEFINE([FPU_UAE], [1], [Define to 1])
 
 
 # Write Makefile

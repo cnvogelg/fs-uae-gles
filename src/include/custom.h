@@ -6,10 +6,16 @@
 * (c) 1995 Bernd Schmidt
 */
 
-#ifndef CUSTOM_H
-#define CUSTOM_H
+#ifndef UAE_CUSTOM_H
+#define UAE_CUSTOM_H
 
+#ifdef FSUAE
+#include "uae/types.h"
+#include "uae/inline.h"
+#include "options.h"
+#else
 #include "machdep/rpt.h"
+#endif
 
 /* These are the masks that are ORed together in the chipset_mask option.
 * If CSMASK_AGA is set, the ECS bits are guaranteed to be set as well.  */
@@ -86,6 +92,7 @@ STATIC_INLINE int dmaen (unsigned int dmamask)
 #ifdef JIT
 #define SPCFLAG_END_COMPILE 16384
 #endif
+#define SPCFLAG_CHECK 32768
 
 extern uae_u16 adkcon;
 
@@ -133,6 +140,7 @@ extern int maxvpos, maxvpos_nom, maxvpos_display;
 extern int hsyncstartpos, hsyncendpos;
 extern int minfirstline, vblank_endline, numscrlines;
 extern double vblank_hz, fake_vblank_hz;
+extern double hblank_hz;
 extern int vblank_skip, doublescan;
 extern bool programmedmode;
 
@@ -240,4 +248,4 @@ extern int current_maxvpos (void);
 extern struct chipset_refresh *get_chipset_refresh (void);
 extern void compute_framesync (void);
 
-#endif /* CUSTOM_H */
+#endif // UAE_CUSTOM_H

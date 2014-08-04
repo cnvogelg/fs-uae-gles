@@ -6,8 +6,17 @@
   * (c) 1996 Ed Hanway
   */
 
+#ifndef UAE_AUTOCONF_H
+#define UAE_AUTOCONF_H
+
+#ifdef FSUAE // NL
+#include "uae/types.h"
+#include "uae/limits.h"
+#endif
+
 #define RTAREA_DEFAULT 0xf00000
 #define RTAREA_BACKUP  0xef0000
+#define RTAREA_BACKUP_2 0xdb0000
 #define RTAREA_SIZE 0x10000
 #define RTAREA_TRAPS 0x2000
 #define RTAREA_RTG 0x3000
@@ -30,6 +39,7 @@ extern uaecptr makedatatable (uaecptr resid, uaecptr resname, uae_u8 type, uae_s
 extern void align (int);
 
 extern volatile int uae_int_requested, uaenet_int_requested;
+extern volatile int uaenet_vsync_requested;
 extern void set_uae_int_flag (void);
 
 #define RTS 0x4e75
@@ -95,7 +105,12 @@ extern void emulib_install (void);
 extern void expansion_init (void);
 extern void expansion_cleanup (void);
 extern void expansion_clear (void);
+extern void expansion_autoconfig_put(int, uae_u8);
+extern uaecptr expansion_startaddress(uaecptr addr, uae_u32 size);
+
 
 extern void uaegfx_install_code (uaecptr);
 
 extern uae_u32 emulib_target_getcpurate (uae_u32, uae_u32*);
+
+#endif // UAE_AUTOCONF_H

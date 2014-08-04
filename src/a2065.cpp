@@ -10,8 +10,10 @@
 #include "sysconfig.h"
 #include "sysdeps.h"
 
+#ifdef A2065
+
 #include "options.h"
-#include "uae/memory.h"
+#include "memory_uae.h"
 #include "custom.h"
 #include "newcpu.h"
 #include "a2065.h"
@@ -110,6 +112,15 @@ static uae_u8 broadcast[6] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
 #define RX_BUFF 0x0400
 #define RX_STP 0x0200
 #define RX_ENP 0x0100
+
+DECLARE_MEMORY_FUNCTIONS(a2065);
+
+static addrbank a2065_bank = {
+	a2065_lget, a2065_wget, a2065_bget,
+	a2065_lput, a2065_wput, a2065_bput,
+	default_xlate, default_check, NULL, _T("A2065 Z2 Ethernet"),
+	a2065_lgeti, a2065_wgeti, ABFLAG_IO
+};
 
 static uae_u16 gword2 (uae_u8 *p)
 {
@@ -828,8 +839,6 @@ static void REGPARAM2 a2065_lput (uaecptr addr, uae_u32 l)
 	a2065_wput (addr + 2, l);
 }
 
-extern addrbank a2065_bank;
-
 static void REGPARAM2 a2065_bput (uaecptr addr, uae_u32 b)
 {
 #ifdef JIT
@@ -877,14 +886,7 @@ static uae_u32 REGPARAM2 a2065_lgeti (uaecptr addr)
 	return v;
 }
 
-static addrbank a2065_bank = {
-	a2065_lget, a2065_wget, a2065_bget,
-	a2065_lput, a2065_wput, a2065_bput,
-	default_xlate, default_check, NULL, _T("A2065 Z2 Ethernet"),
-	a2065_lgeti, a2065_wgeti, ABFLAG_IO
-};
-
-static void a2065_config (void)
+static addrbank *a2065_config (void)
 {
 	memset (config, 0xff, sizeof config);
 	ew (0x00, 0xc0 | 0x01);
@@ -927,8 +929,9 @@ static void a2065_config (void)
 			map_banks (&a2065_bank, configured, 0x10000 >> 16, 0x10000);
 	} else {
 		/* KS autoconfig handles the rest */
-		map_banks (&a2065_bank, 0xe80000 >> 16, 0x10000 >> 16, 0x10000);
+		return &a2065_bank;
 	}
+	return NULL;
 }
 
 uae_u8 *save_a2065 (int *len, uae_u8 *dstptr)
@@ -963,8 +966,10 @@ void restore_a2065_finish (void)
 		a2065_config ();
 }
 
-void a2065_init (void)
+addrbank *a2065_init (void)
 {
 	configured = 0;
-	a2065_config ();
+	return a2065_config ();
 }
+
+#endif // A2065

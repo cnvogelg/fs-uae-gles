@@ -200,7 +200,7 @@
 
 #include "options.h"
 #include "uae.h"
-#include "uae/memory.h"
+#include "memory_uae.h"
 #include "rommgr.h"
 #include "custom.h"
 #include "newcpu.h"
@@ -209,7 +209,6 @@
 #include "savestate.h"
 #include "crc32.h"
 #include "akiko.h"
-#include "picasso96.h"
 
 #define DEBUG
 #ifdef DEBUG
@@ -1642,6 +1641,8 @@ int action_replay_load (void)
 	}
 
 	if (_tcslen (currprefs.cartfile) == 0)
+		return 0;
+	if (currprefs.cs_cd32fmv)
 		return 0;
 	rd = getromdatabypath (currprefs.cartfile);
 	if (rd) {

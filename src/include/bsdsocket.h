@@ -7,6 +7,15 @@
   *
   */
 
+#ifndef UAE_BSDSOCKET_H
+#define UAE_BSDSOCKET_H
+
+#ifdef FSUAE // NL
+#include "uae/types.h"
+#include "traps.h"
+#include "threaddep/thread.h"
+#endif
+
 #define BSD_TRACING_ENABLED 0
 
 extern int log_bsd;
@@ -26,7 +35,7 @@ extern void deinit_socket_layer (void);
 
 #define MAXADDRLEN 256
 
-#ifdef WINDOWS
+#ifdef _WIN32
 #define SOCKET_TYPE SOCKET
 #else
 #define SOCKET_TYPE int
@@ -67,7 +76,7 @@ struct socketbase {
 
     unsigned int *mtable;	/* window messages allocated for asynchronous event notification */
     /* host-specific fields below */
-#ifdef WINDOWS
+#ifdef _WIN32
     SOCKET_TYPE sockAbort;	/* for aborting WinSock2 select() (damn Microsoft) */
     SOCKET_TYPE sockAsync;	/* for aborting WSBAsyncSelect() in window message handler */
     int needAbort;		/* abort flag */
@@ -206,3 +215,5 @@ extern uae_u32 callfdcallback (TrapContext *context, SB, uae_u32 fd, uae_u32 act
 extern uaecptr bsdlib_startup (uaecptr);
 extern void bsdlib_install (void);
 extern void bsdlib_reset (void);
+
+#endif // UAE_BSDSOCKET_H

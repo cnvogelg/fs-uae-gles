@@ -38,13 +38,13 @@
  * terms and conditions of the copyright.
  */
 
-#include <slirp.h>
+#include "slirp.h"
 
 /*
  * Since this is only used in "stats socket", we give meaning
  * names instead of the REAL names
  */
-char *tcpstates[] = {
+const char *tcpstates[] = {
 /*	"CLOSED",       "LISTEN",       "SYN_SENT",     "SYN_RCVD", */
 	"REDIRECT",	"LISTEN",	"SYN_SENT",     "SYN_RCVD",
 	"ESTABLISHED",  "CLOSE_WAIT",   "FIN_WAIT_1",   "CLOSING",

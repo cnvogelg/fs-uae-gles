@@ -16,7 +16,7 @@
 #include "sysdeps.h"
 
 #include "options.h"
-#include "uae/memory.h"
+#include "memory_uae.h"
 #include "custom.h"
 #include "newcpu.h"
 #include "autoconf.h"
@@ -68,7 +68,7 @@ static bool debugchannel (int ch)
 
 STATIC_INLINE bool usehacks(void)
 {
-	return currprefs.cpu_model >= 68020 || currprefs.m68k_speed != 0;
+	return currprefs.cpu_model >= 68020 || currprefs.m68k_speed != 0 || (currprefs.cs_hacks & 4);
 }
 
 #define SINC_QUEUE_MAX_AGE 2048
@@ -1469,9 +1469,7 @@ void audio_reset (void)
 
 #ifdef AHI
 	ahi_close_sound ();
-#ifdef AHI_V2
 	free_ahi_v2 ();
-#endif
 #endif
 	reset_sound ();
 	memset (sound_filter_state, 0, sizeof sound_filter_state);

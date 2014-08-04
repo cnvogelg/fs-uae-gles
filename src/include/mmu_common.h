@@ -1,6 +1,12 @@
+#ifndef UAE_MMU_COMMON_H
+#define UAE_MMU_COMMON_H
 
-#ifndef MMU_COMMON_H
-#define MMU_COMMON_H
+#ifdef FSUAE // NL
+#include "uae/types.h"
+#include "uae/inline.h"
+#include "uae/memory.h"
+#include "newcpu.h"
+#endif
 
 #define MMUDEBUG 0
 #define MMUINSDEBUG 0
@@ -152,4 +158,13 @@ static ALWAYS_INLINE uae_u32 phys_get_byte(uaecptr addr)
     return byteget (addr);
 }
 
-#endif
+extern uae_u32(*x_phys_get_iword)(uaecptr);
+extern uae_u32(*x_phys_get_ilong)(uaecptr);
+extern uae_u32(*x_phys_get_byte)(uaecptr);
+extern uae_u32(*x_phys_get_word)(uaecptr);
+extern uae_u32(*x_phys_get_long)(uaecptr);
+extern void(*x_phys_put_byte)(uaecptr, uae_u32);
+extern void(*x_phys_put_word)(uaecptr, uae_u32);
+extern void(*x_phys_put_long)(uaecptr, uae_u32);
+
+#endif // UAE_MMU_COMMON_H

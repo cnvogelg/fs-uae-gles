@@ -1,3 +1,10 @@
+#ifndef UAE_SCSI_H
+#define UAE_SCSI_H
+
+#ifdef FSUAE // NL
+#include "uae/types.h"
+#include "uae/limits.h"
+#endif
 
 #define SCSI_DATA_BUFFER_SIZE (512 * 512)
 
@@ -21,6 +28,7 @@ struct scsi_data_tape
 struct scsi_data
 {
     int id;
+	void *privdata;
     int cmd_len;
     uae_u8 *data;
     int data_len;
@@ -109,3 +117,5 @@ extern void tape_media_change (int unitnum, struct uaedev_config_info*);
 #define SCSI_STATUS_COMMAND_TERMINATED     0x22
 #define SCSI_STATUS_QUEUE_FULL             0x28
 #define SCSI_STATUS_ACA_ACTIVE             0x30
+
+#endif // UAE_SCSI_H

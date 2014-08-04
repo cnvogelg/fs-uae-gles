@@ -190,9 +190,26 @@ static void UNUSED_FUNCTION(cpulimit) (void)
 	printf ("#ifndef CPUEMU_68000_ONLY\n");
 }
 
-static void addcycles_ce020 (int cycles, const char *s)
+static bool isce020(void)
 {
 	if (!using_ce020)
+		return false;
+	if (using_ce020 >= 3)
+		return false;
+	return true;
+}
+static bool isprefetch020(void)
+{
+	if (!using_prefetch_020)
+		return false;
+	if (using_prefetch_020 >= 3)
+		return false;
+	return true;
+}
+
+static void addcycles_ce020 (int cycles, const char *s)
+{
+	if (!isce020())
 		return;
 	if (cycles > 0) {
 		if (s == NULL)
@@ -210,21 +227,21 @@ static void addcycles_ce020 (int cycles)
 
 static void get_prefetch_020 (void)
 {
-	if (!using_prefetch_020 || no_prefetch_ce020)
+	if (!isprefetch020() || no_prefetch_ce020)
 		return;
 	printf ("\tregs.irc = %s (%d);\n", prefetch_word, m68k_pc_offset);
 }
 static void get_prefetch_020_0 (void)
 {
-	if (!using_prefetch_020 || no_prefetch_ce020)
+	if (!isprefetch020() || no_prefetch_ce020)
 		return;
 	printf ("\tregs.irc = %s (0);\n", prefetch_word);
 }
 
 static void returntail (bool iswrite)
 {
-	if (!using_ce020) {
-		if (using_prefetch_020) {
+	if (!isce020()) {
+		if (isprefetch020()) {
 			if (!tail_ce020_done) {
 				if (!did_prefetch)
 					get_prefetch_020 ();
@@ -293,7 +310,7 @@ static void returncycles (const char *s, int cycles)
 
 static void addcycles_ce020 (const char *name, int head, int tail, int cycles)
 {
-	if (!using_ce020)
+	if (!isce020())
 		return;
 	if (!head && !tail && !cycles)
 		return;
@@ -301,7 +318,7 @@ static void addcycles_ce020 (const char *name, int head, int tail, int cycles)
 }
 static void addcycles_ce020 (const char *name, int head, int tail, int cycles, int ophead)
 {
-	if (!using_ce020)
+	if (!isce020())
 		return;
 	if (!head && !tail && !cycles && !ophead) {
 		printf ("\t/* OP zero */\n");
@@ -324,7 +341,8 @@ static void addcycles000 (int cycles)
 	printf ("\t%s (%d);\n", do_cycles, cycles);
 	count_cycles += cycles;
 }
-static void addcycles000_2 (const char *s, int cycles)
+
+static void UNUSED_FUNCTION(addcycles000_2) (const char *s, int cycles)
 {
 	if (!using_ce)
 		return;
@@ -528,7 +546,7 @@ static const char *gen_nextibyte (int flags)
 static void makefromsr (void)
 {
 	printf ("\tMakeFromSR();\n");
-	if (using_ce || using_ce020)
+	if (using_ce || isce020())
 		printf ("\tregs.ipl_pin = intlev ();\n");
 }
 
@@ -536,7 +554,7 @@ static void check_ipl (void)
 {
 	if (ipl_fetched)
 		return;
-	if (using_ce || using_ce020)
+	if (using_ce || isce020())
 		printf ("\tipl_fetch ();\n");
 	ipl_fetched = true;
 }
@@ -586,7 +604,7 @@ static void fill_prefetch_full (void)
 		fill_prefetch_1 (0);
 		irc2ir ();
 		fill_prefetch_1 (2);
-	} else if (using_prefetch_020) {
+	} else if (isprefetch020()) {
 		did_prefetch = 2;
 		total_ce020 -= 4;
 		returntail (false);
@@ -624,7 +642,7 @@ static void fill_prefetch_0 (void)
 	insn_n_cycles += 4;
 }
 
-static void dummy_prefetch (void)
+static void UNUSED_FUNCTION(dummy_prefetch) (void)
 {
 	int o = m68k_pc_offset + 2;
 	if (!using_prefetch)
@@ -765,7 +783,7 @@ static void head_cycs (int h)
 
 static void add_head_cycs (int h)
 {
-	if (!using_ce020)
+	if (!isce020())
 		return;
 	head_ce020_cycs_done = false;
 	head_cycs (h);
@@ -858,7 +876,7 @@ static void addopcycles_ce20 (int h, int t, int c, int subhead)
 
 static void addop_ce020 (instr *curi, int subhead)
 {
-	if (!using_ce020)
+	if (!isce020())
 		return;
 	int h = curi->head;
 	int t = curi->tail;
@@ -1571,7 +1589,7 @@ static void genamode (instr *curi, amodes mode, const char *reg, wordsizes size,
 {
 	int oldfixup = mmufixupstate;
 	int subhead = 0;
-	if (using_ce020 && curi) {
+	if (isce020() && curi) {
 		switch (curi->fetchmode)
 		{
 		case fetchmode_fea:
@@ -1592,7 +1610,7 @@ static void genamode (instr *curi, amodes mode, const char *reg, wordsizes size,
 		// we have fixup already active = this genamode call is destination mode and we can now clear previous source fixup.
 		clearmmufixup (0);
 	}
-	if (using_ce020 && curi)
+	if (isce020() && curi)
 		addop_ce020 (curi, subhead);
 }
 
@@ -1612,7 +1630,7 @@ static void genamodedual (instr *curi, amodes smode, const char *sreg, wordsizes
 	int subhead = 0;
 	bool eadmode = false;
 
-	if (using_ce020) {
+	if (isce020()) {
 		switch (curi->fetchmode)
 		{
 		case fetchmode_fea:
@@ -2274,12 +2292,12 @@ static void genflags_normal (flagtypes type, wordsizes size, const char *value, 
 
 	case flag_add:
 		start_brace ();
-		printf ("uae_u32 %s = %s + %s;\n", value, dstr, sstr);
+		printf ("uae_u32 %s = %s + %s;\n", value, udstr, usstr);
 		break;
 	case flag_sub:
 	case flag_cmp:
 		start_brace ();
-		printf ("uae_u32 %s = %s - %s;\n", value, dstr, sstr);
+		printf ("uae_u32 %s = %s - %s;\n", value, udstr, usstr);
 		break;
 	}
 
@@ -2561,7 +2579,7 @@ static void resetvars (void)
 			dstw = "x_put_word";
 			srcb = "x_get_byte";
 			dstb = "x_put_byte";
-			do_cycles = "do_cycles_ce000";
+			do_cycles = "do_cycles_ce000_internal";
 		} else if (using_ce020 == 1) {
 			/* x_ not used if it redirects to
 			 * get_word_ce020_prefetch()
@@ -2578,7 +2596,7 @@ static void resetvars (void)
 			dstw = "x_put_word";
 			srcb = "x_get_byte";
 			dstb = "x_put_byte";
-			do_cycles = "do_cycles_ce020";
+			do_cycles = "do_cycles_ce020_internal";
 			nextw = "next_iword_020ce";
 			nextl = "next_ilong_020ce";
 		} else if (using_ce020 == 2) {
@@ -2595,9 +2613,26 @@ static void resetvars (void)
 			dstw = "x_put_word";
 			srcb = "x_get_byte";
 			dstb = "x_put_byte";
-			do_cycles = "do_cycles_ce020";
+			do_cycles = "do_cycles_ce020_internal";
 			nextw = "next_iword_030ce";
 			nextl = "next_ilong_030ce";
+		} else if (using_ce020 == 3) {
+			// 68040/060 CE
+			disp020 = "x_get_disp_ea_040";
+			prefetch_long = "get_ilong_cache_040";
+			prefetch_word = "get_iword_cache_040";
+			srcli = "x_get_ilong";
+			srcwi = "x_get_iword";
+			srcbi = "x_get_ibyte";
+			srcl = "x_get_long";
+			dstl = "x_put_long";
+			srcw = "x_get_word";
+			dstw = "x_put_word";
+			srcb = "x_get_byte";
+			dstb = "x_put_byte";
+			do_cycles = "do_cycles_ce020_internal";
+			nextw = "next_iword_cache040";
+			nextl = "next_ilong_cache040";
 		} else if (using_prefetch_020) {
 			disp020 = "x_get_disp_ea_020";
 			prefetch_word = "get_word_020_prefetch";
@@ -3249,7 +3284,7 @@ static void gen_opcode (unsigned int opcode)
 			* - move.x xxx,[at least 1 extension word here] = fetch 1 extension word before (xxx)
 			*
 			*/
-			if (using_ce020) {
+			if (isce020()) {
 				// MOVE is too complex to handle in table68k
 				int h = 0, t = 0, c = 0, subhead = 0;
 				bool fea = false;
@@ -3546,6 +3581,7 @@ static void gen_opcode (unsigned int opcode)
 			printf ("\t\tint frame = format >> 12;\n");
 			printf ("\t\tint offset = 8;\n");
 			printf ("\t\tnewsr = sr; newpc = pc;\n");
+			addcycles_ce020 (6);
 		    printf ("\t\tif (frame == 0x0) { m68k_areg (regs, 7) += offset; break; }\n");
 		    printf ("\t\telse if (frame == 0x1) { m68k_areg (regs, 7) += offset; }\n");
 		    printf ("\t\telse if (frame == 0x2) { m68k_areg (regs, 7) += offset + 4; break; }\n");
@@ -3574,6 +3610,7 @@ static void gen_opcode (unsigned int opcode)
 			printf ("}\n");
 		    pop_braces (old_brace_level);
 		    printf ("\tregs.sr = newsr;\n");
+			addcycles_ce020 (4);
 			makefromsr ();
 		    printf ("\tif (newpc & 1) {\n");
 		    printf ("\t\texception3i (0x%04X, newpc);\n", opcode);
@@ -3767,7 +3804,7 @@ static void gen_opcode (unsigned int opcode)
 		break;
 	case i_BSR:
 		// .b/.w = idle cycle, store high, store low, 2xprefetch
-		if (using_ce020)
+		if (isce020())
 			no_prefetch_ce020 = true;
 		printf ("\tuae_s32 s;\n");
 		if (curi->size == sz_long) {
@@ -4967,6 +5004,7 @@ static void gen_opcode (unsigned int opcode)
 	case i_CPUSHL:
 	case i_CPUSHP:
 	case i_CPUSHA:
+		printf ("\tflush_cpu_caches_040(opcode);\n");
 		if (using_mmu)
 			printf ("\tflush_mmu%s(m68k_areg (regs, opcode & 3), (opcode >> 6) & 3);\n", mmu_postfix);
 		printf ("\tif (opcode & 0x80)\n");
@@ -5076,7 +5114,7 @@ static void generate_includes (FILE * f, int id)
 	fprintf (f, "#include \"sysconfig.h\"\n");
 	fprintf (f, "#include \"sysdeps.h\"\n");
 	fprintf (f, "#include \"options.h\"\n");
-	fprintf (f, "#include \"uae/memory.h\"\n");
+	fprintf (f, "#include \"memory_uae.h\"\n");
 	fprintf (f, "#include \"custom.h\"\n");
 	fprintf (f, "#include \"events.h\"\n");
 	fprintf (f, "#include \"newcpu.h\"\n");
@@ -5420,7 +5458,7 @@ static void generate_cpu (int id, int mode)
 	}
 
 	postfix = id;
-	if (id == 0 || id == 11 || id == 13 || id == 20 || id == 21 || id == 22 || id == 31 || id == 32 || id == 33) {
+	if (id == 0 || id == 11 || id == 13 || id == 20 || id == 21 || id == 22 || id == 23 || id == 31 || id == 32 || id == 33) {
 		if (generate_stbl)
 			fprintf (stblfile, "#ifdef CPUEMU_%d%s\n", postfix, extraup);
 		postfix2 = postfix;
@@ -5429,6 +5467,11 @@ static void generate_cpu (int id, int mode)
 			abort ();
 		}
 		generate_includes (stdout, id);
+#ifdef FSUAE
+		// since the code is auto-generated by template functions, many
+		// variables are unused in the generated code
+		fprintf (stdout, "#pragma GCC diagnostic ignored \"-Wunused-variable\"\n");
+#endif
 	}
 
 	using_prefetch = 0;
@@ -5477,13 +5520,21 @@ static void generate_cpu (int id, int mode)
 		read_counts ();
 		for (rp = 0; rp < nr_cpuop_funcs; rp++)
 			opcode_next_clev[rp] = cpu_level;
-	} else if (id == 22 || id == 23 || id == 24) { // 68030/040/60 "cycle-exact"
-		cpu_level = 3 + (24 - id);
+	} else if (id == 22) { // 68030 "cycle-exact"
+		cpu_level = 3;
 		using_ce020 = 2;
 		using_prefetch_020 = 2;
 		memory_cycle_cnt = 2;
-		if (id == 22) {
-			read_counts ();
+		read_counts ();
+		for (rp = 0; rp < nr_cpuop_funcs; rp++)
+			opcode_next_clev[rp] = cpu_level;
+	} else if (id == 23 || id == 24) { // 68040/060 "cycle-exact"
+		cpu_level = id == 23 ? 5 : 4;
+		using_ce020 = 3;
+		using_prefetch_020 = 3;
+		memory_cycle_cnt = 0;
+		if (id == 23) {
+			read_counts();
 			for (rp = 0; rp < nr_cpuop_funcs; rp++)
 				opcode_next_clev[rp] = cpu_level;
 		}

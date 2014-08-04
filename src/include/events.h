@@ -1,6 +1,3 @@
-#ifndef EVENTS_H
-#define EVENTS_H
-
  /*
   * UAE - The Un*x Amiga Emulator
   *
@@ -11,6 +8,17 @@
   *
   * Copyright 1995-1998 Bernd Schmidt
   */
+
+#ifndef UAE_EVENTS_H
+#define UAE_EVENTS_H
+
+#ifdef FSUAE // NL
+#include "uae/types.h"
+#include "uae/inline.h"
+#include "options.h"
+// FIXME: move CYCLE_UNIT define here instead
+#include "uae/cycleunit.h"
+#endif
 
 #undef EVENT_DEBUG
 
@@ -26,7 +34,9 @@ extern int event2_count;
 extern void compute_vsynctime (void);
 extern void init_eventtab (void);
 extern void do_cycles_ce (unsigned long cycles);
+extern void do_cycles_ce_internal (unsigned long cycles);
 extern void do_cycles_ce020 (unsigned long cycles);
+extern void do_cycles_ce020_interal (unsigned long cycles);
 extern void events_schedule (void);
 extern void do_cycles_slow (unsigned long cycles_to_add);
 extern void do_cycles_fast (unsigned long cycles_to_add);
@@ -152,5 +162,4 @@ STATIC_INLINE void event2_remevent (int no)
 	eventtab2[no].active = 0;
 }
 
-
-#endif
+#endif // UAE_EVENTS_H

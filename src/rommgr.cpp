@@ -12,9 +12,10 @@
 #include "uae.h"
 #include "gui.h"
 #include "rommgr.h"
-#include "uae/memory.h"
+#include "memory_uae.h"
 #include "zfile.h"
 #include "crc32.h"
+#include "fsdb.h"
 
 #include "autoconf.h"
 
@@ -86,13 +87,13 @@ struct romdata *getromdatabypath (const TCHAR *path)
 			if (!_tcscmp(path + 1, rd->configname))
 				return rd;
 		}
-		if (!_tcscmp(rl[i].path, path))
+		if (my_issamepath(rl[i].path, path))
 			return rl[i].rd;
 	}
 	return NULL;
 }
 
-#define NEXT_ROM_ID 89
+#define NEXT_ROM_ID 95
 
 #define ALTROM(id,grp,num,size,flags,crc32,a,b,c,d,e) \
 { _T("X"), 0, 0, 0, 0, 0, size, id, 0, 0, flags, (grp << 16) | num, 0, NULL, crc32, a, b, c, d, e },
@@ -189,10 +190,10 @@ static struct romdata roms[] = {
 	/* real CD32 rom dump 391640-03 */
 	ALTROMPN(64, 1, 1, 2 * 524288, ROMTYPE_CD32, _T("391640-03"), 0xa4fbc94a, 0x816ce6c5,0x07787585,0x0c7d4345,0x2230a9ba,0x3a2902db )
 
-	{ _T("CD32 MPEG Cartridge ROM"), 3, 1, 40, 30, _T("CD32FMV\0"), 262144, 23, 1, 0, ROMTYPE_CD32CART, 0, 0, NULL,
+	{ _T("CD32 Full Motion Video Cartridge ROM"), 3, 1, 40, 30, _T("CD32FMV\0"), 262144, 23, 1, 0, ROMTYPE_CD32CART, 0, 0, NULL,
 	0xc35c37bf, 0x03ca81c7,0xa7b259cf,0x64bc9582,0x863eca0f,0x6529f435 },
-	{ _T("CD32 MPEG Cartridge ROM"), 3, 1, 40, 22, _T("CD32FMV\0"), 262144, 74, 1, 0, ROMTYPE_CD32CART, 0, 0, _T("391777-01"),
-	0xc2002d08, 0xa1ca2d71,0x7efb6c60,0xb9bfabeb,0x0280ae97,0xe82b0cb9 },
+	{ _T("CD32 Full Motion Video Cartridge ROM"), 3, 1, 40, 22, _T("CD32FMV\0"), 262144, 74, 1, 0, ROMTYPE_CD32CART, 0, 0, _T("391777-01"),
+	0xf11158eb, 0x94e469a7,0x6030dcb2,0x99ebc752,0x0aaeef9d,0xb54284cf },
 
 	{ _T("CDTV extended ROM v1.00"), 1, 0, 1, 0, _T("CDTV\0"), 262144, 20, 0, 0, ROMTYPE_EXTCDTV, 0, 0, NULL,
 	0x42baa124, 0x7BA40FFA,0x17E500ED,0x9FED041F,0x3424BD81,0xD9C907BE },
@@ -284,6 +285,22 @@ static struct romdata roms[] = {
 	0x00000000, 0, 0, 0, 0, 0 },
 	{ _T("A4091 ROM 40.13"), 40, 13, 40, 13, _T("A4091\0"), 32768, 58, 0, 0, ROMTYPE_A4091BOOT, 0, 0, _T("391592-02"),
 	0x54cb9e85, 0x3CE66919,0xF6FD6797,0x4923A12D,0x91B730F1,0xFFB4A7BA },
+
+	{ _T("Blizzard 1230-IV ROM"), 0, 0, 0, 0, _T("B1230\0"), 32768, 89, 0, 0, ROMTYPE_CPUBOARD, 0, 0, NULL,
+	0x3078dbdc, 0x4d3e7fd0,0xa1a4c3ae,0xe17c5de3,0xcbe1af03,0x447aff92 },
+	{ _T("Blizzard 1240/1260 ROM"), 0, 0, 0, 0, _T("B1240\0B1260\0"), 32768, 90, 0, 0, ROMTYPE_CPUBOARD, 0, 0, NULL,
+	0xf88ae0f1, 0xf69aca4b,0xb13e3389,0x04676f0c,0x8616f8db,0x074c313d },
+	{ _T("Blizzard 2060 ROM"), 8, 5, 8, 5, _T("B2060\0"), 65536, 92, 0, 0, ROMTYPE_CPUBOARD, 0, 0, NULL,
+	0xce270bc0, 0xe043c1aa,0x3bb06e06,0xd4dabff3,0x0a8c6317,0xabfef2bb },
+	ALTROMPN(92, 1, 1, 32768, ROMTYPE_ODD  | ROMTYPE_8BIT, NULL, 0xa6023f20, 0xdfb048d6, 0xbdc03587, 0x241e8121, 0x26aba603, 0xd69b0238)
+	ALTROMPN(92, 1, 2, 32768, ROMTYPE_EVEN | ROMTYPE_8BIT, NULL, 0x9635a9cd, 0x47578b27, 0xc4ba6e54, 0x891930dd, 0xcb4b6a45, 0x5d6b31b2)
+	{ _T("Blizzard SCSI Kit IV ROM"), 8, 5, 8, 5, _T("BSCSIIV\0"), 32768, 94, 0, 0, ROMTYPE_CPUBOARD, 0, 0, NULL,
+	0xf53a0fca, 0xefe17ca5,0x88c44a7f,0x0f8c62be,0x20f23278,0xcfe06727 },
+	{ _T("Warp Engine A4000 ROM"), 0, 0, 0, 0, _T("WARPENGINE\0WARPENGINEA4000\0"), 32768, 93, 0, 0, ROMTYPE_CPUBOARD, 0, 0, NULL,
+	0x4deb574a, 0x6e6c95ff,0xe8448391,0xd36c5b68,0xc9065cb0,0x702a7d27 },
+
+	{ _T("Picasso IV ROM"), 7, 4, 7, 4, _T("PIV\0"), 131072, 91, 0, 0, ROMTYPE_PIV, 0, 0, NULL,
+	0xa8133e7e, 0xcafafb91,0x6f16b9f3,0xec9b49aa,0x4b40eb4e,0xeceb5b5b },
 
 	{ _T("Arcadia OnePlay 2.11"), 0, 0, 0, 0, _T("ARCADIA\0"), 0, 49, 0, 0, ROMTYPE_ARCADIABIOS, 0, 0 },
 	{ _T("Arcadia TenPlay 2.11"), 0, 0, 0, 0, _T("ARCADIA\0"), 0, 50, 0, 0, ROMTYPE_ARCADIABIOS, 0, 0 },
@@ -1146,6 +1163,7 @@ struct zfile *read_rom (struct romdata *prd)
 {
 	struct romdata *rd2 = prd;
 	struct romdata *rd = prd;
+	struct romdata *rdpair = NULL;
 	const TCHAR *name;
 	int id = rd->id;
 	uae_u32 crc32;
@@ -1189,6 +1207,12 @@ struct zfile *read_rom (struct romdata *prd)
 				int romsize = size / 2;
 				if (i)
 					odd = !odd;
+				if (rd->id == rd[1].id)
+					rdpair = &rd[1];
+				else if (rd != roms)
+					rdpair = &rd[-1];
+				else
+					rdpair = rd;
 				if (flags & ROMTYPE_8BIT) {
 					read_rom_file (buf2, rd);
 					if (flags & ROMTYPE_BYTESWAP)
@@ -1197,7 +1221,7 @@ struct zfile *read_rom (struct romdata *prd)
 						descramble (rd, buf2, romsize, odd);
 					for (j = 0; j < size; j += 2)
 						buf[j + odd] = buf2[j / 2];
-					read_rom_file (buf2, rd + 1);
+					read_rom_file (buf2, rdpair);
 					if (flags & ROMTYPE_BYTESWAP)
 						byteswap (buf2, romsize);
 					if (flags & ROMTYPE_SCRAMBLED)
@@ -1214,7 +1238,7 @@ struct zfile *read_rom (struct romdata *prd)
 						buf[j + 2 * odd + 0] = buf2[j / 2 + 0];
 						buf[j + 2 * odd + 1] = buf2[j / 2 + 1];
 					}
-					read_rom_file (buf2, rd + 1);
+					read_rom_file (buf2, rdpair);
 					if (flags & ROMTYPE_BYTESWAP)
 						byteswap (buf2, romsize);
 					if (flags & ROMTYPE_SCRAMBLED)
@@ -1244,6 +1268,8 @@ struct zfile *read_rom (struct romdata *prd)
 				byteswap (buf, size);
 				if (get_crc32 (buf, size) == crc32)
 					ok = 1;
+				if (!ok)
+					byteswap(buf, size);
 			}
 			if (ok) {
 				struct zfile *zf = zfile_fopen_empty (NULL, name, size);
@@ -1277,7 +1303,7 @@ struct zfile *read_rom_name (const TCHAR *filename)
 	struct zfile *f;
 
 	for (i = 0; i < romlist_cnt; i++) {
-		if (!_tcsicmp (filename, rl[i].path)) {
+		if (my_issamepath(filename, rl[i].path)) {
 			struct romdata *rd = rl[i].rd;
 			f = read_rom (rd);
 			if (f)

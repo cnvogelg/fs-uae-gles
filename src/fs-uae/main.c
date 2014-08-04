@@ -48,7 +48,11 @@ void change_port_device_mode(int data) {
     if (port >= 0 && port < FS_UAE_NUM_INPUT_PORTS) {
         g_fs_uae_input_ports[port].mode = mode;
         g_fs_uae_input_ports[port].new_mode = mode;
-        amiga_set_joystick_port_mode(port, mode);
+        // The fifth port isn't an Amiga port, but rather a fake
+        // port used with custom input mapping only
+        if (port < 4) {
+            amiga_set_joystick_port_mode(port, mode);
+        }
         fs_uae_reconfigure_input_ports_host();
         fs_emu_menu_update_current();
     }
@@ -844,9 +848,9 @@ static const char *overlay_names[] = {
 };
 
 #define COPYRIGHT_NOTICE "\nFS-UAE VERSION %s\n" \
-"Copyright 1995-2002 Bernd Schmidt, 1999-2012 Toni Wilen,\n" \
+"Copyright 1995-2002 Bernd Schmidt, 1999-2014 Toni Wilen,\n" \
 "2003-2007 Richard Drummond, 2006-2011 Mustafa 'GnoStiC' Tufan,\n" \
-"2011-2013 Frode Solheim, and contributors.\n" \
+"2011-2014 Frode Solheim, and contributors.\n" \
 "\n" \
 "This is free software; see the file COPYING for copying conditions. There\n" \
 "is NO warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR\n" \
@@ -958,6 +962,15 @@ int main(int argc, char* argv[]) {
 
     amiga_init();
 
+#if 0
+	// FIXME: disabling fullscreen spaces must be done before
+	// SDL_INIT_VIDEO, but we need to check config to see if this should
+	// be done, and we initialize SDL early to check for config file
+	// (catch 22)...
+	// FIXME: check fullscreen_spaces option
+	SDL_SetHint(SDL_HINT_VIDEO_MAC_FULLSCREEN_SPACES, "0");
+#endif
+
 #ifdef MACOSX
     SDL_Init(SDL_INIT_EVERYTHING);
     SDL_PumpEvents();
@@ -1019,7 +1032,7 @@ int main(int argc, char* argv[]) {
     init_i18n();
 
     if (g_warn_about_missing_config_file) {
-        fs_emu_warning(_("No configuration file was found"));
+		fs_emu_warning(_("No configuration file was found\n"));
     }
 
     fs_log("\n");

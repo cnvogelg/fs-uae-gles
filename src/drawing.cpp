@@ -37,7 +37,7 @@ happening, all ports should restrict window widths to be multiples of 16 pixels.
 #include "options.h"
 #include "threaddep/thread.h"
 #include "uae.h"
-#include "uae/memory.h"
+#include "memory_uae.h"
 #include "custom.h"
 #include "newcpu.h"
 #include "xwin.h"
@@ -49,6 +49,7 @@ happening, all ports should restrict window widths to be multiples of 16 pixels.
 #include "statusline.h"
 #include "inputdevice.h"
 #include "debug.h"
+#include "cd32_fmv.h"
 
 extern bool emulate_specialmonitors (struct vidbuffer*, struct vidbuffer*);
 
@@ -747,6 +748,7 @@ PLAYFIELD_START and PLAYFIELD_END are in window coordinates.  */
 static int playfield_start, playfield_end;
 static int real_playfield_start, real_playfield_end;
 static int sprite_playfield_start;
+static bool may_require_hard_way;
 static int linetoscr_diw_start, linetoscr_diw_end;
 static int native_ddf_left, native_ddf_right;
 
@@ -854,6 +856,7 @@ static void pfield_init_linetoscr (bool border)
 	}
 
 #ifdef AGA
+	may_require_hard_way = false;
 	if (dp_for_drawing->bordersprite_seen && !colors_for_drawing.borderblank && dip_for_drawing->nr_sprites) {
 		int min = visible_right_border, max = visible_left_border, i;
 		for (i = 0; i < dip_for_drawing->nr_sprites; i++) {
@@ -877,6 +880,8 @@ static void pfield_init_linetoscr (bool border)
 			playfield_end = max;
 		if (playfield_end > visible_right_border)
 			playfield_end = visible_right_border;
+		sprite_playfield_start = 0;
+		may_require_hard_way = true;
 	}
 #endif
 
@@ -1934,6 +1939,10 @@ static void weird_bitplane_fix (int start, int end)
 	}
 }
 
+/* We use the compiler's inlining ability to ensure that PLANES is in effect a compile time
+constant.  That will cause some unnecessary code to be optimized away.
+Don't touch this if you don't know what you are doing.  */
+
 #define MERGE(a,b,mask,shift) do {\
 	uae_u32 tmp = mask & (a ^ (b >> shift)); \
 	a ^= tmp; \
@@ -1942,9 +1951,6 @@ static void weird_bitplane_fix (int start, int end)
 
 #define GETLONG(P) (*(uae_u32 *)P)
 
-/* We use the compiler's inlining ability to ensure that PLANES is in effect a compile time
-constant.  That will cause some unnecessary code to be optimized away.
-Don't touch this if you don't know what you are doing.  */
 STATIC_INLINE void pfield_doline_1 (uae_u32 *pixels, int wordcount, int planes)
 {
 	while (wordcount-- > 0) {
@@ -2305,6 +2311,24 @@ static void adjust_drawing_colors (int ctable, int need_full)
 	}
 }
 
+static void playfield_hard_way(line_draw_func worker_pfield, int first, int last)
+{
+	if (first < real_playfield_start)  {
+		int next = last < real_playfield_start ? last : real_playfield_start;
+		int diff = next - first;
+		pfield_do_linetoscr_bordersprite_aga(first, next, false);
+		if (res_shift >= 0)
+			diff >>= res_shift;
+		else
+			diff <<= res_shift;
+		src_pixel += diff;
+		first = next;
+	}
+	(*worker_pfield)(first, last < real_playfield_end ? last : real_playfield_end, false);
+	if (last > real_playfield_end)
+		pfield_do_linetoscr_bordersprite_aga(real_playfield_end, last, false);
+}
+
 static void do_color_changes (line_draw_func worker_border, line_draw_func worker_pfield, int vp)
 {
 	int i;
@@ -2344,7 +2368,10 @@ static void do_color_changes (line_draw_func worker_border, line_draw_func worke
 			int t = nextpos_in_range <= playfield_end ? nextpos_in_range : playfield_end;
 			if (plf2pri > 5 && bplplanecnt == 5 && !(currprefs.chipset_mask & CSMASK_AGA))
 				weird_bitplane_fix (lastpos, t);
-			(*worker_pfield) (lastpos, t, false);
+			if (bplxor && may_require_hard_way && worker_pfield != pfield_do_linetoscr_bordersprite_aga)
+				playfield_hard_way(worker_pfield, lastpos, t);
+			else
+				(*worker_pfield) (lastpos, t, false);
 			lastpos = t;
 		}
 
@@ -2885,6 +2912,9 @@ static void init_drawing_frame (void)
 	drawing_color_matches = -1;
 }
 
+static int lightpen_y1, lightpen_y2;
+static int statusbar_y1, statusbar_y2;
+
 void putpixel (uae_u8 *buf, int bpp, int x, xcolnr c8, int opaq)
 {
 	if (x <= 0)
@@ -2924,20 +2954,26 @@ void putpixel (uae_u8 *buf, int bpp, int x, xcolnr c8, int opaq)
 	}
 }
 
-static void draw_status_line (int line, int statusy)
+static uae_u8 *status_line_ptr(int line)
 {
-	int bpp, y;
-	uae_u8 *buf;
+	int y;
 
-	if (!(currprefs.leds_on_screen & STATUSLINE_CHIPSET) || (currprefs.leds_on_screen & STATUSLINE_TARGET))
-		return;
-	bpp = gfxvidinfo.drawbuffer.pixbytes;
 	y = line - (gfxvidinfo.drawbuffer.outheight - TD_TOTAL_HEIGHT);
 	xlinebuffer = gfxvidinfo.drawbuffer.linemem;
 	if (xlinebuffer == 0)
 		xlinebuffer = row_map[line];
-	buf = xlinebuffer;
-	draw_status_line_single (buf, bpp, statusy, gfxvidinfo.drawbuffer.outwidth, xredcolors, xgreencolors, xbluecolors, NULL);
+	return xlinebuffer;
+}
+
+static void draw_status_line (int line, int statusy)
+{
+	uae_u8 *buf = status_line_ptr(line);
+	if (!buf)
+		return;
+	if (statusy < 0)
+		statusline_render(buf, gfxvidinfo.drawbuffer.pixbytes, gfxvidinfo.drawbuffer.rowbytes, gfxvidinfo.drawbuffer.outwidth, TD_TOTAL_HEIGHT, xredcolors, xgreencolors, xbluecolors, NULL);
+	else
+		draw_status_line_single(buf, gfxvidinfo.drawbuffer.pixbytes, statusy, gfxvidinfo.drawbuffer.outwidth, xredcolors, xgreencolors, xbluecolors, NULL);
 }
 
 static void draw_debug_status_line (int line)
@@ -2985,8 +3021,6 @@ static void draw_lightpen_cursor (int x, int y, int line, int onscreen)
 		p++;
 	}
 }
-
-static int lightpen_y1, lightpen_y2;
 
 static void lightpen_update (struct vidbuffer *vb)
 {
@@ -3101,6 +3135,16 @@ bool draw_frame (struct vidbuffer *vb)
 	return true;
 }
 
+static void setnativeposition(struct vidbuffer *vb)
+{
+	vb->inwidth = gfxvidinfo.drawbuffer.inwidth;
+	vb->inheight = gfxvidinfo.drawbuffer.inheight;
+	vb->inwidth2 = gfxvidinfo.drawbuffer.inwidth2;
+	vb->inheight2 = gfxvidinfo.drawbuffer.inheight2;
+	vb->outwidth = gfxvidinfo.drawbuffer.outwidth;
+	vb->outheight = gfxvidinfo.drawbuffer.outheight;
+}
+
 static void finish_drawing_frame (void)
 {
 	int i;
@@ -3125,9 +3169,12 @@ static void finish_drawing_frame (void)
 
 	draw_frame2 (vb, vb);
 
-	if (currprefs.leds_on_screen) {
+	if (currprefs.leds_on_screen && ((currprefs.leds_on_screen & STATUSLINE_CHIPSET) && !(currprefs.leds_on_screen & STATUSLINE_TARGET))) {
 		int slx, sly;
-		statusline_getpos (&slx, &sly, vb->outwidth, vb->outheight);
+		statusline_getpos(&slx, &sly, vb->outwidth, vb->outheight);
+		statusbar_y1 = sly + min_ypos_for_screen - 1;
+		statusbar_y2 = statusbar_y1 + TD_TOTAL_HEIGHT + 1;
+		draw_status_line(sly, -1);
 		for (i = 0; i < TD_TOTAL_HEIGHT; i++) {
 			int line = sly + i;
 			draw_status_line (line, i);
@@ -3148,14 +3195,8 @@ static void finish_drawing_frame (void)
 	if (currprefs.monitoremu && gfxvidinfo.tempbuffer.bufmem_allocated) {
 		if (emulate_specialmonitors (vb, &gfxvidinfo.tempbuffer)) {
 			vb = gfxvidinfo.outbuffer = &gfxvidinfo.tempbuffer;
-			if (vb->nativepositioning) {
-				vb->inwidth = gfxvidinfo.drawbuffer.inwidth;
-				vb->inheight = gfxvidinfo.drawbuffer.inheight;
-				vb->inwidth2 = gfxvidinfo.drawbuffer.inwidth2;
-				vb->inheight2 = gfxvidinfo.drawbuffer.inheight2;
-				vb->outwidth = gfxvidinfo.drawbuffer.outwidth;
-				vb->outheight = gfxvidinfo.drawbuffer.outheight;
-			}
+			if (vb->nativepositioning)
+				setnativeposition(vb);
 			gfxvidinfo.drawbuffer.tempbufferinuse = true;
 			if (!specialmonitoron)
 				compute_framesync ();
@@ -3167,6 +3208,19 @@ static void finish_drawing_frame (void)
 			if (specialmonitoron)
 				compute_framesync ();
 			specialmonitoron = false;
+		}
+	}
+
+	if (!currprefs.monitoremu && gfxvidinfo.tempbuffer.bufmem_allocated && currprefs.cs_cd32fmv) {
+		if (cd32_fmv_active) {
+			cd32_fmv_genlock(vb, &gfxvidinfo.tempbuffer);
+			vb = gfxvidinfo.outbuffer = &gfxvidinfo.tempbuffer;
+			setnativeposition(vb);
+			gfxvidinfo.drawbuffer.tempbufferinuse = true;
+			do_flush_screen(vb, 0, vb->outheight);
+			didflush = true;
+		} else {
+			gfxvidinfo.drawbuffer.tempbufferinuse = false;
 		}
 	}
 
@@ -3307,7 +3361,10 @@ void hsync_record_line_state (int lineno, enum nln_how how, int changed)
 		return;
 
 	state = linestate + lineno;
-	changed += frame_redraw_necessary + ((lineno >= lightpen_y1 && lineno <= lightpen_y2) ? 1 : 0);
+	changed += frame_redraw_necessary + ((
+		(lineno >= lightpen_y1 && lineno < lightpen_y2) ||
+		(lineno >= statusbar_y1 && lineno < statusbar_y2))
+		? 1 : 0);
 
 	switch (how) {
 	case nln_normal:

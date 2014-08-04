@@ -6,23 +6,12 @@
 * Copyright 2013-2014 Frode Solheim
 */
 
-#ifndef _UAE_UAENATIVE_H_
-#define _UAE_UAENATIVE_H_
+#ifndef UAE_UAENATIVE_H
+#define UAE_UAENATIVE_H
 
 #ifdef WITH_UAENATIVE
 
-#if defined(_WIN32) || defined(WINDOWS)
-
-    #define UNIAPI __declspec(dllimport)
-    #define UNICALL __cdecl
-
-#else // _WIN32 not defined
-
-    #define UNIAPI
-    #define UNICALL
-
-#endif
-
+#define UNI_IMPORT
 #include "uni_common.h"
 
 #define UNI_FLAG_ASYNCHRONOUS 1
@@ -46,4 +35,4 @@ const TCHAR **uaenative_get_library_dirs(void);
 
 #endif // WITH_UAENATIVE
 
-#endif // _UAE_UAENATIVE_H_
+#endif // UAE_UAENATIVE_H
