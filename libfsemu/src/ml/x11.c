@@ -66,7 +66,10 @@ static void set_window_icon() {
         *op++ = image->height;
         for (int i = 0; i < pixel_count; i++) {
             //*op = 0xffff0000;
-            *op = (p[3] << 24) | (p[0] << 16) | (p[1] << 8) | p[2];
+            *op = (((unsigned long) p[3]) << 24) |
+                    (p[0] << 16) |
+                    (p[1] << 8) |
+                    p[2];
             p += 4;
             op++;
         }
@@ -441,5 +444,9 @@ int fs_ml_scancode_to_key(int scancode) {
     }
     return g_key_map[scancode];
 }
+
+#else
+
+int libfsemu_x11_dummy;
 
 #endif // USE_X11

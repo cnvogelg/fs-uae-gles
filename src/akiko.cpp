@@ -867,7 +867,7 @@ static int cdrom_command_led (void)
 	return 0;
 }
 
-static int UNUSED_FUNCTION(cdrom_command_idle_status) (void)
+static int cdrom_command_idle_status (void)
 {
 	cdrom_result_buffer[0] = 0x0a;
 	cdrom_result_buffer[1] = 0x70;
@@ -1509,8 +1509,8 @@ STATIC_INLINE void akiko_put_long (uae_u32 *p, int offset, int v)
 static uae_u32 REGPARAM3 akiko_lget (uaecptr) REGPARAM;
 static uae_u32 REGPARAM3 akiko_wget (uaecptr) REGPARAM;
 static uae_u32 REGPARAM3 akiko_bget (uaecptr) REGPARAM;
-static uae_u32 REGPARAM3 UNUSED_FUNCTION(akiko_lgeti) (uaecptr) REGPARAM;
-static uae_u32 REGPARAM3 UNUSED_FUNCTION(akiko_wgeti) (uaecptr) REGPARAM;
+static uae_u32 REGPARAM3 akiko_lgeti (uaecptr) REGPARAM;
+static uae_u32 REGPARAM3 akiko_wgeti (uaecptr) REGPARAM;
 static void REGPARAM3 akiko_lput (uaecptr, uae_u32) REGPARAM;
 static void REGPARAM3 akiko_wput (uaecptr, uae_u32) REGPARAM;
 static void REGPARAM3 akiko_bput (uaecptr, uae_u32) REGPARAM;
@@ -1805,7 +1805,7 @@ static void REGPARAM2 akiko_lput (uaecptr addr, uae_u32 v)
 addrbank akiko_bank = {
 	akiko_lget, akiko_wget, akiko_bget,
 	akiko_lput, akiko_wput, akiko_bput,
-	default_xlate, default_check, NULL, _T("Akiko"),
+	default_xlate, default_check, NULL, NULL, _T("Akiko"),
 	dummy_lgeti, dummy_wgeti, ABFLAG_IO
 };
 

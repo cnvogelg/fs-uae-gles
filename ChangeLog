@@ -1,3 +1,62 @@
+Version 2.5.13dev:
+
+* Added another fix for --disable-cpuboard.
+* Add internal HRTMon rom to the rom list on startup.
+* Show GUI warning when some config incompatibilities are detected.
+* GUI warning when custom uae_ options fails or are not recognized.
+* Added more compiler warnings by default.
+* More code cleanup, especially in src/od-fs.
+* Merged several modules which were similar between FS-UAE and WinUAE.
+
+Version 2.5.12dev:
+
+* Updated emulation core from WinUAE 2900b12.
+* FS-UAE on Windows now supports unicode command line arguments.
+* Fixed a bug on Windows preventing load of non-ASCII config file paths.
+* Another big-endian fix for loading fs-uae.dat.
+* Added xinput_controller_15_6_0_0_windows.conf [Kitty].
+
+Version 2.5.11dev:
+
+* Big-endian support for loading of fs-uae.dat.
+* Remove message "no configuration file loaded".
+* Re-enable DMS support (missing for a couple of versions).
+* Can configure with --disable-cpuboard --disable-ppc.
+* Configure script checks if -fno-strict-overflow is recognized.
+
+Version 2.5.10dev:
+
+* Updated emulation core from WinUAE 2900b10.
+* Fixed audio initialization (broke in 2.5.9dev).
+* New option cpuboard_flash_ext_file (not tested).
+
+Version 2.5.9dev:
+
+* New option cpuboard_flash_file (path to accelerator "ROM").
+* Bug fixes and source cleanup based on static analysis.
+* Code cleanup in some code modules.
+* Moved glee, manymouse, lua source to toplevel directories.
+* Updated emulation core from WinUAE 2900b9.
+* Enabled experimental PearPC PPC emulation from WinUAE.
+
+Version 2.5.8dev:
+
+* New option uaem_write_flags to control when .uaem files are created.
+* Support NewMouse-compatible mouse wheel events.
+* Bundle libmpeg2 with FS-UAE source (missing on many Linux distros).
+* Don't install uaenative.library unless requested.
+
+Version 2.5.7dev:
+
+* Fix 68000 cycle exact mode (tbl == op_smalltbl_14_ff check was missing).
+* Fixed specifying base_dir via config file (broke in 2.5.6dev).
+* Re-enable slirp/a2065/sana2 by default. A2065 works partially,
+  uaenet.device still crashes.
+* Modified Makefile.am for out-of-tree builds.
+* Fixed crash when playing videos with CD32 FMV (no display yet).
+* Added libudis86 (disassembler library for x86 / x86-64).
+* Explicitly flush lines logged to stdout.
+
 Version 2.5.6dev:
 
 * Updated emulation core from WinUAE 2820b8.

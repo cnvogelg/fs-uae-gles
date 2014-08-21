@@ -19,6 +19,7 @@
 #include <fs/base.h>
 #include <fs/data.h>
 #include <fs/emu.h>
+#include <fs/main.h>
 #include <fs/i18n.h>
 #include <fs/string.h>
 #include <fs/thread.h>
@@ -40,7 +41,7 @@ static int g_warn_about_missing_config_file = 0;
 #define LOG_LINE "---------------------------------------------------------" \
         "-------------------\n"
 
-void change_port_device_mode(int data) {
+static void change_port_device_mode(int data) {
     int modes = INPUTEVENT_AMIGA_JOYPORT_MODE_0_LAST -
             INPUTEVENT_AMIGA_JOYPORT_MODE_0_NONE + 1;
     int port = data / modes;
@@ -58,7 +59,7 @@ void change_port_device_mode(int data) {
     }
 }
 
-void select_port_0_device(int data) {
+static void select_port_0_device(int data) {
     printf("--> device index %d\n", data);
     int port = 0;
     if (data == 9) {
@@ -80,7 +81,8 @@ void select_port_0_device(int data) {
         if (data < count) {
             g_fs_uae_input_ports[port].mode = new_mode;
             g_fs_uae_input_ports[port].new_mode = new_mode;
-            strcpy(g_fs_uae_input_ports[port].device, devices[data].name);
+            uae_strlcpy(g_fs_uae_input_ports[port].device, devices[data].name,
+                        sizeof(g_fs_uae_input_ports[port].device));
             amiga_set_joystick_port_mode(port, new_mode);
             // FIXME: not a warning, rather a notification
             fs_emu_warning(_("Port 0: %s"), devices[data].name);
@@ -180,13 +182,17 @@ void fs_uae_process_input_event(int line, int action, int state, int playback) {
     }
 
     if (load_state) {
+#ifdef WITH_LUA
         fs_log("run handler on_fs_uae_load_state\n");
         fs_emu_lua_run_handler("on_fs_uae_load_state");
+#endif
         record_event = 0;
     }
     else if (save_state) {
+#ifdef WITH_LUA
         fs_log("run handler on_fs_uae_save_state\n");
         fs_emu_lua_run_handler("on_fs_uae_save_state");
+#endif
         record_event = 0;
     }
 
@@ -196,12 +202,16 @@ void fs_uae_process_input_event(int line, int action, int state, int playback) {
     amiga_send_input_event(action, state);
 
     if (load_state) {
+#ifdef WITH_LUA
         fs_log("run handler on_fs_uae_load_state_done\n");
         fs_emu_lua_run_handler("on_fs_uae_load_state_done");
+#endif
     }
     else if (save_state) {
+#ifdef WITH_LUA
         fs_log("run handler on_fs_uae_save_state_done\n");
         fs_emu_lua_run_handler("on_fs_uae_save_state_done");
+#endif
     }
 }
 
@@ -211,7 +221,9 @@ static int input_handler_loop(int line) {
     static int last_frame = -1;
     if (g_fs_uae_frame != last_frame) {
         // only run this for the first input handler loop per frame
+#ifdef WITH_LUA
         fs_emu_lua_run_handler("on_fs_uae_read_input");
+#endif
         last_frame = g_fs_uae_frame;
     }
 
@@ -227,7 +239,9 @@ static int input_handler_loop(int line) {
 
         g_fs_uae_last_input_event = action;
         g_fs_uae_last_input_event_state = state;
+#ifdef WITH_LUA
         fs_emu_lua_run_handler("on_fs_uae_input_event");
+#endif
 
         // handler can modify input event
         //action = g_fs_uae_last_input_event;
@@ -253,7 +267,7 @@ static void pause_throttle() {
     fs_emu_msleep(5);
 }
 
-void event_handler(int line) {
+static void event_handler(int line) {
     // printf("%d\n", line);
     if (line >= 0) {
         input_handler_loop(line);
@@ -352,6 +366,7 @@ void fs_uae_load_rom_files(const char *path) {
     fs_dir *dir = fs_dir_open(path, 0);
     if (dir == NULL) {
         fs_log("error opening dir\n");
+        return;
     }
 
     // we include the rom key when generating the cache name for the
@@ -539,7 +554,7 @@ static void on_init() {
     fs_log("\n");
 }
 
-void pause_function(int pause) {
+static void pause_function(int pause) {
     fs_log("pause_function %d\n", pause);
     //uae_pause(pause);
     amiga_pause(pause);
@@ -614,6 +629,7 @@ static int load_config_file() {
         g_fs_uae_config_dir_path = fs_path_get_dirname(
                 g_fs_uae_config_file_path);
     }
+#if 0
     else {
         if (fs_config_get_boolean("end_config") == 1) {
             // do not warn in case end_config was specified via argv
@@ -623,6 +639,7 @@ static int load_config_file() {
             g_warn_about_missing_config_file = 1;
         }
     }
+#endif
 
     char *path = fs_path_join(fs_uae_configurations_dir(),
             "Host.fs-uae", NULL);
@@ -650,7 +667,7 @@ static void main_function() {
 // int _putenv(const char *envstring);
 #endif
 
-void init_i18n() {
+static void init_i18n() {
     if (fs_config_get_boolean("localization") == 0) {
         fs_log("localization was forced off\n");
         return;
@@ -724,7 +741,7 @@ int ManyMouse_Init(void);
 void ManyMouse_Quit(void);
 const char *ManyMouse_DeviceName(unsigned int index);
 
-void list_joysticks() {
+static void list_joysticks() {
     printf("# FS-UAE VERSION %s\n", PACKAGE_VERSION);
     printf("# listing keyboards\n");
     printf("K: Keyboard\n");
@@ -859,72 +876,10 @@ static const char *overlay_names[] = {
 
 FILE *g_state_log_file = NULL;
 
-#ifdef WINDOWS
-
-char *mbcs_to_utf8(const char *str) {
-    int size = -1;
-    DWORD flags = MB_ERR_INVALID_CHARS;
-
-    int chars = MultiByteToWideChar(CP_ACP, flags, str, size, NULL, 0);
-    if (chars == 0) {
-        fs_log("error convering to wide string\n");
-        return NULL;
-    }
-    wchar_t* wstr = (wchar_t*) (malloc(sizeof(wchar_t) * (chars + 1)));
-    chars = MultiByteToWideChar(CP_ACP, flags, str, size, wstr, chars + 1);
-    if (chars == 0) {
-        fs_log("error convering to wide string\n");
-        free(wstr);
-        return NULL;
-    }
-
-    flags = 0;
-    int bytes = WideCharToMultiByte(
-            CP_UTF8,                   // UINT CodePage,
-            flags,                     // DWORD dwFlags,
-            wstr,                      // LPCWSTR lpWideCharStr,
-            size,                      // int cchWideChar,
-            NULL,                      // LPSTR lpMultiByteStr,
-            0,                         // int cbMultiByte,
-            NULL,                      // LPCSTR lpDefaultChar,
-            NULL);                     // LPBOOL lpUsedDefaultChar
-    if (bytes == 0) {
-        fs_log("error convering to utf-8\n");
-        free(wstr);
-        return NULL;
-    }
-    char* buffer = (char*) (malloc(bytes + 1));
-    bytes = WideCharToMultiByte(
-            CP_UTF8,                   // UINT CodePage,
-            flags,                     // DWORD dwFlags,
-            wstr,                      // LPCWSTR lpWideCharStr,
-            size,                      // int cchWideChar,
-            buffer,                    // LPSTR lpMultiByteStr,
-            bytes + 1,                 // int cbMultiByte,
-            NULL,                      // LPCSTR lpDefaultChar,
-            NULL);                     // LPBOOL lpUsedDefaultChar
-    if (bytes == 0) {
-        fs_log("error convering to utf-8\n");
-        free(wstr);
-        free(buffer);
-        return NULL;
-    }
-    return buffer;
-}
-
-#endif
-
 int main(int argc, char* argv[]) {
     fs_uae_argc = argc;
     fs_uae_argv = argv;
     fs_set_argv(argc, argv);
-
-#ifdef _WIN32
-    if (AttachConsole(-1) != 0) {
-        freopen("CON", "wb", stdout);
-        freopen("CON", "wb", stderr);
-    }
-#endif
 
     char **arg;
     arg = argv + 1;
@@ -991,19 +946,10 @@ int main(int argc, char* argv[]) {
     arg = argv + 1;
     if (g_fs_uae_config_file_path == NULL) {
         while (arg && *arg) {
-#ifdef WINDOWS
-            char *test_path = mbcs_to_utf8(*arg);
-#else
             const gchar *test_path = *arg;
-#endif
             if (test_path && fs_path_exists(test_path)) {
                 g_fs_uae_config_file_path = fs_strdup(test_path);
             }
-#ifdef WINDOWS
-            if (test_path) {
-                g_free(test_path);
-            }
-#endif
             arg++;
         }
     }
@@ -1017,8 +963,6 @@ int main(int argc, char* argv[]) {
     fs_log("libfsemu init\n");
     fs_log(LOG_LINE);
     fs_log("\n");
-
-    fs_uae_plugins_init();
 
     fs_emu_init_overlays(overlay_names);
     fs_emu_init();
@@ -1049,6 +993,8 @@ int main(int argc, char* argv[]) {
     fs_uae_kickstarts_dir();
     fs_uae_configurations_dir();
     fs_uae_init_path_resolver();
+
+    fs_uae_plugins_init();
 
     // must be called early, before fs_emu_init -affects video output
     fs_uae_configure_amiga_model();

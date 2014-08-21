@@ -1,4 +1,5 @@
 /*
+/*
  * emulating the clockport for external hw
  *
  * written by Christian Vogelgsang
@@ -242,7 +243,7 @@ static void REGPARAM2 clockport_bput (uaecptr addr, uae_u32 value)
 static addrbank clockport_bank = {
   clockport_lget, clockport_wget, clockport_bget,
   clockport_lput, clockport_wput, clockport_bput,
-  default_xlate, default_check, NULL, _T("Clockport"),
+  default_xlate, default_check, NULL, NULL, _T("Clockport"),
   dummy_lgeti, dummy_wgeti, ABFLAG_IO
 };
 

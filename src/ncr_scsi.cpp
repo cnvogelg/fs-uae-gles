@@ -96,9 +96,6 @@ static struct ncr_state *ncra4091[] =
 	&ncr_a4091_2
 };
 
-extern void cyberstorm_irq(int);
-extern void blizzardppc_irq(int);
-
 static void set_irq2(int level)
 {
 	if (level)
@@ -111,8 +108,10 @@ void ncr_rethink(void)
 		if (ncrs[i]->irq)
 			INTREQ(0x8000 | 0x0008);
 	}
+#ifdef WITH_CPUBOARD
 	if (ncr_cs.irq)
 		cyberstorm_irq(1);
+#endif
 }
 
 /* 720+ */
@@ -311,16 +310,19 @@ static uaecptr beswap(uaecptr addr)
 	return (addr & ~3) | (3 - (addr & 3));
 }
 
-void ncr_io_bput(struct ncr_state *ncr, uaecptr addr, uae_u32 val)
+static void ncr_io_bput(struct ncr_state *ncr, uaecptr addr, uae_u32 val)
 {
+#ifdef WITH_CPUBOARD
 	if (addr >= CYBERSTORM_SCSI_RAM_OFFSET && ncr->ramsize) {
 		cyberstorm_scsi_ram_put(addr, val);
 		return;
 	}
+#endif
 	addr &= IO_MASK;
 	lsi_mmio_write(ncr->devobject.lsistate, beswap(addr), val, 1);
 }
-void ncr710_io_bput(struct ncr_state *ncr, uaecptr addr, uae_u32 val)
+
+static void ncr710_io_bput(struct ncr_state *ncr, uaecptr addr, uae_u32 val)
 {
 	addr &= IO_MASK;
 	lsi710_mmio_write(ncr->devobject.lsistate, beswap(addr), val, 1);
@@ -338,14 +340,17 @@ static void ncr_bput2 (struct ncr_state *ncr, uaecptr addr, uae_u32 val)
 		ncr710_io_bput(ncr, addr, val);
 }
 
-uae_u32 ncr_io_bget(struct ncr_state *ncr, uaecptr addr)
+static uae_u32 ncr_io_bget(struct ncr_state *ncr, uaecptr addr)
 {
+#ifdef WITH_CPUBOARD
 	if (addr >= CYBERSTORM_SCSI_RAM_OFFSET && ncr->ramsize)
 		return cyberstorm_scsi_ram_get(addr);
+#endif
 	addr &= IO_MASK;
 	return lsi_mmio_read(ncr->devobject.lsistate, beswap(addr), 1);
 }
-uae_u32 ncr710_io_bget(struct ncr_state *ncr, uaecptr addr)
+
+static uae_u32 ncr710_io_bget(struct ncr_state *ncr, uaecptr addr)
 {
 	addr &= IO_MASK;
 	return lsi710_mmio_read(ncr->devobject.lsistate, beswap(addr), 1);
@@ -397,9 +402,6 @@ static uae_u32 REGPARAM2 ncr_wget (struct ncr_state *ncr, uaecptr addr)
 #ifdef JIT
 	special_mem |= S_READ;
 #endif
-	if (ncr->newncr)
-		return 0;
-	addr &= ncr->board_mask;
 	v = (ncr_bget2 (ncr, addr) << 8) | ncr_bget2 (ncr, addr + 1);
 	return v;
 }
@@ -452,7 +454,7 @@ DECLARE_MEMORY_FUNCTIONS(ncr4)
 static addrbank ncr_bank_a4091 = {
 	ncr4_lget, ncr4_wget, ncr4_bget,
 	ncr4_lput, ncr4_wput, ncr4_bput,
-	default_xlate, default_check, NULL, _T("A4091"),
+	default_xlate, default_check, NULL, NULL, _T("A4091"),
 	dummy_lgeti, dummy_wgeti, ABFLAG_IO
 };
 
@@ -461,7 +463,7 @@ DECLARE_MEMORY_FUNCTIONS(ncr42)
 static addrbank ncr_bank_a4091_2 = {
 	ncr42_lget, ncr42_wget, ncr42_bget,
 	ncr42_lput, ncr42_wput, ncr42_bput,
-	default_xlate, default_check, NULL, _T("A4091 #2"),
+	default_xlate, default_check, NULL, NULL, _T("A4091 #2"),
 	dummy_lgeti, dummy_wgeti, ABFLAG_IO
 };
 
@@ -478,7 +480,7 @@ static void REGPARAM2 ncr_wput (struct ncr_state *ncr, uaecptr addr, uae_u32 w)
 		{
 			case 0x44:
 			// yes, this could be much better..
-			if (currprefs.jit_direct_compatible_memory) {
+			if (expamem_z3hack(&currprefs)) {
 				if (ncr == &ncr_we) {
 					// warp engine needs to be first
 					value = 0x10000000;
@@ -512,8 +514,6 @@ static void REGPARAM2 ncr_wput (struct ncr_state *ncr, uaecptr addr, uae_u32 w)
 		}
 		return;
 	}
-	if (ncr->newncr)
-		return;
 	ncr_bput2(ncr, addr, w >> 8);
 	ncr_bput2 (ncr, addr + 1, w);
 }
@@ -680,24 +680,24 @@ static uae_u32 REGPARAM2 bppc_lget(uaecptr addr)
 static addrbank ncr_bank_warpengine = {
 	we_lget, we_wget, we_bget,
 	we_lput, we_wput, we_bput,
-	default_xlate, default_check, NULL, _T("Warp Engine SCSI"),
+	default_xlate, default_check, NULL, NULL, _T("Warp Engine SCSI"),
 	dummy_lgeti, dummy_wgeti, ABFLAG_IO
 };
-
+#ifdef WITH_CPUBOARD
 addrbank ncr_bank_cyberstorm = {
 	cs_lget, cs_wget, cs_bget,
 	cs_lput, cs_wput, cs_bput,
-	cyberstorm_scsi_ram_xlate, cyberstorm_scsi_ram_check, NULL, _T("CyberStorm SCSI"),
+	cyberstorm_scsi_ram_xlate, cyberstorm_scsi_ram_check, NULL, NULL, _T("CyberStorm SCSI"),
 	dummy_lgeti, dummy_wgeti, ABFLAG_IO
 };
 
 addrbank ncr_bank_blizzardppc = {
 	bppc_lget, bppc_wget, bppc_bget,
 	bppc_lput, bppc_wput, bppc_bput,
-	default_xlate, default_check, NULL, _T("Blizzard PPC SCSI"),
+	default_xlate, default_check, NULL, NULL, _T("Blizzard PPC SCSI"),
 	dummy_lgeti, dummy_wgeti, ABFLAG_IO
 };
-
+#endif
 
 
 static void ew (struct ncr_state *ncr, int addr, uae_u8 value)
@@ -735,8 +735,10 @@ static void ncr_reset_board(struct ncr_state *ncr)
 	ncr->irq = false;
 	if (ncr->devobject.lsistate)
 		lsi_scsi_reset(&ncr->devobject, ncr);
+#ifdef WITH_CPUBOARD
 	ncr->bank = &ncr_bank_cyberstorm;
 	ncr->irq_func = cyberstorm_irq;
+#endif
 }
 
 static void ncr710_reset_board (struct ncr_state *ncr)
@@ -763,11 +765,13 @@ static void ncr710_reset_board (struct ncr_state *ncr)
 		ncr->name = _T("Warp Engine SCSI");
 		ncr->bank = &ncr_bank_warpengine;
 	}
+#ifdef WITH_CPUBOARD
 	if (ncr == &ncr_bppc) {
 		ncr->name = _T("Blizzard PPC SCSI");
 		ncr->bank = &ncr_bank_blizzardppc;
 		ncr->irq_func = blizzardppc_irq;
 	}
+#endif
 }
 
 static const uae_u8 warpengine_a4000_autoconfig[16] = {

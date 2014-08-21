@@ -14,6 +14,7 @@
 #include "options.h"
 #include "filesys.h"
 #include "zfile.h"
+#include "uae/fs.h"
 
 #ifdef MACOSX
 #include <sys/stat.h>
@@ -191,7 +192,7 @@ static void trim (TCHAR *s)
 }
 */
 
-int isharddrive (const TCHAR *name)
+static int isharddrive (const TCHAR *name)
 {
     int i;
 

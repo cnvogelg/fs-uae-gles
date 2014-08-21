@@ -214,7 +214,7 @@ int slirp_select_fill(SOCKET *pnfds,
 		 * in the fragment queue, or there are TCP connections active
 		 */
 		do_slowtimo = ((tcb.so_next != &tcb) ||
-			       ((struct ipasfrag *)&ipq != (struct ipasfrag *)ipq.next));
+			       (&ipq.ip_link != ipq.ip_link.next));
 		
 		for (so = tcb.so_next; so != &tcb; so = so_next) {
 			so_next = so->so_next;
@@ -436,7 +436,7 @@ void slirp_select_poll(fd_set *readfds, fd_set *writefds, fd_set *xfds)
 					continue;
 				} /* else */
 				ret = soread(so);
-				
+
 				/* Output it if we read something */
 				if (ret > 0)
 				   tcp_output(sototcpcb(so));
@@ -591,7 +591,7 @@ struct arphdr
 	unsigned char		ar_tip[4];		/* target IP address		*/
 };
 
-void arp_input(const uint8_t *pkt, int pkt_len)
+static void arp_input(const uint8_t *pkt, int pkt_len)
 {
     struct ethhdr *eh = (struct ethhdr *)pkt;
     struct arphdr *ah = (struct arphdr *)(pkt + ETH_HLEN);

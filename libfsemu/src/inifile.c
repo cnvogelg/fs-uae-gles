@@ -3,6 +3,7 @@
 #endif
 
 #include <fs/inifile.h>
+#include <fs/filesys.h>
 
 #include <stdlib.h>
 #include <fs/hashtable.h>
@@ -20,9 +21,8 @@ static void free_group(void *data) {
     fs_hash_table_destroy((fs_hash_table*) data);
 }
 
-fs_ini_file* fs_ini_file_create() {
-    fs_ini_file *ini_file = malloc(sizeof(ini_file));
-    // FIXME: use full
+static fs_ini_file* fs_ini_file_create() {
+    fs_ini_file *ini_file = malloc(sizeof(fs_ini_file));
     ini_file->groups = fs_hash_table_new_full(fs_str_hash, fs_str_equal,
             free, free_group);
     return ini_file;
@@ -356,7 +356,7 @@ static int ini_parse(const char* filename,
     FILE* file;
     int error;
 
-    file = fopen(filename, "r");
+    file = fs_fopen(filename, "r");
     if (!file)
         return -1;
     error = ini_parse_file(file, handler, user);

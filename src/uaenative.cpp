@@ -659,7 +659,7 @@ struct uae_library {
     uaecptr aptr_data_table;
 };
 
-void uae_library_install (struct uae_library *library)
+static void uae_library_install (struct uae_library *library)
 {
 	library->aptr_name = ds (library->name);
 	library->aptr_id = ds (library->id);
@@ -710,11 +710,11 @@ void uae_library_install (struct uae_library *library)
                library->name, MODULE_SUFFIX);
 }
 
-uaecptr uae_library_startup (uaecptr res_addr, struct uae_library *library)
+static uaecptr uae_library_startup (uaecptr res_addr, struct uae_library *library)
 {
 	if (library->aptr_name == 0 || !currprefs.native_code) {
 		return res_addr;
-    }
+	}
 
 	put_word (res_addr + 0x00, 0x4AFC);
 	put_long (res_addr + 0x02, res_addr);
@@ -832,11 +832,17 @@ static struct uae_library uaenative_library = {
 
 void uaenative_install (void)
 {
+    if (!currprefs.native_code) {
+        return;
+    }
     uae_library_install (&uaenative_library);
 }
 
 uaecptr uaenative_startup (uaecptr res_addr)
 {
+    if (!currprefs.native_code) {
+        return res_addr;
+    }
     return uae_library_startup (res_addr, &uaenative_library);
 }
 

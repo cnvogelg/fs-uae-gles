@@ -588,7 +588,7 @@ int mmu030_match_ttr_access(uaecptr addr, uae_u32 fc, bool write)
 }
 
 /* Locked Read-Modify-Write */
-int mmu030_match_lrmw_ttr_access(uaecptr addr, uae_u32 fc)
+static int mmu030_match_lrmw_ttr_access(uaecptr addr, uae_u32 fc)
 {
     int tt0, tt1;
 
@@ -1601,7 +1601,7 @@ void mmu030_put_long_atc(uaecptr addr, uae_u32 val, int l, uae_u32 fc) {
         return;
     }
 
-    x_phys_put_long(physical_addr, val);
+    phys_put_long(physical_addr, val);
 }
 
 void mmu030_put_word_atc(uaecptr addr, uae_u16 val, int l, uae_u32 fc) {
@@ -1620,7 +1620,7 @@ void mmu030_put_word_atc(uaecptr addr, uae_u16 val, int l, uae_u32 fc) {
         return;
     }
 
-    x_phys_put_word(physical_addr, val);
+    phys_put_word(physical_addr, val);
 }
 
 void mmu030_put_byte_atc(uaecptr addr, uae_u8 val, int l, uae_u32 fc) {
@@ -1639,7 +1639,7 @@ void mmu030_put_byte_atc(uaecptr addr, uae_u8 val, int l, uae_u32 fc) {
         return;
     }
 
-    x_phys_put_byte(physical_addr, val);
+    phys_put_byte(physical_addr, val);
 }
 
 uae_u32 mmu030_get_long_atc(uaecptr addr, int l, uae_u32 fc) {
@@ -1658,9 +1658,10 @@ uae_u32 mmu030_get_long_atc(uaecptr addr, int l, uae_u32 fc) {
         return 0;
     }
 
-    return x_phys_get_long(physical_addr);
+    return phys_get_long(physical_addr);
 }
-uae_u32 mmu030_get_ilong_atc(uaecptr addr, int l, uae_u32 fc) {
+
+static uae_u32 mmu030_get_ilong_atc(uaecptr addr, int l, uae_u32 fc) {
 	uae_u32 page_index = addr & mmu030.translation.page.mask;
 	uae_u32 addr_mask = mmu030.translation.page.imask;
 
@@ -1695,10 +1696,10 @@ uae_u16 mmu030_get_word_atc(uaecptr addr, int l, uae_u32 fc) {
         return 0;
     }
     
-    return x_phys_get_word(physical_addr);
+    return phys_get_word(physical_addr);
 }
 
-uae_u16 mmu030_get_iword_atc(uaecptr addr, int l, uae_u32 fc) {
+static uae_u16 mmu030_get_iword_atc(uaecptr addr, int l, uae_u32 fc) {
 	uae_u32 page_index = addr & mmu030.translation.page.mask;
 	uae_u32 addr_mask = mmu030.translation.page.imask;
 
@@ -1733,11 +1734,11 @@ uae_u8 mmu030_get_byte_atc(uaecptr addr, int l, uae_u32 fc) {
         return 0;
     }
 
-    return x_phys_get_byte(physical_addr);
+    return phys_get_byte(physical_addr);
 }
 
 /* Generic versions of above */
-void mmu030_put_atc_generic(uaecptr addr, uae_u32 val, int l, uae_u32 fc, int size, int flags) {
+static void mmu030_put_atc_generic(uaecptr addr, uae_u32 val, int l, uae_u32 fc, int size, int flags) {
     uae_u32 page_index = addr & mmu030.translation.page.mask;
     uae_u32 addr_mask = mmu030.translation.page.imask;
     
@@ -1753,14 +1754,15 @@ void mmu030_put_atc_generic(uaecptr addr, uae_u32 val, int l, uae_u32 fc, int si
         return;
     }
 	if (size == sz_byte)
-	    x_phys_put_byte(physical_addr, val);
+	    phys_put_byte(physical_addr, val);
 	else if (size == sz_word)
-	    x_phys_put_word(physical_addr, val);
+	    phys_put_word(physical_addr, val);
 	else
-	    x_phys_put_long(physical_addr, val);
+	    phys_put_long(physical_addr, val);
 
 }
-uae_u32 mmu030_get_atc_generic(uaecptr addr, int l, uae_u32 fc, int size, int flags, bool checkwrite) {
+
+static uae_u32 mmu030_get_atc_generic(uaecptr addr, int l, uae_u32 fc, int size, int flags, bool checkwrite) {
     uae_u32 page_index = addr & mmu030.translation.page.mask;
     uae_u32 addr_mask = mmu030.translation.page.imask;
     
@@ -1776,10 +1778,10 @@ uae_u32 mmu030_get_atc_generic(uaecptr addr, int l, uae_u32 fc, int size, int fl
         return 0;
     }
 	if (size == sz_byte)
-		return x_phys_get_byte(physical_addr);
+		return phys_get_byte(physical_addr);
 	else if (size == sz_word)
-		return x_phys_get_word(physical_addr);
-	return x_phys_get_long(physical_addr);
+		return phys_get_word(physical_addr);
+	return phys_get_long(physical_addr);
 }
 
 
@@ -1852,7 +1854,7 @@ void mmu030_put_long(uaecptr addr, uae_u32 val, uae_u32 fc) {
     
 	//                                        addr,super,write
 	if ((!mmu030.enabled) || (mmu030_match_ttr_access(addr,fc,true)) || (fc==7)) {
-		x_phys_put_long(addr,val);
+		phys_put_long(addr,val);
 		return;
     }
 
@@ -1870,7 +1872,7 @@ void mmu030_put_word(uaecptr addr, uae_u16 val, uae_u32 fc) {
     
 	//                                        addr,super,write
 	if ((!mmu030.enabled) || (mmu030_match_ttr_access(addr,fc,true)) || (fc==7)) {
-		x_phys_put_word(addr,val);
+		phys_put_word(addr,val);
 		return;
     }
     
@@ -1888,7 +1890,7 @@ void mmu030_put_byte(uaecptr addr, uae_u8 val, uae_u32 fc) {
     
 	//                                        addr,super,write
 	if ((!mmu030.enabled) || (mmu030_match_ttr_access(addr, fc, true)) || (fc==7)) {
-		x_phys_put_byte(addr,val);
+		phys_put_byte(addr,val);
 		return;
     }
     
@@ -1974,7 +1976,7 @@ uae_u8 mmu030_get_byte(uaecptr addr, uae_u32 fc) {
     
 	//                                        addr,super,write
 	if ((!mmu030.enabled) || (mmu030_match_ttr_access(addr,fc,false)) || (fc==7)) {
-		return x_phys_get_byte(addr);
+		return phys_get_byte(addr);
     }
     
     int atc_line_num = mmu030_logical_is_in_atc(addr, fc, false);
@@ -1987,18 +1989,17 @@ uae_u8 mmu030_get_byte(uaecptr addr, uae_u32 fc) {
     }
 }
 
-
 /* Not commonly used access function */
-void mmu030_put_generic(uaecptr addr, uae_u32 val, uae_u32 fc, int size, int accesssize, int flags) {
+static void mmu030_put_generic(uaecptr addr, uae_u32 val, uae_u32 fc, int size, int accesssize, int flags) {
     
 	//                                        addr,super,write
 	if ((!mmu030.enabled) || (mmu030_match_ttr_access(addr, fc, true)) || (fc==7)) {
 		if (size == sz_byte)
-			x_phys_put_byte(addr, val);
+			phys_put_byte(addr, val);
 		else if (size == sz_word)
-			x_phys_put_word(addr, val);
+			phys_put_word(addr, val);
 		else
-			x_phys_put_long(addr, val);
+			phys_put_long(addr, val);
 		return;
     }
     
@@ -2281,21 +2282,9 @@ void mmu030_reset(int hardreset)
 	if (currprefs.cpu_cycle_exact || currprefs.cpu_compatible) {
 		x_phys_get_iword = get_word_icache030;
 		x_phys_get_ilong = get_long_icache030;
-		x_phys_get_byte = get_dcache_byte;
-		x_phys_get_word = get_dcache_word;
-		x_phys_get_long = get_dcache_long;
-		x_phys_put_byte = put_dcache_byte;
-		x_phys_put_word = put_dcache_word;
-		x_phys_put_long = put_dcache_long;
 	} else {
 		x_phys_get_iword = phys_get_word;
 		x_phys_get_ilong = phys_get_long;
-		x_phys_get_byte = phys_get_byte;
-		x_phys_get_word = phys_get_word;
-		x_phys_get_long = phys_get_long;
-		x_phys_put_byte = phys_put_byte;
-		x_phys_put_word = phys_put_word;
-		x_phys_put_long = phys_put_long;
 	}
 }
 

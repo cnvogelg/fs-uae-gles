@@ -73,8 +73,8 @@ void fs_config_set_log_file(const char *path) {
                     read = fread(buffer, 1, 1024, f);
                 }
                 free(buffer);
+                fclose(f);
             }
-            fclose(f);
         }
     }
 
@@ -98,6 +98,7 @@ void fs_log_string(const char *str) {
     fs_mutex_lock(g_mutex);
     if (g_fs_log_stdout) {
         printf("%s", str);
+        fflush(stdout);
     }
     if (g_log_file) {
         fprintf(g_log_file, "%s", str);

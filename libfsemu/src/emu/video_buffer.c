@@ -10,6 +10,7 @@
 
 #include "libfsemu.h"
 #include "video.h"
+#include "video_buffer.h"
 
 static fs_mutex* g_video_buffers_mutex = NULL;
 static fs_emu_video_buffer g_video_buffers[3] = {};
@@ -113,7 +114,7 @@ int fs_emu_video_buffer_grow(fs_emu_video_buffer *buffer, int width,
     return 1;
 }
 
-void copy_buffer_data(fs_emu_video_buffer *new_buffer,
+static void copy_buffer_data(fs_emu_video_buffer *new_buffer,
         fs_emu_video_buffer *old_buffer) {
     if (!old_buffer) {
         return;
@@ -126,8 +127,8 @@ void copy_buffer_data(fs_emu_video_buffer *new_buffer,
     int width;
     int first_line, last_line;
 
-    //int crop = g_fs_emu_video_crop_mode;
-    int crop = 0;
+#if 0
+    int crop = g_fs_emu_video_crop_mode;
 
     // calculate copy parameters
     if (crop) {
@@ -141,6 +142,7 @@ void copy_buffer_data(fs_emu_video_buffer *new_buffer,
                 new_buffer->crop.x * g_fs_emu_video_bpp;
     }
     else {
+#endif
         // no cropping; must copy the entire line
         width = new_buffer->width;
         first_line = 0;
@@ -148,7 +150,9 @@ void copy_buffer_data(fs_emu_video_buffer *new_buffer,
 
         src = old_buffer->data;
         dst = new_buffer->data;
+#if 0
     }
+#endif
     // actually copy the lines
     for (int y = first_line; y <= last_line; y++) {
         if (new_buffer->line[y]) {

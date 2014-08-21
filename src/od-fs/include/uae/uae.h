@@ -2,10 +2,15 @@
 #define LIBAMIGA_LIBAMIGA_H_
 
 #include <stdint.h>
+#include "uae/string.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/* Sets uaem metadata write flags based on chars in flags. You only need
+ * to call this function to set non-default behavior. */
+void uae_set_uaem_write_flags_from_string(const char *flags);
 
 int amiga_get_vsync_counter();
 void amiga_set_vsync_counter(int vsync_counter);
@@ -219,7 +224,7 @@ void amiga_set_native_library_dirs(const char **library_dirs);
 } // extern "C"
 #endif
 
-#ifndef UAE_OD_FS_UAE_FS_H
+#ifndef UAE_FS_H
 
 // This section must only be included by external code and cannot be used
 // by od-fs code.

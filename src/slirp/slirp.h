@@ -50,6 +50,12 @@ typedef int ioctlsockopt_t;
 # include <stdint.h>
 #endif
 
+#ifdef __MINGW32__
+typedef uint8_t u_int8_t;
+typedef uint16_t u_int16_t;
+typedef uint32_t u_int32_t;
+#endif
+
 #ifdef NEED_TYPEDEFS
 typedef char int8_t;
 typedef unsigned char u_int8_t;
@@ -297,14 +303,6 @@ void lprint _P((const char *, ...));
 
 extern int do_echo;
 
-#if SIZEOF_CHAR_P == 4
-# define insque_32 insque
-# define remque_32 remque
-#else
- extern inline void insque_32 _P((void *, void *));
- extern inline void remque_32 _P((void *));
-#endif
-
 #ifndef _WIN32
 #include <netdb.h>
 #endif
@@ -322,7 +320,7 @@ void if_output _P((struct socket *, struct mbuf *));
 void ip_init _P((void));
 void ip_cleanup _P((void));
 void ip_input _P((struct mbuf *));
-struct ip * ip_reass _P((register struct ipasfrag *, register struct ipq *));
+struct ip *ip_reass(struct ip *ip, struct ipq *fp);
 void ip_freef _P((struct ipq *));
 void ip_enq _P((register struct ipasfrag *, register struct ipasfrag *));
 void ip_deq _P((register struct ipasfrag *));
@@ -368,7 +366,7 @@ struct tcpcb *tcp_drop(struct tcpcb *tp, int err);
 #define MAX_MRU 16384
 #endif
 
-#ifndef _WIN32
+#if !defined(_WIN32) || defined(__MINGW32__)
 #define min(x,y) ((x) < (y) ? (x) : (y))
 #define max(x,y) ((x) > (y) ? (x) : (y))
 #endif

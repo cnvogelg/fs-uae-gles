@@ -16,8 +16,8 @@
 #endif
 
 #define UAEMAJOR 2
-#define UAEMINOR 8
-#define UAESUBREV 2
+#define UAEMINOR 9
+#define UAESUBREV 0
 
 typedef enum { KBD_LANG_US, KBD_LANG_DK, KBD_LANG_DE, KBD_LANG_SE, KBD_LANG_FR, KBD_LANG_IT, KBD_LANG_ES } KbdLang;
 
@@ -86,8 +86,11 @@ struct jport {
 #define MAX_SPARE_DRIVES 20
 #define MAX_CUSTOM_MEMORY_ADDRS 2
 
+#define CONFIG_TYPE_ALL -1
+#define CONFIG_TYPE_DEFAULT 0
 #define CONFIG_TYPE_HARDWARE 1
 #define CONFIG_TYPE_HOST 2
+#define CONFIG_TYPE_NORESET 4
 #define CONFIG_BLEN 2560
 
 #define TABLET_OFF 0
@@ -466,6 +469,10 @@ struct uae_prefs {
 	TCHAR a4091romfile2[MAX_DPATH];
 	TCHAR a4091romident2[256];
 	bool a4091;
+	TCHAR acceleratorromfile[MAX_DPATH];
+	TCHAR acceleratorromident[256];
+	TCHAR acceleratorextromfile[MAX_DPATH];
+	TCHAR acceleratorextromident[256];
 	TCHAR flashfile[MAX_DPATH];
 	TCHAR rtcfile[MAX_DPATH];
 	TCHAR cartfile[MAX_DPATH];
@@ -494,6 +501,7 @@ struct uae_prefs {
 	int cpu060_revision;
 	int fpu_model;
 	int fpu_revision;
+	int ppc_mode;
 	bool cpu_compatible;
 	bool int_no_unimplemented;
 	bool fpu_no_unimplemented;
@@ -696,6 +704,7 @@ extern uae_u32 cfgfile_modify (uae_u32 index, const TCHAR *parms, uae_u32 size, 
 extern void cfgfile_addcfgparam (TCHAR *);
 extern int built_in_prefs (struct uae_prefs *p, int model, int config, int compa, int romcheck);
 extern int built_in_chipset_prefs (struct uae_prefs *p);
+extern int built_in_cpuboard_prefs(struct uae_prefs *p);
 extern int cmdlineparser (const TCHAR *s, TCHAR *outp[], int max);
 extern int cfgfile_configuration_change (int);
 extern void fixup_prefs_dimensions (struct uae_prefs *prefs);

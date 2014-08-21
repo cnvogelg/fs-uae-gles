@@ -2,18 +2,18 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.67])
-AC_INIT([FS-UAE], [2.5.6dev],
+AC_INIT([FS-UAE], [2.5.12dev],
         [frode@fs-uae.net], [fs-uae], [http://fs-uae.net])
 AC_CONFIG_AUX_DIR([.])
 AC_CANONICAL_SYSTEM
 AC_CONFIG_SRCDIR([src/main.cpp])
 AC_CONFIG_HEADERS([config.h])
-# AC_CONFIG_MACRO_DIRS([m4])
+AC_CONFIG_MACRO_DIRS([m4])
 AM_INIT_AUTOMAKE([tar-ustar subdir-objects])
 
 AC_SUBST([PACKAGE_SERIES], [devel])
 
-AC_DEFINE_UNQUOTED([UAE_BASE_VERSION], ["WinUAE 2.8.2 beta 8"],
+AC_DEFINE_UNQUOTED([UAE_BASE_VERSION], ["WinUAE 2.9.0 beta 12"],
 [Which UAE core this version is based on.])
 
 PACKAGE_MAJOR=`echo ${PACKAGE_VERSION} | sed -e 's,\(\.*\)\..*\..*,\1,g'`
@@ -25,8 +25,8 @@ AC_SUBST(PACKAGE_REVISION)
 
 # Checks for programs.
 
-AC_PROG_CXX
 AC_PROG_CC
+AC_PROG_CXX
 AC_PROG_CPP
 AC_PROG_INSTALL
 # AC_PROG_LIBTOOL
@@ -37,6 +37,26 @@ AM_PROG_CC_C_O
 # AC_PATH_TOOL(OBJCOPY, objcopy)
 AC_PATH_PROG([MSGFMT], [msgfmt])
 AC_PATH_PROG([ZIP], [zip])
+
+# Compiler flags
+
+AX_CHECK_COMPILE_FLAG(-fno-strict-overflow,
+[f_no_strict_overflow=yes],
+[f_no_strict_overflow=no])
+AM_CONDITIONAL([F_NO_STRICT_OVERFLOW],
+[test x$f_no_strict_overflow = xyes])
+
+AX_CHECK_COMPILE_FLAG(-Wmissing-declarations,
+[w_missing_declarations=yes],
+[w_missing_declarations=no])
+AM_CONDITIONAL([W_MISSING_DECLARATIONS],
+[test x$w_missing_declarations = xyes])
+
+AX_CHECK_COMPILE_FLAG(-Wmissing-format-attribute,
+[w_missing_format_attribute=yes],
+[w_missing_format_attribute=no])
+AM_CONDITIONAL([W_MISSING_FORMAT_ATTRIBUTE],
+[test x$w_missing_format_attribute = xyes])
 
 # Misc system checks.
 
@@ -64,7 +84,15 @@ AC_CHECK_LIB([gdi32], [main])
 AC_DEFINE([USE_GLIB], [1], [Define to 1 to use GLib])
 PKG_CHECK_MODULES([GLIB], [glib-2.0 >= 2.32 gthread-2.0])
 
-PKG_CHECK_MODULES([LIBMPEG2], [libmpeg2 libmpeg2convert])
+AC_CHECK_LIB([Iphlpapi], [main])
+
+AM_CONDITIONAL([BUILTIN_GLEE], [true])
+
+# Todo: make configurable
+# PKG_CHECK_MODULES([LIBMPEG2], [libmpeg2 libmpeg2convert])
+AM_CONDITIONAL([BUILTIN_LIBMPEG2], [true])
+
+AM_CONDITIONAL([BUILTIN_MANYMOUSE], [true])
 
 # The built-in Lua has been sandboxed
 # AC_DEFINE([USE_LUA], [1], [Define to 1 to use LUA])
@@ -261,10 +289,12 @@ AC_C_VOLATILE
 
 AX_GCC_FUNC_ATTRIBUTE(always_inline)
 AX_GCC_FUNC_ATTRIBUTE(fastcall)
+AX_GCC_FUNC_ATTRIBUTE(format)
 AX_GCC_FUNC_ATTRIBUTE(noinline)
 AX_GCC_FUNC_ATTRIBUTE(noreturn)
 AX_GCC_FUNC_ATTRIBUTE(regparm)
 AX_GCC_FUNC_ATTRIBUTE(unused)
+
 AX_GCC_VAR_ATTRIBUTE(unused)
 
 # FIXME: not found on the mingw box
@@ -293,12 +323,12 @@ AC_TYPE_UINT64_T
 AC_TYPE_UINT8_T
 AC_TYPE_LONG_LONG_INT
 
-AC_CHECK_SIZEOF(short)
-AC_CHECK_SIZEOF(long)
 AC_CHECK_SIZEOF(int)
-AC_CHECK_SIZEOF(void *)
+AC_CHECK_SIZEOF(long)
 AC_CHECK_SIZEOF(long long)
 AC_CHECK_SIZEOF(long long int)
+AC_CHECK_SIZEOF(short)
+AC_CHECK_SIZEOF(void *)
 
 # Checks for library functions.
 
@@ -492,7 +522,7 @@ AM_CONDITIONAL([$1], [test x$enable_$2 = xyes])
 ])
 
 OPT_FEATURE([A2065], [a2065], [a2065],
-	[enable A2065 ethernet card], [no])
+	[enable A2065 ethernet card], [yes])
 OPT_FEATURE([A2091], [a2091], [a2091],
 	[enable A590/A2091 SCSI], [yes])
 OPT_FEATURE([ACTION_REPLAY], [action_replay], [action-replay],
@@ -503,6 +533,10 @@ OPT_FEATURE([CD32], [cd32], [cd32],
 	[enable CD32 emulation], [yes])
 OPT_FEATURE([CDTV], [cdtv], [cdtv],
 	[enable CDTV emulation], [yes])
+OPT_FEATURE([WITH_CPUBOARD], [cpuboard], [cpuboard],
+	[enable cpu board emulation], [yes])
+OPT_FEATURE([A_DMS], [dms], [dms],
+        [enable DMS support], [yes])
 OPT_FEATURE([DRIVESOUND], [drivesound], [drivesound],
 	[enable drive sound emulation], [yes])
 OPT_FEATURE([FPUEMU], [fpuemu], [fpuemu],
@@ -513,12 +547,16 @@ OPT_FEATURE([WITH_NETPLAY], [netplay], [netplay],
 	[enable netplay support], [yes])
 OPT_FEATURE([NCR9X], [ncr9x], [ncr9x],
 	[enable 53C9X SCSI], [yes])
+OPT_FEATURE([WITH_PPC], [ppc], [ppc],
+	[enable PPC (requires cpu board)], [yes])
 OPT_FEATURE([WITH_SLIRP], [slirp], [slirp],
-	[enable SLIRP (user mode NAT)], [no])
+	[enable SLIRP (user mode NAT)], [yes])
 OPT_FEATURE([WITH_UAENATIVE], [uaenative], [uaenative],
 	[enable uaenative.library], [yes])
-OPT_FEATURE([WITH_UAENET], [uaenet], [uaenet],
-	[enable uaenet.device], [no])
+OPT_FEATURE([SANA2], [uaenet], [uaenet],
+	[enable uaenet.device], [yes])
+OPT_FEATURE([WITH_UDIS86], [udis86], [udis86],
+	[enable UDIS86 x86/x86-64 disassembler], [yes])
 OPT_FEATURE([WITH_XML_SHADER], [xml_shader], [xml-shader],
 	[enable XML shader support], [yes])
 OPT_FEATURE([A_ZIP], [zip], [zip],
@@ -527,6 +565,7 @@ OPT_FEATURE([A_ZIP], [zip], [zip],
 
 AC_DEFINE([FPU_UAE], [1], [Define to 1])
 
+AC_CONFIG_SUBDIRS([libmpeg2])
 
 # Write Makefile
 

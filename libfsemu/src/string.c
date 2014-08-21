@@ -29,7 +29,7 @@
 #define TOUPPER(c)              (ISLOWER (c) ? (c) - 'a' + 'A' : (c))
 #define TOLOWER(c)              (ISUPPER (c) ? (c) - 'A' + 'a' : (c))
 
-static const uint16_t ascii_table_data[256] = { 0x004, 0x004, 0x004, 0x004,
+const uint16_t fs_ascii_table[256] = { 0x004, 0x004, 0x004, 0x004,
         0x004, 0x004, 0x004, 0x004, 0x004, 0x104, 0x104, 0x004, 0x104, 0x104,
         0x004, 0x004, 0x004, 0x004, 0x004, 0x004, 0x004, 0x004, 0x004, 0x004,
         0x004, 0x004, 0x004, 0x004, 0x004, 0x004, 0x004, 0x004, 0x140, 0x0d0,
@@ -45,8 +45,6 @@ static const uint16_t ascii_table_data[256] = { 0x004, 0x004, 0x004, 0x004,
         0x0d0, 0x0d0, 0x0d0, 0x004
 /* the upper 128 are all zeroes */
 };
-
-const uint16_t * const fs_ascii_table = ascii_table_data;
 
 int fs_str_equal (const void *v1, const void *v2) {
     const char *string1 = v1;
@@ -128,7 +126,7 @@ char* fs_strndup(const char *str, size_t n) {
     return new_str;
 }
 
-char *fs_strnfill(size_t length, char fill_char) {
+static char *fs_strnfill(size_t length, char fill_char) {
     char *str;
 
     str = fs_new (char, length + 1);
@@ -138,7 +136,7 @@ char *fs_strnfill(size_t length, char fill_char) {
     return str;
 }
 
-char *fs_stpcpy(char *dest, const char *src) {
+static char *fs_stpcpy(char *dest, const char *src) {
     if (src == NULL) {
         return NULL;
     }

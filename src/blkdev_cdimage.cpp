@@ -25,7 +25,8 @@
 #include "scsidev.h"
 #include "mp3decoder.h"
 #include "cda_play.h"
-#include "memory_uae.h"
+#include "uae/memory.h"
+#include "uae/cdrom.h"
 #ifdef RETROPLATFORM
 #include "rp.h"
 #endif
@@ -148,11 +149,33 @@ static struct cdtoc *findtoc (struct cdunit *cdu, int *sectorp, bool data)
 	return NULL;
 }
 
-static int do_read (struct cdunit *cdu, struct cdtoc *t, uae_u8 *data, int sector, int offset, int size)
+static int do_read (struct cdunit *cdu, struct cdtoc *t, uae_u8 *data, int sector, int offset, int size, bool audio)
 {
 	if (t->enctype == ENC_CHD) {
 #ifdef WITH_CHD
-		return read_partial_sector(cdu->chd_cdf, data, sector + t->offset, 0, offset, size) == CHDERR_NONE;
+		int type = CD_TRACK_MODE1_RAW;
+		uae_u8 tmpbuf[2352];
+		if (size > 2352)
+			return 0;
+		switch (size)
+		{
+			case 2352:
+			type = CD_TRACK_MODE1_RAW;
+			break;
+			case 2336:
+			type = CD_TRACK_MODE2;
+			break;
+			case 2048:
+			type = CD_TRACK_MODE1;
+			break;
+		}
+		if (audio && size == 2352)
+			type = CD_TRACK_AUDIO;
+		if (cdrom_read_data(cdu->chd_cdf, sector + t->offset, tmpbuf, type, true)) {
+			memcpy(data, tmpbuf + offset, size);
+			return 1;
+		}
+		return 0;
 #endif
 	} else if (t->handle) {
 		int ssize = t->size + t->skipsize;
@@ -223,7 +246,7 @@ static void flac_get_size (struct cdtoc *t)
 	FLAC__StreamDecoder *decoder = FLAC__stream_decoder_new ();
 	if (decoder) {
 		FLAC__stream_decoder_set_md5_checking (decoder, false);
-		int UNUSED(init_status) = FLAC__stream_decoder_init_stream (decoder,
+		int init_status = FLAC__stream_decoder_init_stream (decoder,
 			&file_read_callback, &file_seek_callback, &file_tell_callback,
 			&file_len_callback, &file_eof_callback,
 			&flac_write_callback, &flac_metadata_callback, &flac_error_callback, t);
@@ -238,7 +261,7 @@ static uae_u8 *flac_get_data (struct cdtoc *t)
 	FLAC__StreamDecoder *decoder = FLAC__stream_decoder_new ();
 	if (decoder) {
 		FLAC__stream_decoder_set_md5_checking (decoder, false);
-		int UNUSED(init_status) = FLAC__stream_decoder_init_stream (decoder,
+		int init_status = FLAC__stream_decoder_init_stream (decoder,
 			&file_read_callback, &file_seek_callback, &file_tell_callback,
 			&file_len_callback, &file_eof_callback,
 			&flac_write_callback, &flac_metadata_callback, &flac_error_callback, t);
@@ -284,8 +307,7 @@ static int getsub_deinterleaved (uae_u8 *dst, struct cdunit *cdu, struct cdtoc *
 		if (t->enctype == ENC_CHD) {
 #ifdef WITH_CHD
 			const cdrom_track_info *cti = t->chdtrack;
-			ret = do_read (cdu, t, dst, sector, cti->datasize, cti->subsize);
-			if (ret)
+			if (cdrom_read_subcode(cdu->chd_cdf, sector, dst, false))
 				ret = t->subcode;
 #endif
 		} else if (t->subhandle) {
@@ -555,7 +577,7 @@ static void *cdda_play_func (void *v)
 					if (!(t->ctrl & 4)) {
 						if (t->enctype == ENC_CHD) {
 #ifdef WITH_CHD
-							do_read (cdu, t, dst, sector, 0, t->size);
+							do_read (cdu, t, dst, sector, 0, t->size, true);
 							for (int i = 0; i < 2352; i+=2) {
 								uae_u8 p;
 								p = dst[i + 0];
@@ -809,7 +831,7 @@ static int command_rawread (int unitnum, uae_u8 *data, int sector, int size, int
 				data[13] = tobcd((uae_u8)((address / 75) % 60));
 				data[14] = tobcd((uae_u8)(address % 75));
 				data[15] = 2; /* MODE2 */
-				do_read(cdu, t, data + 16, sector, 0, t->size);
+				do_read(cdu, t, data + 16, sector, 0, t->size, false);
 				sector++;
 				asector++;
 				data += sectorsize;
@@ -819,7 +841,7 @@ static int command_rawread (int unitnum, uae_u8 *data, int sector, int size, int
 			// 2048 -> 2352
 			while (size-- > 0) {
 				memset (data, 0, 16);
-				do_read (cdu, t, data + 16, sector, 0, 2048);
+				do_read (cdu, t, data + 16, sector, 0, 2048, false);
 				encode_l2 (data, sector + 150);
 				sector++;
 				asector++;
@@ -830,8 +852,8 @@ static int command_rawread (int unitnum, uae_u8 *data, int sector, int size, int
 			// 2352 -> 2048
 			while (size-- > 0) {
 				uae_u8 b = 0;
-				do_read (cdu, t, &b, sector, 15, 1);
-				do_read (cdu, t, data, sector, b == 2 ? 24 : 16, sectorsize);
+				do_read (cdu, t, &b, sector, 15, 1, false);
+				do_read (cdu, t, data, sector, b == 2 ? 24 : 16, sectorsize, false);
 				sector++;
 				asector++;
 				data += sectorsize;
@@ -841,10 +863,10 @@ static int command_rawread (int unitnum, uae_u8 *data, int sector, int size, int
 			// 2352 -> 2336
 			while (size-- > 0) {
 				uae_u8 b = 0;
-				do_read (cdu, t, &b, sector, 15, 1);
+				do_read (cdu, t, &b, sector, 15, 1, false);
 				if (b != 2 && b != 0) // MODE0 or MODE2 only allowed
 					return 0;
-				do_read (cdu, t, data, sector, 16, sectorsize);
+				do_read (cdu, t, data, sector, 16, sectorsize, false);
 				sector++;
 				asector++;
 				data += sectorsize;
@@ -853,7 +875,7 @@ static int command_rawread (int unitnum, uae_u8 *data, int sector, int size, int
 		} else if (sectorsize == t->size) {
 			// no change
 			while (size -- > 0) {
-				do_read (cdu, t, data, sector, 0, sectorsize);
+				do_read (cdu, t, data, sector, 0, sectorsize, false);
 				sector++;
 				asector++;
 				data += sectorsize;
@@ -866,47 +888,45 @@ static int command_rawread (int unitnum, uae_u8 *data, int sector, int size, int
 
 		uae_u8 sectortype = extra >> 16;
 		uae_u8 cmd9 = extra >> 8;
-		int UNUSED(sync) = (cmd9 >> 7) & 1;
-		int UNUSED(headercodes) = (cmd9 >> 5) & 3;
-		int UNUSED(userdata) = (cmd9 >> 4) & 1;
-		int UNUSED(edcecc) = (cmd9 >> 3) & 1;
-		int UNUSED(errorfield) = (cmd9 >> 1) & 3;
+		int sync = (cmd9 >> 7) & 1;
+		int headercodes = (cmd9 >> 5) & 3;
+		int userdata = (cmd9 >> 4) & 1;
+		int edcecc = (cmd9 >> 3) & 1;
+		int errorfield = (cmd9 >> 1) & 3;
 		uae_u8 subs = extra & 7;
 		if (subs != 0 && subs != 1 && subs != 2 && subs != 4) {
 			ret = -1;
 			goto end;
 		}
 
-		if (isaudiotrack (&cdu->di.toc, sector)) {
-			if (sectortype != 0 && sectortype != 1) {
-				ret = -2;
-				goto end;
-			}
-			if (t->size != 2352) {
-				ret = -1;
-				goto end;
-			}
-			for (int i = 0; i < size; i++) {
-				do_read (cdu, t, data, sector, 0, t->size);
-				uae_u8 *p = data + t->size;
-				if (subs) {
-					uae_u8 subdata[SUB_CHANNEL_SIZE];
-					getsub_deinterleaved (subdata, cdu, t, sector);
-					if (subs == 4) { // all, de-interleaved
-						memcpy (p, subdata, SUB_CHANNEL_SIZE);
-						p += SUB_CHANNEL_SIZE;
-					} else if (subs == 2) { // q-only
-						memcpy (p, subdata + SUB_ENTRY_SIZE, SUB_ENTRY_SIZE);
-						p += SUB_ENTRY_SIZE;
-					} else if (subs == 1) { // all, interleaved
-						sub_to_interleaved (subdata, p);
-						p += SUB_CHANNEL_SIZE;
-					}
+		if (sectortype != 0 && sectortype != 1) {
+			ret = -2;
+			goto end;
+		}
+		if (t->size != 2352) {
+			ret = -1;
+			goto end;
+		}
+		for (int i = 0; i < size; i++) {
+			do_read (cdu, t, data, sector, 0, t->size, true);
+			uae_u8 *p = data + t->size;
+			if (subs) {
+				uae_u8 subdata[SUB_CHANNEL_SIZE];
+				getsub_deinterleaved (subdata, cdu, t, sector);
+				if (subs == 4) { // all, de-interleaved
+					memcpy (p, subdata, SUB_CHANNEL_SIZE);
+					p += SUB_CHANNEL_SIZE;
+				} else if (subs == 2) { // q-only
+					memcpy (p, subdata + SUB_ENTRY_SIZE, SUB_ENTRY_SIZE);
+					p += SUB_ENTRY_SIZE;
+				} else if (subs == 1) { // all, interleaved
+					sub_to_interleaved (subdata, p);
+					p += SUB_CHANNEL_SIZE;
 				}
-				ret += p - data;
-				data = p;
-				sector++;
 			}
+			ret += p - data;
+			data = p;
+			sector++;
 		}
 	}
 end:
@@ -925,7 +945,7 @@ static int command_read (int unitnum, uae_u8 *data, int sector, int numsectors)
 	cdda_stop (cdu);
 	if (t->size == 2048) {
 		while (numsectors-- > 0) {
-			do_read (cdu, t, data, sector, 0, 2048);
+			do_read (cdu, t, data, sector, 0, 2048, false);
 			data += 2048;
 			sector++;
 		}
@@ -933,11 +953,11 @@ static int command_read (int unitnum, uae_u8 *data, int sector, int numsectors)
 		while (numsectors-- > 0) {
 			if (t->size == 2352) {
 				uae_u8 b = 0;
-				do_read (cdu, t, &b, sector, 15, 1);
+				do_read (cdu, t, &b, sector, 15, 1, false);
 				// 2 = MODE2
-				do_read (cdu, t, data, sector, b == 2 ? 24 : 16, 2048);
+				do_read (cdu, t, data, sector, b == 2 ? 24 : 16, 2048, false);
 			} else {
-				do_read (cdu, t, data, sector, 16, 2048);
+				do_read (cdu, t, data, sector, 16, 2048, false);
 			}
 			data += 2048;
 			sector++;
@@ -1167,7 +1187,7 @@ static int parsemds (struct cdunit *cdu, struct zfile *zmds, const TCHAR *img)
 			tracknum = point - 1;
 		if (tracknum >= 0) {
 			MDS_Footer *footer = tb->footer_offset == 0 ? NULL : (MDS_Footer*)(mds + tb->footer_offset);
-			MDS_TrackExtraBlock *UNUSED(teb) = tb->extra_offset == 0 ? NULL : (MDS_TrackExtraBlock*)(mds + tb->extra_offset);
+			MDS_TrackExtraBlock *teb = tb->extra_offset == 0 ? NULL : (MDS_TrackExtraBlock*)(mds + tb->extra_offset);
 			t = &cdu->toc[tracknum];
 			t->adr = tb->adr_ctl >> 4;
 			t->ctrl = tb->adr_ctl & 15;
@@ -1231,7 +1251,7 @@ static int parsechd (struct cdunit *cdu, struct zfile *zcue, const TCHAR *img)
 	if (!f)
 		return 0;
 	chd_file *cf = new chd_file();
-	err = cf->open(f, false, NULL);
+	err = cf->open(*f, false, NULL);
 	if (err != CHDERR_NONE) {
 		write_log (_T("CHD '%s' err=%d\n"), zfile_getname (zcue), err);
 		zfile_fclose (f);
@@ -1602,7 +1622,7 @@ static int parsecue (struct cdunit *cdu, struct zfile *zcue, const TCHAR *img)
 			pregap += tn;
 			lastpregap = tn;
 		} else if (!_tcsnicmp (p, _T("POSTGAP"), 7)) {
-			struct cdtoc *UNUSED(t) = &cdu->toc[tracknum - 1];
+			struct cdtoc *t = &cdu->toc[tracknum - 1];
 			TCHAR *tt;
 			int tn;
 			p += 7;
@@ -1738,16 +1758,19 @@ static int parse_image (struct cdunit *cdu, const TCHAR *img)
 		if (p > curdir)
 			my_setcurrentdir (curdir, oldcurdir);
 
-		if (!_tcsicmp (ext, _T("cue")))
+		if (!_tcsicmp (ext, _T("cue"))) {
 			parsecue (cdu, zcue, img);
-		else if (!_tcsicmp (ext, _T("ccd")))
+		} else if (!_tcsicmp (ext, _T("ccd"))) {
 			parseccd (cdu, zcue, img);
-		else if (!_tcsicmp (ext, _T("mds")))
+		} else if (!_tcsicmp (ext, _T("mds"))) {
 			parsemds (cdu, zcue, img);
 #ifdef WITH_CHD
-		else if (!_tcsicmp (ext, _T("chd")))
+		} else if (!_tcsicmp (ext, _T("chd"))) {
+			if (oldcurdir[0])
+				my_setcurrentdir (oldcurdir, NULL);
 			parsechd (cdu, zcue, img);
 #endif
+		}
 
 		if (oldcurdir[0])
 			my_setcurrentdir (oldcurdir, NULL);

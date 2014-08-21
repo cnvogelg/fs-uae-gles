@@ -25,7 +25,7 @@
 #include "xwin.h"
 #include "identify.h"
 #include "audio.h"
-#include "sound.h"
+#include "sounddep/sound.h"
 #include "disk.h"
 #include "savestate.h"
 #include "autoconf.h"
@@ -41,8 +41,10 @@
 #include "cpummu.h"
 #include "cpummu030.h"
 #include "ar.h"
+#include "ppc/ppcd.h"
 
 #ifdef FSUAE // NL
+#include "uae/fs.h"
 #undef _WIN32
 #endif
 
@@ -280,7 +282,7 @@ uae_u32 get_ilong_debug (uaecptr addr)
 	}
 }
 
-int safe_addr (uaecptr addr, int size)
+static int safe_addr (uaecptr addr, int size)
 {
 	if (debug_mmu_mode) {
 		flagtype olds = regs.s;
@@ -359,7 +361,7 @@ static int more_params (TCHAR **c)
 }
 
 static uae_u32 readint (TCHAR **c);
-static uae_u32 UNUSED_FUNCTION(readbin) (TCHAR **c);
+static uae_u32 readbin (TCHAR **c);
 static uae_u32 readhex (TCHAR **c);
 
 static int readregx (TCHAR **c, uae_u32 *valp)
@@ -608,7 +610,7 @@ static uae_u32 readhex (TCHAR **c)
 	int size;
 	return readnum (c, &size, '$');
 }
-static uae_u32 UNUSED_FUNCTION(readbin) (TCHAR **c)
+static uae_u32 readbin (TCHAR **c)
 {
 	int size;
 	return readnum (c, &size, '%');
@@ -2372,7 +2374,7 @@ uae_u16 debug_wgetpeekdma_chipram (uaecptr addr, uae_u32 v, uae_u32 mask, int re
 	return vv;
 }
 
-void debug_putlpeek (uaecptr addr, uae_u32 v)
+static void debug_putlpeek (uaecptr addr, uae_u32 v)
 {
 	if (!memwatch_enabled)
 		return;
@@ -4218,7 +4220,30 @@ static void segtracker(TCHAR **inptr)
     }
 }
 
+static void ppc_disasm(uaecptr addr, uaecptr *nextpc, int cnt)
+{
+#ifdef WITH_PPC
+	PPCD_CB disa;
+
+	while(cnt-- > 0) {
+		uae_u32 instr = get_long_debug(addr);
+		disa.pc = addr;
+		disa.instr = instr;
+		PPCDisasm(&disa);
+		TCHAR *mnemo = au(disa.mnemonic);
+		TCHAR *ops = au(disa.operands);
+		console_out_f(_T("%08X  %08X  %-12s%-30s\n"), addr, instr, mnemo, ops);
+		xfree(ops);
+		xfree(mnemo);
+		addr += 4;
+	}
+	if (nextpc)
+		*nextpc = addr;
+#endif
+}
+
 static uaecptr nxdis, nxmem;
+static bool ppcmode;
 
 static BOOL debug_line (TCHAR *input)
 {
@@ -4312,6 +4337,13 @@ static BOOL debug_line (TCHAR *input)
 				} else {
 					uae_u32 daddr;
 					int count;
+					if (*inptr == 'p') {
+						ppcmode = true;
+						next_char(&inptr);
+					} else if(*inptr == 'o') {
+						ppcmode = false;
+						next_char(&inptr);
+					}
 					if (more_params (&inptr))
 						daddr = readhex (&inptr);
 					else
@@ -4320,7 +4352,11 @@ static BOOL debug_line (TCHAR *input)
 						count = readhex (&inptr);
 					else
 						count = 10;
-					m68k_disasm (daddr, &nxdis, count);
+					if (ppcmode) {
+						ppc_disasm(daddr, &nxdis, count);
+					} else {
+						m68k_disasm (daddr, &nxdis, count);
+					}
 				}
 			}
 			break;
@@ -4612,7 +4648,7 @@ static void debug_1 (void)
 
 static void addhistory (void)
 {
-	uae_u32 UNUSED(pc) = m68k_getpc ();
+	uae_u32 pc = m68k_getpc ();
 	//    if (!notinrom())
 	//	return;
 	history[lasthist] = regs;

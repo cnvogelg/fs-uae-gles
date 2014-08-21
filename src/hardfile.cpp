@@ -31,6 +31,7 @@
 #ifdef WITH_CHD
 #include "archivers/chd/chdtypes.h"
 #include "archivers/chd/chd.h"
+#include "archivers/chd/harddisk.h"
 #endif
 
 //#undef DEBUGME
@@ -68,9 +69,10 @@ struct hardfileprivdata {
 	uaecptr changeint;
 };
 
+#define HFD_CHD_OTHER 5
+#define HFD_CHD_HD 4
 #define HFD_VHD_DYNAMIC 3
 #define HFD_VHD_FIXED 2
-#define HFD_CHD 1
 
 STATIC_INLINE uae_u32 gl (uae_u8 *p)
 {
@@ -475,20 +477,43 @@ int hdf_open (struct hardfiledata *hfd, const TCHAR *pname)
 	_tcscpy (nametmp, pname);
 	TCHAR *ext = _tcsrchr (nametmp, '.');
 	if (ext && !_tcsicmp (ext, _T(".chd"))) {
-		struct zfile *zf = zfile_fopen (nametmp, _T("rb"));
+		bool chd_readonly = false;
+		struct zfile *zf = NULL;
+		if (!hfd->ci.readonly)
+			zf = zfile_fopen (nametmp, _T("rb+"));
+		if (!zf) {
+			chd_readonly = true;
+			zf = zfile_fopen (nametmp, _T("rb"));
+		}
 		if (zf) {
-			int err;
+			int err = CHDERR_FILE_NOT_WRITEABLE;
+			hard_disk_file *chdf;
 			chd_file *cf = new chd_file();
-			err = cf->open(zf, false, NULL);
+			if (!chd_readonly)
+				err = cf->open(*zf, true, NULL);
+			if (err == CHDERR_FILE_NOT_WRITEABLE) {
+				chd_readonly = true;
+				err = cf->open(*zf, false, NULL);
+			}
 			if (err != CHDERR_NONE) {
 				zfile_fclose (zf);
-				goto nonvhd;
+				delete cf;
+				goto end;
 			}
-			hfd->chd_handle = cf;
-			hfd->ci.readonly = true;
-			hfd->hfd_type = HFD_CHD;
-			hfd->handle_valid = -1;
+			chdf = hard_disk_open(cf);
+			if (!chdf) {
+				hfd->ci.readonly = true;
+				hfd->hfd_type = HFD_CHD_OTHER;
+				hfd->chd_handle = cf;
+			} else {
+				hfd->hfd_type = HFD_CHD_HD;
+				hfd->chd_handle = chdf;
+			}
+			if (chd_readonly)
+				hfd->ci.readonly = true;
 			hfd->virtsize = cf->logical_bytes ();
+			hfd->handle_valid = -1;
+			write_log(_T("CHD '%s' mounted as %s, %s.\n"), pname, chdf ? _T("HD") : _T("OTHER"), hfd->ci.readonly ? _T("read only") : _T("read/write"));
 			goto nonvhd;
 		}
 	}
@@ -563,11 +588,18 @@ void hdf_close (struct hardfiledata *hfd)
 	hdf_flush_cache (hfd);
 	hdf_close_target (hfd);
 #ifdef WITH_CHD
-	if (hfd->chd_handle) {
+	if (hfd->hfd_type == HFD_CHD_OTHER) {
 		chd_file *cf = (chd_file*)hfd->chd_handle;
 		cf->close();
-		hfd->chd_handle = NULL;
+		delete cf;
+	} else if (hfd->hfd_type == HFD_CHD_HD) {
+		hard_disk_file *chdf = (hard_disk_file*)hfd->chd_handle;
+		chd_file *cf = hard_disk_get_chd(chdf);
+		hard_disk_close(chdf);
+		cf->close();
+		delete cf;
 	}
+	hfd->chd_handle = NULL;
 #endif
 	hfd->hfd_type = 0;
 	xfree (hfd->vhd_header);
@@ -580,8 +612,6 @@ int hdf_dup (struct hardfiledata *dhfd, const struct hardfiledata *shfd)
 {
 	return hdf_dup_target (dhfd, shfd);
 }
-
-extern int get_guid_target (uae_u8 *out);
 
 static uae_u64 vhd_read (struct hardfiledata *hfd, void *v, uae_u64 offset, uae_u64 len)
 {
@@ -874,11 +904,27 @@ static int hdf_read2 (struct hardfiledata *hfd, void *buffer, uae_u64 offset, in
 	else if (hfd->hfd_type == HFD_VHD_FIXED)
 		return hdf_read_target (hfd, buffer, offset + 512, len);
 #ifdef WITH_CHD
-	else if (hfd->hfd_type == HFD_CHD) {
+	else if (hfd->hfd_type == HFD_CHD_OTHER) {
 		chd_file *cf = (chd_file*)hfd->chd_handle;
 		if (cf->read_bytes(offset, buffer, len) == CHDERR_NONE)
 			return len;
 		return 0;
+	} else if (hfd->hfd_type == HFD_CHD_HD) {
+		hard_disk_file *chdf = (hard_disk_file*)hfd->chd_handle;
+		hard_disk_info *chdi = hard_disk_get_info(chdf);
+		chd_file *cf = hard_disk_get_chd(chdf);
+		uae_u8 *buf = (uae_u8*)buffer;
+		int got = 0;
+		offset /= chdi->sectorbytes;
+		while (len > 0) {
+			if (cf->read_units(offset, buf) != CHDERR_NONE)
+				return got;
+			got += chdi->sectorbytes;
+			buf += chdi->sectorbytes;
+			len -= chdi->sectorbytes;
+			offset++;
+		}
+		return got;
 	}
 #endif
 	else
@@ -892,8 +938,27 @@ static int hdf_write2 (struct hardfiledata *hfd, void *buffer, uae_u64 offset, i
 	else if (hfd->hfd_type == HFD_VHD_FIXED)
 		return hdf_write_target (hfd, buffer, offset + 512, len);
 #ifdef WITH_CHD
-	else if (hfd->hfd_type == HFD_CHD)
+	else if (hfd->hfd_type == HFD_CHD_OTHER)
 		return 0;
+	else if (hfd->hfd_type == HFD_CHD_HD) {
+		if (hfd->ci.readonly)
+			return 0;
+		hard_disk_file *chdf = (hard_disk_file*)hfd->chd_handle;
+		hard_disk_info *chdi = hard_disk_get_info(chdf);
+		chd_file *cf = hard_disk_get_chd(chdf);
+		uae_u8 *buf = (uae_u8*)buffer;
+		int got = 0;
+		offset /= chdi->sectorbytes;
+		while (len > 0) {
+			if (cf->write_units(offset, buf) != CHDERR_NONE)
+				return got;
+			got += chdi->sectorbytes;
+			buf += chdi->sectorbytes;
+			len -= chdi->sectorbytes;
+			offset++;
+		}
+		return got;
+	}
 #endif
 	else
 		return hdf_write_target (hfd, buffer, offset, len);
@@ -1244,7 +1309,7 @@ int scsi_hd_emulate (struct hardfiledata *hfd, struct hd_hardfiledata *hdhfd, ua
 	case 0x1a: /* MODE SENSE(6) */
 		{
 			uae_u8 *p;
-			int UNUSED(pc) = cmdbuf[2] >> 6;
+			int pc = cmdbuf[2] >> 6;
 			int pcode = cmdbuf[2] & 0x3f;
 			int dbd = cmdbuf[1] & 8;
 			int alen = cmdbuf[4];
@@ -1508,7 +1573,7 @@ static int handle_scsi (uaecptr request, struct hardfiledata *hfd)
 	uae_u8 scsi_flags = get_byte (acmd + 20);
 	uaecptr scsi_sense = get_long (acmd + 22);
 	uae_u16 scsi_sense_len = get_word (acmd + 26);
-	uae_u8 UNUSED(cmd) = get_byte (scsi_cmd);
+	uae_u8 cmd = get_byte (scsi_cmd);
 	uae_u8 cmdbuf[256];
 	int status, ret = 0, reply_len, sense_len;
 	uae_u32 i;
@@ -2055,7 +2120,7 @@ static uae_u32 REGPARAM2 hardfile_beginio (TrapContext *context)
 {
 	uae_u32 request = m68k_areg (regs, 1);
 	uae_u8 flags = get_byte (request + 30);
-	int UNUSED(cmd) = get_word (request + 28);
+	int cmd = get_word (request + 28);
 	int unit = mangleunit (get_long (request + 24));
 	struct hardfiledata *hfd = get_hardfile_data (unit);
 	struct hardfileprivdata *hfpd = &hardfpd[unit];

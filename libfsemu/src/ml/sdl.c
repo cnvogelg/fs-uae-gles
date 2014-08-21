@@ -25,7 +25,7 @@
 //#endif
 
 #include <fs/config.h>
-#include <fs/glee.h>
+#include <GLee.h>
 #include <fs/hashtable.h>
 #include <fs/ml.h>
 #include <fs/queue.h>
@@ -60,7 +60,7 @@ static int g_fs_ml_automatic_input_grab = 1;
 static int g_fs_ml_keyboard_input_grab = 1;
 static int g_fsaa = 0;
 
-static int g_debug_keys = 0;
+static int g_debug_input = 0;
 static int g_f12_state, g_f11_state;
 
 static char *g_window_title;
@@ -245,7 +245,7 @@ static void set_video_mode() {
             flags |= SDL_WINDOW_BORDERLESS;
         }
         else if (g_fs_emu_video_fullscreen_mode == FULLSCREEN_DESKTOP) {
-            fs_log("using fullscreen dektop mode\n");
+            fs_log("using fullscreen desktop mode\n");
             // the width and height will not be used for the fullscreen
             // desktop mode, only for the window when toggling fullscreen
             // state
@@ -607,7 +607,7 @@ void fs_ml_clear_keyboard_modifier_state() {
 #endif
 
 #ifdef USE_SDL2
-#include "sdl2_keys.c"
+#include "sdl2_keys.h"
 // modifiers have values in SDL and SDL2, except META is renamed to GUI
 #define KMOD_LMETA KMOD_LGUI
 #define KMOD_RMETA KMOD_RGUI
@@ -707,7 +707,7 @@ static int event_loop() {
 #endif
         case SDL_KEYDOWN:
         case SDL_KEYUP:
-            if (g_debug_keys) {
+            if (g_debug_input) {
                 fs_log("SDL key sym %d mod %d scancode %d state %d\n",
                         event.key.keysym.sym, event.key.keysym.mod,
                         event.key.keysym.scancode, event.key.state);
@@ -716,7 +716,7 @@ static int event_loop() {
                 // ignore "ghost key" seen on OS X which without this
                 // specific check will cause the A key to be mysteriously
                 // pressed.
-                if (g_debug_keys) {
+                if (g_debug_input) {
                     fs_log("- ignored key with keysym 0 and scancode 0\n");
                 }
                 continue;
@@ -807,7 +807,7 @@ static int event_loop() {
             }
 #endif
             else if (key >= 0) {
-                if (g_debug_keys) {
+                if (g_debug_input) {
                     fs_log("- key code set to %d (was %d) based on "
                            "scancode %d\n", key, event.key.keysym.sym,
                            event.key.keysym.scancode);
@@ -842,7 +842,9 @@ static int event_loop() {
         //    printf("--- mousebutton down ---\n");
         }
         fs_ml_event *new_event = NULL;
+#if !defined(USE_SDL2)
         fs_ml_event *new_event_2 = NULL;
+#endif
         if (event.type == SDL_KEYDOWN) {
             new_event = fs_ml_alloc_event();
             new_event->type = FS_ML_KEYDOWN;
@@ -907,7 +909,7 @@ static int event_loop() {
             new_event->motion.xrel = event.motion.xrel;
             new_event->motion.yrel = event.motion.yrel;
 
-            if (g_debug_keys) {
+            if (g_debug_input) {
                 fs_log("SDL mouse event x: %4d y: %4d xrel: %4d yrel: %4d\n", 
                     event.motion.x, event.motion.y,
                     event.motion.xrel, event.motion.yrel);
@@ -950,23 +952,45 @@ static int event_loop() {
             new_event->button.state = event.button.state;
         }
 #ifdef USE_SDL2
+        else if (event.type == SDL_MOUSEWHEEL) {
+            /*
+            if (event.wheel.which == SDL_TOUCH_MOUSEID) {
+
+            }
+            */
+            if (event.wheel.y) {
+                if (g_debug_input) {
+                    fs_log("SDL mouse event y-scroll: %4d\n",
+                        event.wheel.y);
+                }
+                new_event = fs_ml_alloc_event();
+                new_event->type = FS_ML_MOUSEBUTTONDOWN;
+                if (event.wheel.y > 0) {
+                    new_event->button.button = FS_ML_BUTTON_WHEELUP;
+                }
+                else {
+                    new_event->button.button = FS_ML_BUTTON_WHEELDOWN;
+                }
+                new_event->button.device = g_fs_ml_first_mouse_index;
+                new_event->button.state = 1;
+            }
+        }
         else if (event.type == SDL_TEXTINPUT) {
             new_event = fs_ml_alloc_event();
             new_event->type = FS_ML_TEXTINPUT;
-            int len = TEXTINPUTEVENT_TEXT_SIZE;
-            if (SDL_TEXTINPUTEVENT_TEXT_SIZE < len) {
-                len = SDL_TEXTINPUTEVENT_TEXT_SIZE;
-            }
-            memcpy(&(new_event->text.text), &(event.text.text), len);
+            memcpy(&(new_event->text.text), &(event.text.text),
+                   MIN(TEXTINPUTEVENT_TEXT_SIZE, SDL_TEXTINPUTEVENT_TEXT_SIZE));
             new_event->text.text[TEXTINPUTEVENT_TEXT_SIZE - 1] = 0;
         }
 #endif
         if (new_event) {
             fs_ml_post_event(new_event);
         }
+#if !defined(USE_SDL2)
         if (new_event_2) {
             fs_ml_post_event(new_event_2);
         }
+#endif
     }
     return result;
 }
@@ -1035,7 +1059,7 @@ void fs_ml_video_init() {
     g_video_event_queue = fs_queue_new();
     g_video_event_mutex = fs_mutex_create();
 
-    g_debug_keys = getenv("FS_DEBUG_INPUT") && \
+    g_debug_input = getenv("FS_DEBUG_INPUT") && \
             getenv("FS_DEBUG_INPUT")[0] == '1';
 
     fs_ml_render_init();

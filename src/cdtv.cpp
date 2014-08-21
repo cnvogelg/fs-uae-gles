@@ -280,7 +280,7 @@ static void do_play (void)
 {
 	uae_u32 start = read_comm_pipe_u32_blocking (&requests);
 	uae_u32 end = read_comm_pipe_u32_blocking (&requests);
-	uae_u32 UNUSED(scan) = read_comm_pipe_u32_blocking (&requests);
+	uae_u32 scan = read_comm_pipe_u32_blocking (&requests);
 	subreset ();
 	sys_command_cd_pause (unitnum, 0);
 	sys_command_cd_volume (unitnum, (cd_volume_stored << 5) | (cd_volume_stored >> 5), (cd_volume_stored << 5) | (cd_volume_stored >> 5));
@@ -303,9 +303,9 @@ static void startplay (void)
 static int play_cdtrack (uae_u8 *p)
 {
 	int track_start = p[1];
-	int UNUSED(index_start) = p[2];
+	int index_start = p[2];
 	int track_end = p[3];
-	int UNUSED(index_end) = p[4];
+	int index_end = p[4];
 	int start_found, end_found;
 	uae_u32 start, end;
 	int j;
@@ -1545,7 +1545,7 @@ static uae_u32 REGPARAM2 dmac_lgeti (uaecptr addr)
 addrbank dmac_bank = {
 	dmac_lget, dmac_wget, dmac_bget,
 	dmac_lput, dmac_wput, dmac_bput,
-	default_xlate, default_check, NULL, _T("CDTV DMAC/CD Controller"),
+	default_xlate, default_check, NULL, NULL, _T("CDTV DMAC/CD Controller"),
 	dmac_lgeti, dmac_wgeti, ABFLAG_IO
 };
 

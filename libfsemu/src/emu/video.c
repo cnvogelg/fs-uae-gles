@@ -193,7 +193,9 @@ void fs_emu_video_init_opengl() {
 #ifdef WITH_XML_SHADER
     fs_emu_xml_shader_init();
 #endif
+#ifdef WITH_LUA
     fs_emu_lua_run_handler("on_fs_emu_init_video");
+#endif
 }
 
 void fs_emu_toggle_fullscreen() {
@@ -229,7 +231,7 @@ void fs_emu_update_video_stats_2() {
     g_frame_time_last = time_ms;
 }
 
-void update_video_stats_system_video() {
+static void update_video_stats_system_video() {
     if (g_fs_emu_benchmark_start_time > 0) {
         g_fs_emu_total_sys_frames++;
     }
@@ -403,7 +405,7 @@ void fs_emu_video_after_update() {
     if (g_fs_emu_benchmark_start_time) {
         static int64_t last_report = 0;
         if (t - last_report > 5000000) {
-            double ttime = ((t - g_fs_emu_benchmark_start_time) / 1000000);
+            double ttime = ((t - g_fs_emu_benchmark_start_time) / 1000000.0);
             double sys_fps = g_fs_emu_total_sys_frames / ttime;
             double emu_fps = g_fs_emu_total_emu_frames / ttime;
             //fs_log("average fps sys: %0.1f emu: %0.1f\n", sys_fps, emu_fps);

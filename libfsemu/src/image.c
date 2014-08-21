@@ -13,7 +13,7 @@
 #include <png.h>
 #endif
 
-void fs_image_destroy(void* ptr) {
+static void fs_image_destroy(void* ptr) {
     fs_log("fs_image_destroy\n");
     fs_image* image = ptr;
     if (image->data) {
@@ -179,6 +179,7 @@ fs_image* fs_image_new_from_data(const void *buffer, int size) {
     //}
 
     png_read_image(png_ptr, row_pointers);
+    free(row_pointers);
 
     //fclose(fp);
     //fs_log("png_read_image done\n");

@@ -1,5 +1,5 @@
 Name: fs-uae
-Version: 2.5.6dev
+Version: 2.5.12dev
 Release: 1%{?dist}
 Summary: Amiga emulator with on-screen GUI and online play support
 License: GPL-2.0+
@@ -22,6 +22,7 @@ BuildRequires: pkgconfig(sdl2)
 BuildRequires: pkgconfig(x11)
 BuildRequires: pkgconfig(zlib)
 BuildRequires: pkgconfig(freetype2)
+BuildRequires: zip
 
 %description
 FS-UAE is an Amiga emulator for Windows, Linux and Mac OS X

@@ -1,12 +1,15 @@
 #include "sysconfig.h"
 #include "sysdeps.h"
 
-#include "include/options.h"
-#include "include/xwin.h"
-#include "include/uae.h"
-#include "include/custom.h"
-#include "include/drawing.h"
-#include "include/gfxfilter.h"
+#include "options.h"
+#include "xwin.h"
+#include "uae.h"
+#include "custom.h"
+#include "drawing.h"
+#include "gfxfilter.h"
+#include "gui.h"
+#include "uae/fs.h"
+
 #include <limits.h>
 #include <stdlib.h>
 
@@ -36,7 +39,7 @@ uae_s32 tcrrgb[65536];
 //#define USE_BUFMEM
 //#define USE_LINEMEM
 
-struct MultiDisplay Displays[MAX_DISPLAYS] = {};
+struct MultiDisplay Displays[MAX_DISPLAYS + 1] = {};
 
 static int g_picasso_enabled = 0;
 static int g_picasso_width = 0;
@@ -827,10 +830,9 @@ int check_prefs_changed_gfx (void) {
     return 0;
 }
 
-void gui_fps(int fps, int idle) {
-    //double ffps = (fps + 5) / 10;
-    //write_log("fps %0.1f idle %d\n", ffps, idle);
-
+void gui_fps (int fps, int idle, int color)
+{
+    UAE_LOG_STUB_MAX(1, "");
 }
 
 int gui_update (void) {

@@ -23,8 +23,7 @@
 #include "cia.h"
 #include "serial.h"
 #include "enforcer.h"
-
-#include "od-fs/parser.h"
+#include "uae/parser.h"
 
 #define SERIALLOGGING 0
 #define SERIALDEBUG 0 /* 0, 1, 2 3 */
@@ -55,7 +54,7 @@ static int allowed_baudrates[] =
 void SERPER (uae_u16 w)
 {
 	int baud = 0, i, per;
-	static int UNUSED(warned);
+	static int warned;
 
 	if (serper == w)  /* don't set baudrate if it's already ok */
 		return;
@@ -256,7 +255,6 @@ static void checksend (int mode)
 void serial_hsynchandler (void)
 {
 #ifdef AHI
-	extern void hsyncstuff(void);
 	hsyncstuff();
 #endif
 	if (serial_period_hsyncs == 0)

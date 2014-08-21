@@ -1,5 +1,10 @@
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 #include "fs/data.h"
 #include "fs/base.h"
+#include "fs/endian.h"
 #include "fs/filesys.h"
 #include <limits.h>
 #include <string.h>
@@ -10,7 +15,7 @@
 static FILE* g_dat_file;
 static GHashTable *g_dat_table;
 
-#pragma pack(1)
+#pragma pack(push, 1)
 
 typedef struct end_of_central_directory_record {
     char signature[4];
@@ -57,22 +62,24 @@ typedef struct local_file_header {
     uint16_t extra_field_length;
 } local_file_header;
 
-#pragma pack(0)
+#pragma pack(pop)
 
-#if WORDS_BIGENDIAN
-#error must byteswap here
-#else
-#define ZIP_UINT32(x) ((uint32_t)(x))
-#define ZIP_UINT16(x) ((uint16_t)(x))
-#endif
+#define ERROR_EOCDR_SEEK 3
+#define ERROR_EOCDR_READ 4
+#define ERROR_EOCDR_SIG 5
+#define ERROR_EOCDR_ENTRIES 6
 
-int read_zip_entries (FILE *f) {
+#define ERROR_CFH_SEEK 7
+#define ERROR_CFH_READ 8
+#define ERROR_CFH_SIG 9
+#define ERROR_CFH_NAME 10
+
+static int read_zip_entries (FILE *f) {
     if (fseek(f, 0, SEEK_END) != 0) {
         // fseek to end of file failed
         return 2;
     }
     int file_size = ftell(f);
-
 
     // we do not support zip file comments here (which are added at the end),
     // and assume that the file ends with the (fixed size) end of
@@ -80,48 +87,51 @@ int read_zip_entries (FILE *f) {
 
     int pos = file_size - sizeof(end_of_central_directory_record);
     if (fseek(f, pos, SEEK_SET) != 0) {
-        return 3;
+        return ERROR_EOCDR_SEEK;
     }
 
     end_of_central_directory_record eocdr;
     if (fread(&eocdr, sizeof(end_of_central_directory_record), 1, f) != 1) {
-        return 4;
+        return ERROR_EOCDR_READ;
     }
     if (strncmp(eocdr.signature, "PK\x05\x06", 4) != 0) {
         // no signature found, not a zip file
-        return 5;
+        return ERROR_EOCDR_SIG;
+    }
+    if (le16toh(eocdr.num_entries) > 8192) {
+        return ERROR_EOCDR_ENTRIES;
     }
 
-    pos = ZIP_UINT32(eocdr.central_directory_offset);
+    pos = le32toh(eocdr.central_directory_offset);
     central_file_header cfh;
-    for (int i = 0; i < eocdr.num_entries; i++) {
+    for (int i = 0; i < le16toh(eocdr.num_entries); i++) {
         // printf("reading zip entry %d from position %d\n", i, pos);
         if (fseek(f, pos, SEEK_SET) != 0) {
-            return 6;
+            return ERROR_CFH_SEEK;
         }
         if (fread(&cfh, sizeof(central_file_header), 1, f) != 1) {
-            return 7;
+            return ERROR_CFH_READ;
         }
         if (strncmp(cfh.signature, "PK\x01\x02", 4) != 0) {
             // no signature found, not a central file header
-            return 8;
+            return ERROR_CFH_SIG;
         }
-        int name_len = ZIP_UINT16(cfh.file_name_length);
+        uint16_t name_len = le16toh(cfh.file_name_length);
         char *name = malloc(name_len + 1);
         name[name_len] = 0;
         pos += sizeof(central_file_header);
         if (fread(name, name_len, 1, f) != 1) {
             free(name);
-            return 9;
+            return ERROR_CFH_NAME;
         }
         // printf("%s\n", name);
 
         g_hash_table_insert(
             g_dat_table, name,
-            GUINT_TO_POINTER(ZIP_UINT32(cfh.relative_offset_of_local_header)));
+            GUINT_TO_POINTER(le32toh(cfh.relative_offset_of_local_header)));
 
-        pos += name_len + ZIP_UINT16(cfh.extra_field_length) + \
-                ZIP_UINT16(cfh.file_comment_length);
+        pos += name_len + le16toh(cfh.extra_field_length) + \
+                le16toh(cfh.file_comment_length);
     }
 
     /*
@@ -190,7 +200,7 @@ int fs_data_file_content(const char *name, char **data, int *size) {
         return 11;
     }
 
-    *size = ZIP_UINT32(lfh.uncompressed_size);
+    *size = le32toh(lfh.uncompressed_size);
     if (*size > 10 * 1024 * 1024) {
         // don't try to allocate very large files
         return 12;
@@ -198,8 +208,8 @@ int fs_data_file_content(const char *name, char **data, int *size) {
 
     *data = malloc(*size);
 
-    pos += sizeof(local_file_header) + ZIP_UINT16(lfh.file_name_length) + \
-            ZIP_UINT16(lfh.extra_field_length);
+    pos += sizeof(local_file_header) + le16toh(lfh.file_name_length) + \
+            le16toh(lfh.extra_field_length);
 
     if (fseek(g_dat_file, pos, SEEK_SET) != 0) {
         printf("could not seek to dat file data position %d\n", pos);

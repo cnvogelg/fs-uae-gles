@@ -22,10 +22,18 @@
 #include "savestate.h"
 #include "autoconf.h"
 
+#ifdef FSUAE
+#define DUMPPACKET 1
+#else
 #define DUMPPACKET 0
+#endif
 
 #define MEM_MIN 0x8100
+#ifdef FSUAE
+int log_a2065 = 1;
+#else
 int log_a2065 = 0;
+#endif
 static int log_transmit = 1;
 static int log_receive = 1;
 int a2065_promiscuous = 0;
@@ -115,13 +123,6 @@ static uae_u8 broadcast[6] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
 
 DECLARE_MEMORY_FUNCTIONS(a2065);
 
-static addrbank a2065_bank = {
-	a2065_lget, a2065_wget, a2065_bget,
-	a2065_lput, a2065_wput, a2065_bput,
-	default_xlate, default_check, NULL, _T("A2065 Z2 Ethernet"),
-	a2065_lgeti, a2065_wgeti, ABFLAG_IO
-};
-
 static uae_u16 gword2 (uae_u8 *p)
 {
 	return (p[0] << 8) | p[1];
@@ -172,7 +173,7 @@ static void dumppacket (const TCHAR *n, uae_u8 *packet, int len)
 		_stprintf (buf + i * 3, _T(".%02X"), packet[i]);
 	}
 	write_log (_T("%s %d: "), n, len);
-	write_log (buf);
+	write_log (_T("%s"), buf);
 	write_log (_T("\n\n"));
 }
 #endif
@@ -838,6 +839,26 @@ static void REGPARAM2 a2065_lput (uaecptr addr, uae_u32 l)
 	a2065_wput (addr, l >> 16);
 	a2065_wput (addr + 2, l);
 }
+
+uae_u8 *REGPARAM2 a2065_xlate(uaecptr addr)
+{
+	if ((addr & 65535) >= RAM_OFFSET)
+		return &boardram[addr & RAM_MASK];
+	return default_xlate(addr);
+}
+
+int REGPARAM2 a2065_check(uaecptr a, uae_u32 b)
+{
+	a &= 65535;
+	return a >= RAM_OFFSET && a + b < 65536;
+}
+
+static addrbank a2065_bank = {
+	a2065_lget, a2065_wget, a2065_bget,
+	a2065_lput, a2065_wput, a2065_bput,
+	a2065_xlate, a2065_check, NULL, NULL, _T("A2065 Z2 Ethernet"),
+	a2065_lgeti, a2065_wgeti, ABFLAG_IO
+};
 
 static void REGPARAM2 a2065_bput (uaecptr addr, uae_u32 b)
 {

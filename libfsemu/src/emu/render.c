@@ -152,7 +152,7 @@ void fs_emu_initialize_opengl() {
     fs_gl_add_context_notification(context_notification_handler, NULL);
 }
 
-void get_buffer_format(int *gl_buffer_format, int *gl_buffer_type) {
+static void get_buffer_format(int *gl_buffer_format, int *gl_buffer_type) {
     int format = fs_emu_get_video_format();
     if (format == FS_EMU_VIDEO_FORMAT_BGRA) {
         *gl_buffer_format = GL_BGRA;
@@ -213,10 +213,12 @@ static void create_texture_if_needed(int width, int height) {
     //g_frame_texture.opengl_context_stamp = g_fs_ml_opengl_context_stamp;
     //fs_emu_set_texture(&g_frame_texture);
     fs_gl_bind_texture(g_frame_texture);
+#if 0
     // with high quality borders, there should be no reason to initialize
     // the texture to black
+    void *data = fs_malloc0(g_frame_texture_width * g_frame_texture_height * 4);
+#endif
     void *data = NULL;
-    //void *data = fs_malloc0(g_frame_texture_width * g_frame_texture_height * 4);
     fs_gl_unpack_row_length(0);
     int gl_buffer_format = 0;
     int gl_buffer_type = 0;
@@ -225,9 +227,11 @@ static void create_texture_if_needed(int width, int height) {
             g_frame_texture_width, g_frame_texture_height, 0,
             gl_buffer_format, gl_buffer_type, data);
     CHECK_GL_ERROR();
+#if 0
     if (data) {
         free(data);
     }
+#endif
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, g_texture_filter);
     CHECK_GL_ERROR();
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, g_texture_filter);
@@ -511,7 +515,7 @@ static int update_texture() {
             strftime(strbuf, 20, "%y%m%d%H%M", tm_p);
             if (strcmp(strbuf, laststrbuf) != 0) {
                 count = 0;
-                strncpy(laststrbuf, strbuf, 20);
+                memcpy(laststrbuf, strbuf, 20);
             }
 
             count += 1;
@@ -912,7 +916,9 @@ static void render_overlays(void) {
 }
 
 static void render_frame(double alpha, int perspective) {
+#ifdef WITH_LUA
     fs_emu_lua_run_handler("on_fs_emu_render_frame");
+#endif
 
 #ifdef WITH_LUA
 
@@ -1690,7 +1696,8 @@ static void render_glow(double opacity) {
     CHECK_GL_ERROR();
     //printf("--- render glow done ---\n");
 }
-void render_fade_overlay(double alpha) {
+
+static void render_fade_overlay(double alpha) {
     // draw fading effect
     fs_gl_viewport(0, 0, fs_ml_video_width(), fs_ml_video_height());
     fs_gl_ortho_hd();
@@ -1732,6 +1739,7 @@ void render_fade_overlay(double alpha) {
 static void handle_quit_sequence() {
     int fade_time = fs_config_get_int_clamped("fade_out_duration", 0, 10000);
     if (fade_time == FS_CONFIG_NONE) {
+        // fade out over 750ms
         fade_time = 750;
     }
     fade_time = fade_time * 1000;
@@ -1751,13 +1759,14 @@ static void handle_quit_sequence() {
         exit(1);
     }
 
-    // fade out over 750ms
-    float fade = (1.0 * dt) / fade_time;
-    if (fade > 1.0) {
-        fade = 1.0;
-    }
 
-    render_fade_overlay(fade);
+    if (fade_time > 0) {
+        float fade = (1.0 * dt) / fade_time;
+        if (fade > 1.0) {
+            fade = 1.0;
+        }
+        render_fade_overlay(fade);
+    }
 }
 
 int fs_emu_video_update_function() {
@@ -2050,7 +2059,7 @@ void fs_emu_video_render_function() {
             int y = 1038;
 
             int rendered_tag = 0;
-            if (player->tag && player->tag[0]) {
+            if (player->tag[0]) {
                 str = fs_strdup_printf("%s", player->tag);
                 fs_emu_font_render(menu_font, str, x, y,
                         1.0, 1.0, 1.0, 1.0);
@@ -2231,7 +2240,7 @@ void fs_emu_video_render_function() {
         fade_time = fade_time * 1000;
     }
 
-    int64_t dt = fs_emu_monotonic_time() - start_time;
+    uint64_t dt = fs_emu_monotonic_time() - start_time;
     if (dt < fade_time) {
         float fade = 1.0 - (1.0 * dt) / fade_time;
         if (fade < 0.0) {

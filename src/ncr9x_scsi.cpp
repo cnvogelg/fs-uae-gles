@@ -357,7 +357,8 @@ static void ncr9x_io_bput(struct ncr9x_state *ncr, uaecptr addr, uae_u32 val)
 	addr >>= 2;
 	esp_reg_write(ncr->devobject.lsistate, (addr), val);
 }
-uae_u32 ncr9x_io_bget(struct ncr9x_state *ncr, uaecptr addr)
+
+static uae_u32 ncr9x_io_bget(struct ncr9x_state *ncr, uaecptr addr)
 {
 	addr &= ncr->board_mask;
 	if (currprefs.cpuboard_type == BOARD_BLIZZARD_2060) {
@@ -515,7 +516,7 @@ static uae_u32 REGPARAM2 bncr9x_lget(uaecptr addr)
 static addrbank ncr9x_bank_blizzard = {
 	bncr9x_lget, bncr9x_wget, bncr9x_bget,
 	bncr9x_lput, bncr9x_wput, bncr9x_bput,
-	default_xlate, default_check, NULL, _T("53C94/FAS216"),
+	default_xlate, default_check, NULL, NULL, _T("53C94/FAS216"),
 	dummy_lgeti, dummy_wgeti, ABFLAG_IO
 };
 

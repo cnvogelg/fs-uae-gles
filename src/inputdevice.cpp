@@ -40,7 +40,7 @@
 #include "gui.h"
 #include "disk.h"
 #include "audio.h"
-#include "sound.h"
+#include "sounddep/sound.h"
 #include "savestate.h"
 #include "arcadia.h"
 #include "zfile.h"
@@ -58,6 +58,7 @@
 #include "statusline.h"
 
 #ifdef FSUAE // NL
+#include "uae/fs.h"
 #undef _WIN32
 #endif
 
@@ -284,7 +285,7 @@ static void copyjport (const struct uae_prefs *src, struct uae_prefs *dst, int n
 	dst->jports[num].nokeyboardoverride = src->jports[num].nokeyboardoverride;
 }
 
-static void UNUSED_FUNCTION(out_config) (struct zfile *f, int id, int num, const TCHAR *s1, const TCHAR *s2)
+static void out_config (struct zfile *f, int id, int num, const TCHAR *s1, const TCHAR *s2)
 {
 	TCHAR tmp[MAX_DPATH];
 	_stprintf (tmp, _T("input.%d.%s%d"), id, s1, num);
@@ -1128,7 +1129,7 @@ static uaecptr get_intuitionbase (void)
 	magicmouse_ibase = get_base ("intuition.library");
 	return magicmouse_ibase;
 }
-static uaecptr UNUSED_FUNCTION(get_gfxbase) (void)
+static uaecptr get_gfxbase (void)
 {
 	if (magicmouse_gfxbase == 0xffffffff)
 		return 0;
@@ -1300,8 +1301,6 @@ int input_mousehack_status (int mode, uaecptr diminfo, uaecptr dispinfo, uaecptr
 	return 1;
 }
 
-void get_custom_mouse_limits (int *w, int *h, int *dx, int *dy, int dbl);
-
 void inputdevice_tablet_strobe (void)
 {
 	mousehack_enable ();
@@ -1426,9 +1425,6 @@ void inputdevice_tablet_info (int maxx, int maxy, int maxz, int maxax, int maxay
 	tablet_maxaz = maxaz;
 	inputdevice_update_tablet_params();
 }
-
-
-void getgfxoffset (float *dx, float *dy, float*, float*);
 
 static void inputdevice_mh_abs (int x, int y, uae_u32 buttonbits)
 {
@@ -1644,8 +1640,6 @@ static int mouseedge_x, mouseedge_y, mouseedge_time;
 #define MOUSEEDGE_RANGE 100
 #define MOUSEEDGE_TIME 2
 
-extern void setmouseactivexy (int,int,int);
-
 static int mouseedge (void)
 {
 	int x, y, dir;
@@ -1849,6 +1843,8 @@ static void mouseupdate (int pct, bool vsync)
 			}
 
 			v = getvelocity (i, 2, pct);
+			/* if v != 0, record mouse wheel key presses
+			 * according to the NewMouse standard */
 			if (v > 0)
 				record_key (0x7a << 1);
 			else if (v < 0)
@@ -2313,7 +2309,7 @@ static uae_u16 handle_joystick_potgor (uae_u16 potgor)
 
 static int inputdelay;
 
-void inputdevice_read (void)
+static void inputdevice_read (void)
 {
 #ifdef FSUAE
 	handle_msgpump ();
@@ -2723,7 +2719,7 @@ static uae_u8 keybuf[256];
 #define MAX_PENDING_EVENTS 20
 static int inputcode_pending[MAX_PENDING_EVENTS], inputcode_pending_state[MAX_PENDING_EVENTS];
 
-void inputdevice_release_all_keys (void)
+static void inputdevice_release_all_keys (void)
 {
 	int i;
 
@@ -3704,7 +3700,7 @@ static int switchdevice (struct uae_input_device *id, int num, bool buttonmode)
 			write_log (_T("Port supported\n"));
 #endif
 			bool issupermouse = false;
-			int UNUSED(om) = jsem_ismouse (num, &currprefs);
+			int om = jsem_ismouse (num, &currprefs);
 			int om1 = jsem_ismouse (0, &currprefs);
 			int om2 = jsem_ismouse (1, &currprefs);
 			if ((om1 >= 0 || om2 >= 0) && ismouse) {
@@ -4112,7 +4108,7 @@ static void setbuttonstateall (struct uae_input_device *id, struct uae_input_dev
 		int sub = sublevdir[buttonstate == 0 ? 1 : 0][i];
 		uae_u64 *flagsp = &id->flags[ID_BUTTON_OFFSET + button][sub];
 		int evt = id->eventid[ID_BUTTON_OFFSET + button][sub];
-		TCHAR *UNUSED(custom) = id->custom[ID_BUTTON_OFFSET + button][sub];
+		TCHAR *custom = id->custom[ID_BUTTON_OFFSET + button][sub];
 		uae_u64 flags = flagsp[0];
 		int autofire = (flags & ID_FLAG_AUTOFIRE) ? 1 : 0;
 		int toggle = (flags & ID_FLAG_TOGGLE) ? 1 : 0;
@@ -6237,7 +6233,7 @@ static int put_event_data (const struct inputdevice_functions *id, int devnum, i
 
 static int is_event_used (const struct inputdevice_functions *id, int devnum, int isnum, int isevent)
 {
-	struct uae_input_device *UNUSED(uid) = get_uid (id, devnum);
+	struct uae_input_device *uid = get_uid (id, devnum);
 	int num, evt, sub;
 
 	for (num = 0; num < id->get_widget_num (devnum); num++) {
@@ -7586,7 +7582,7 @@ void clear_inputstate (void)
 
 static int g_requested_port_modes[4];
 
-void amiga_set_joystick_port_mode_2 (int port, int mode)
+static void amiga_set_joystick_port_mode_2 (int port, int mode)
 {
     int *ip = NULL;
     //parport_joystick_enabled = 0;

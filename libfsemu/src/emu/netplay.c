@@ -258,7 +258,7 @@ static int fs_emu_get_netplay_input_event() {
     return input_event;
 }
 
-void fs_emu_queue_netplay_input_event(int input_event) {
+static void fs_emu_queue_netplay_input_event(int input_event) {
     if (input_event == 0) {
         fs_log("WARNING: tried to queue input event 0\n");
         return;
@@ -280,7 +280,7 @@ static uint32_t bytes_to_uint(unsigned char* buffer) {
             buffer[3];
 }
 
-void fs_emu_netplay_on_disconnect() {
+static void fs_emu_netplay_on_disconnect() {
     dismiss_waiting_dialog();
     //fs_emu_log("fs_emu_netplay_on_disconnect\n");
     fs_mutex_lock(g_connection_mutex);
@@ -315,7 +315,7 @@ void fs_emu_netplay_disconnect() {
     fs_emu_netplay_on_disconnect();
 }
 
-void fs_emu_netplay_on_socket_error() {
+static void fs_emu_netplay_on_socket_error() {
     fs_emu_log("fs_emu_netplay_on_socket_error\n");
     fs_emu_netplay_on_disconnect();
 }
@@ -459,16 +459,10 @@ int fs_emu_netplay_wait_for_frame(int frame) {
         dismiss_waiting_dialog();
     }
 
-    int always = 1;
-    int frame_mod = frame % 50;
-    if (always || frame_mod == 25) {
-        send_message(MESSAGE_RNDCHECK | (g_rand_checksum_function() &
-                0x00ffffff));
-    }
-    if (always || frame_mod == 0) {
-        send_message(MESSAGE_MEMCHECK | (g_state_checksum_function() &
-                0x00ffffff));
-    }
+    send_message(MESSAGE_RNDCHECK | (g_rand_checksum_function() &
+            0x00ffffff));
+    send_message(MESSAGE_MEMCHECK | (g_state_checksum_function() &
+            0x00ffffff));
     send_message(MESSAGE_FRAME_MASK | frame);
 
     // add all pending events for this frame to libfsemu's input queue
@@ -497,7 +491,7 @@ int fs_emu_netplay_wait_for_frame(int frame) {
 //#define EXTRACT_BITS(m, a, b) ((m >> a) & ((1 << (b - a + 1)) - 1))
 //#define FILTER_BITS(m, a, b) (((m >> a) << a) & ((1 << (b + 1)) - 1))
 
-void handle_player_tag_message(int ply, int data) {
+static void handle_player_tag_message(int ply, int data) {
     fs_emu_player *p = g_fs_emu_players + ply;
     p->tag[0] = (data & 0x00ff0000) >> 16;
     p->tag[1] = (data & 0x0000ff00) >> 8;
@@ -508,7 +502,7 @@ void handle_player_tag_message(int ply, int data) {
 
 static char g_text_buffer[FS_EMU_MAX_CHAT_STRING_SIZE + 1];
 
-void process_text_message(const char *text, int from_player) {
+static void process_text_message(const char *text, int from_player) {
     //printf("process message from player %d -- self = %d\n",
     //        from_player, g_fs_emu_netplay_player);
     if (from_player == g_fs_emu_netplay_player) {
@@ -525,7 +519,7 @@ void process_text_message(const char *text, int from_player) {
     fs_emu_hud_add_chat_message(text, fs_emu_get_netplay_tag(from_player));
 }
 
-void handle_ext_message(int message, int data) {
+static void handle_ext_message(int message, int data) {
     if (message == MESSAGE_PING) {
         //printf("ping at frame %d\n", g_frame);
         send_message(CREATE_EXT_MESSAGE(MESSAGE_PING, 0));
@@ -621,7 +615,7 @@ void handle_ext_message(int message, int data) {
     }
 }
 
-void handle_message(uint32_t message) {
+static void handle_message(uint32_t message) {
     //printf("----> received message %08x\n", message);
     int message_type = message & 0xff000000;
 
@@ -654,7 +648,7 @@ void handle_message(uint32_t message) {
     }
 }
 
-void *receive_thread(void * data) {
+static void *receive_thread(void * data) {
     static unsigned char buffer[5] = {};
     int count = 0;
     while (1) {
@@ -681,7 +675,7 @@ void *receive_thread(void * data) {
 }
 
 int fs_emu_netplay_connect() {
-    g_socket = socket(AF_INET, SOCK_STREAM, 0);
+    g_socket = 0;
 
     fs_log("look up address for %s...\n", g_fs_emu_netplay_server);
 
@@ -733,7 +727,7 @@ int fs_emu_netplay_connect() {
 
     freeaddrinfo(result);
 
-    if (g_socket == 0) {
+    if (g_socket <= 0) {
         fs_log("ERROR: could not connect to server\n");
         return 0;
     }
@@ -794,7 +788,7 @@ int fs_emu_netplay_connect() {
     return 1;
 }
 
-void *netplay_thread(void * data) {
+static void *netplay_thread(void * data) {
     fs_log("netplay_thread started\n");
     int connected = 0;
     int retry_secs = 2;
@@ -862,7 +856,8 @@ void *netplay_thread(void * data) {
     }
 
     // FIXME: use non-joinable thread?
-    g_receive_thread = fs_thread_create(receive_thread, NULL);
+    g_receive_thread = fs_thread_create(
+                "netplay-receive", receive_thread, NULL);
     if (g_receive_thread == NULL) {
         fs_log("ERROR: could not create receive thread\n");
     }
@@ -883,7 +878,7 @@ void fs_emu_netplay_start() {
 #endif
 
     // FIXME: use non-joinable thread?
-    g_netplay_thread = fs_thread_create(netplay_thread, NULL);
+    g_netplay_thread = fs_thread_create("netplay", netplay_thread, NULL);
     if (g_netplay_thread == NULL) {
         fs_emu_warning("ERROR: could not create netplay thread\n");
     }

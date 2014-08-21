@@ -1,6 +1,10 @@
 #ifndef UAE_STRING_H
 #define UAE_STRING_H
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 #include "uae/types.h"
 #include <string.h>
 
@@ -9,6 +13,7 @@
 // re-define them below
 #include <tchar.h>
 #include <wchar.h>
+#include <stdlib.h>
 #endif
 
 #if defined(_WIN32) && defined(_UNICODE)
@@ -52,6 +57,21 @@
 #endif
 
 static inline size_t uae_tcslcpy(TCHAR *dst, const TCHAR *src, size_t size)
+{
+	if (size == 0) {
+		return 0;
+	}
+	size_t src_len = strlen(src);
+	size_t cpy_len = src_len;
+	if (cpy_len >= size) {
+		cpy_len = size - 1;
+	}
+	memcpy(dst, src, cpy_len);
+	dst[cpy_len] = '\0';
+	return src_len;
+}
+
+static inline size_t uae_strlcpy(char *dst, const char *src, size_t size)
 {
 	if (size == 0) {
 		return 0;

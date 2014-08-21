@@ -63,6 +63,7 @@
 #include "uaenative.h"
 #include "tabletlibrary.h"
 #include "cpuboard.h"
+#include "ppc.h"
 #ifdef RETROPLATFORM
 #include "rp.h"
 #endif
@@ -169,7 +170,7 @@ static void fixup_prefs_dim2 (struct wh *wh)
 	if (wh->special)
 		return;
 	if (wh->width < 160) {
-		error_log (_T("Width (%d) must be at least 128."), wh->width);
+		error_log (_T("Width (%d) must be at least 160."), wh->width);
 		wh->width = 160;
 	}
 	if (wh->height < 128) {
@@ -236,6 +237,9 @@ void fixup_prefs_dimensions (struct uae_prefs *prefs)
 
 void fixup_cpu (struct uae_prefs *p)
 {
+#ifdef FSUAE
+	write_log("fixup_cpu\n");
+#endif
 	if (p->cpu_frequency == 1000000)
 		p->cpu_frequency = 0;
 
@@ -269,6 +273,21 @@ void fixup_cpu (struct uae_prefs *p)
 			p->fpu_model = 68060;
 		break;
 	}
+
+#ifdef WITH_CPUBOARD
+	// 1 = "automatic" PPC config
+	if (p->ppc_mode == 1) {
+		p->cpuboard_type = BOARD_CSPPC;
+		if (p->cs_compatible == CP_A1200) {
+			p->cpuboard_type = BOARD_BLIZZARDPPC;
+		} else if (p->cs_compatible != CP_A4000 && p->cs_compatible != CP_A4000T && p->cs_compatible != CP_A3000 && p->cs_compatible != CP_A3000T) {
+			if ((p->cs_ide == IDE_A600A1200 || p->cs_pcmcia) && p->cs_mbdmac <= 0)
+				p->cpuboard_type = BOARD_BLIZZARDPPC;
+		}
+		if (p->cpuboardmem1_size < 8 * 1024 * 1024)
+			p->cpuboardmem1_size = 8 * 1024 * 1024;
+	}
+#endif
 
 	if (p->cpu_model < 68020 && p->cachesize) {
 		p->cachesize = 0;
@@ -333,8 +352,10 @@ void fixup_prefs (struct uae_prefs *p)
 	built_in_chipset_prefs (p);
 	fixup_cpu (p);
 
+#ifdef WITH_CPUBOARD
 	if (cpuboard_08000000(p))
 		p->mbresmem_high_size = p->cpuboardmem1_size;
+#endif
 
 	if (((p->chipmem_size & (p->chipmem_size - 1)) != 0 && p->chipmem_size != 0x180000)
 		|| p->chipmem_size < 0x20000
@@ -435,17 +456,22 @@ void fixup_prefs (struct uae_prefs *p)
 		error_log (_T("Possible Gayle bogomem conflict fixed."));
 	}
 	if (p->chipmem_size > 0x200000 && p->fastmem_size > 262144) {
-		error_log (_T("You can't use fastmem and more than 2MB chip at the same time."));
-		p->fastmem_size = 0;
+		error_log(_T("You can't use fastmem and more than 2MB chip at the same time."));
+		p->chipmem_size = 0x200000;
+		err = 1;
+	}
+	if (p->chipmem_size > 0x200000 && p->rtgmem_size && !gfxboard_is_z3(p->rtgmem_type)) {
+		error_log(_T("You can't use Zorro II RTG and more than 2MB chip at the same time."));
+		p->chipmem_size = 0x200000;
 		err = 1;
 	}
 	if (p->mbresmem_low_size > 0x04000000 || (p->mbresmem_low_size & 0xfffff)) {
 		p->mbresmem_low_size = 0;
-		error_log (_T("Unsupported A3000 MB RAM size"));
+		error_log (_T("Unsupported Mainboard RAM size"));
 	}
 	if (p->mbresmem_high_size > 0x08000000 || (p->mbresmem_high_size & 0xfffff)) {
 		p->mbresmem_high_size = 0;
-		error_log (_T("Unsupported Motherboard RAM size."));
+		error_log (_T("Unsupported CPU Board RAM size."));
 	}
 
 	if (p->rtgmem_type >= GFXBOARD_HARDWARE) {
@@ -640,7 +666,7 @@ void fixup_prefs (struct uae_prefs *p)
 #endif
 	if (p->maprom && !p->address_space_24)
 		p->maprom = 0x0f000000;
-	if (((p->maprom & 0xff000000) && p->address_space_24) || p->mbresmem_high_size == 0x08000000) {
+	if (((p->maprom & 0xff000000) && p->address_space_24) || (p->maprom && p->mbresmem_high_size == 0x08000000)) {
 		p->maprom = 0x00e00000;
 	}
 	if (p->tod_hack && p->cs_ciaatod == 0)
@@ -786,6 +812,7 @@ static TCHAR *parsetextpath (const TCHAR *s)
 static void parse_cmdline (int argc, TCHAR **argv)
 {
 	int i;
+	bool firstconfig = true;
 
 	for (i = 1; i < argc; i++) {
 		if (!_tcsncmp (argv[i], _T("-diskswapper="), 13)) {
@@ -800,8 +827,9 @@ static void parse_cmdline (int argc, TCHAR **argv)
 		} else if (_tcsncmp (argv[i], _T("-config="), 8) == 0) {
 			TCHAR *txt = parsetextpath (argv[i] + 8);
 			currprefs.mountitems = 0;
-			target_cfgfile_load (&currprefs, txt, -1, 0);
+			target_cfgfile_load (&currprefs, txt, firstconfig ? CONFIG_TYPE_ALL : CONFIG_TYPE_HARDWARE | CONFIG_TYPE_HOST | CONFIG_TYPE_NORESET, 0);
 			xfree (txt);
+			firstconfig = false;
 		} else if (_tcsncmp (argv[i], _T("-statefile="), 11) == 0) {
 			TCHAR *txt = parsetextpath (argv[i] + 11);
 			savestate_state = STATE_DORESTORE;
@@ -814,8 +842,9 @@ static void parse_cmdline (int argc, TCHAR **argv)
 			} else {
 				TCHAR *txt = parsetextpath (argv[++i]);
 				currprefs.mountitems = 0;
-				target_cfgfile_load (&currprefs, txt, -1, 0);
+				target_cfgfile_load (&currprefs, txt, firstconfig ? CONFIG_TYPE_ALL : CONFIG_TYPE_HARDWARE | CONFIG_TYPE_HOST | CONFIG_TYPE_NORESET, 0);
 				xfree (txt);
+				firstconfig = false;
 			}
 		} else if (_tcscmp (argv[i], _T("-s")) == 0) {
 			if (i + 1 == argc)
@@ -868,12 +897,12 @@ static void parse_cmdline_and_init_file (int argc, TCHAR **argv)
 
 	_tcscat (optionsfile, restart_config);
 
-	if (! target_cfgfile_load (&currprefs, optionsfile, 0, default_config)) {
+	if (! target_cfgfile_load (&currprefs, optionsfile, CONFIG_TYPE_DEFAULT, default_config)) {
 		write_log (_T("failed to load config '%s'\n"), optionsfile);
 #ifdef OPTIONS_IN_HOME
 		/* sam: if not found in $HOME then look in current directory */
 		_tcscpy (optionsfile, restart_config);
-		target_cfgfile_load (&currprefs, optionsfile, 0, default_config);
+		target_cfgfile_load (&currprefs, optionsfile, CONFIG_TYPE_DEFAULT, default_config);
 #endif
 	}
 	fixup_prefs (&currprefs);
@@ -923,6 +952,9 @@ void reset_all_systems (void)
 	native2amiga_reset ();
 	dongle_reset ();
 	sampler_init ();
+#ifdef WITH_PPC
+	uae_ppc_reset(false);
+#endif
 }
 
 /* Okay, this stuff looks strange, but it is here to encourage people who
@@ -1208,12 +1240,14 @@ static int real_main2 (int argc, TCHAR **argv)
 #ifdef AUTOCONFIG
 	native2amiga_install ();
 #endif
-
 	custom_init (); /* Must come after memory_init */
 #ifdef SERIAL_PORT
 	serial_init ();
 #endif
 	DISK_init ();
+#ifdef WITH_PPC
+	uae_ppc_reset(true);
+#endif
 
 	reset_frame_rate_hack ();
 	init_m68k (); /* must come after reset_frame_rate_hack (); */

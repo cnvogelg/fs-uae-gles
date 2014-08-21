@@ -61,6 +61,8 @@
 #include "scsi.h"
 #include "uaenative.h"
 #include "tabletlibrary.h"
+#include "cia.h"
+#include "picasso96.h"
 #include "cpuboard.h"
 #ifdef RETROPLATFORM
 #include "rp.h"
@@ -757,9 +759,6 @@ int move_filesys_unitconfig (struct uae_prefs *p, int nr, int to)
 	return 1;
 }
 
-
-void filesys_addexternals (void);
-
 static void allocuci (struct uae_prefs *p, int nr, int idx, int unitnum)
 {
 	struct uaedev_config_data *uci = &p->mountconfig[nr];
@@ -782,7 +781,7 @@ static void allocuci (struct uae_prefs *p, int nr, int idx)
 static void initialize_mountinfo (void)
 {
 	int nr;
-	UnitInfo *UNUSED(uip) = &mountinfo.ui[0];
+	UnitInfo *uip = &mountinfo.ui[0];
 
 	cd_unit_offset = MAX_FILESYSTEM_UNITS;
 
@@ -879,6 +878,7 @@ static void initialize_mountinfo (void)
 				added = true;
 			}
 #endif
+#ifdef WITH_CPUBOARD
 		} else if (type == HD_CONTROLLER_TYPE_SCSI_CPUBOARD) {
 #ifdef NCR
 			if (currprefs.cpuboard_type == BOARD_WARPENGINE_A4000) {
@@ -898,6 +898,7 @@ static void initialize_mountinfo (void)
 					cpuboard_ncr9x_add_scsi_unit(unit, uci);
 					added = true;
 			}
+#endif
 #endif
 		} else if (type == HD_CONTROLLER_TYPE_SCSI_A4000T) {
 #ifdef NCR
@@ -1984,6 +1985,7 @@ int hardfile_media_change (struct hardfiledata *hfd, struct uaedev_config_info *
 	return 0;
 }
 
+#if 0
 int hardfile_remount (int nr)
 {
 	/* this does work but every media reinsert duplicates the device.. */
@@ -1995,7 +1997,7 @@ int hardfile_remount (int nr)
 #endif
 	return 1;
 }
-
+#endif
 
 bool filesys_do_disk_change (int cdunitnum, bool insert)
 {
@@ -2916,11 +2918,11 @@ static uae_u32 REGPARAM2 startup_handler (TrapContext *context)
 	* our allocated volume structure is in A3, A5 is a pointer to
 	* our port. */
 	uaecptr rootnode = get_long (m68k_areg (regs, 2) + 34);
-	uaecptr UNUSED(dos_info) = get_long (rootnode + 24) << 2;
+	uaecptr dos_info = get_long (rootnode + 24) << 2;
 	uaecptr pkt = m68k_dreg (regs, 3);
-	uaecptr UNUSED(arg1) = get_long (pkt + dp_Arg1);
+	uaecptr arg1 = get_long (pkt + dp_Arg1);
 	uaecptr arg2 = get_long (pkt + dp_Arg2);
-	uaecptr UNUSED(arg3) = get_long (pkt + dp_Arg3);
+	uaecptr arg3 = get_long (pkt + dp_Arg3);
 	uaecptr devnode;
 	int nr;
 	Unit *unit;
@@ -3287,7 +3289,7 @@ static void notify_check (Unit *unit, a_inode *a)
 	Notify *n;
 	int hash = notifyhash (a->aname);
 	for (n = unit->notifyhash[hash]; n; n = n->next) {
-		uaecptr UNUSED(nr) = n->notifyrequest;
+		uaecptr nr = n->notifyrequest;
 		if (same_aname (n->partname, a->aname)) {
 			int err;
 			a_inode *a2 = find_aino (unit, 0, n->fullname, &err);
@@ -3298,7 +3300,7 @@ static void notify_check (Unit *unit, a_inode *a)
 	if (a->parent) {
 		hash = notifyhash (a->parent->aname);
 		for (n = unit->notifyhash[hash]; n; n = n->next) {
-			uaecptr UNUSED(nr) = n->notifyrequest;
+			uaecptr nr = n->notifyrequest;
 			if (same_aname (n->partname, a->parent->aname)) {
 				int err;
 				a_inode *a2 = find_aino (unit, 0, n->fullname, &err);
@@ -3356,7 +3358,7 @@ static void
 	n->fullname = name;
 	if (flags & NRF_NOTIFY_INITIAL) {
 		int err;
-		a_inode *UNUSED(a) = find_aino (unit, 0, n->fullname, &err);
+		a_inode *a = find_aino (unit, 0, n->fullname, &err);
 		if (err == 0)
 			notify_send (unit, n);
 	}
@@ -3539,7 +3541,7 @@ static void action_read_link (Unit *unit, dpacket packet)
 	uaecptr newname = GET_PCK_ARG3 (packet);
 	int size = GET_PCK_ARG4 (packet);
 	a_inode *a, *matched_aino;
-	Unit *u = NULL, *UNUSED(u2) = NULL, *matched_unit;
+	Unit *u = NULL, *u2 = NULL, *matched_unit;
 	int err, i, matched_len;
 	TCHAR tmp[MAX_DPATH];
 	TCHAR *namep, *extrapath;
@@ -3951,7 +3953,7 @@ static int action_lock_record (Unit *unit, dpacket packet, uae_u32 msg)
 	uae_u32 mode = GET_PCK_ARG4 (packet);
 	uae_u32 timeout = GET_PCK_ARG5 (packet);
 
-	bool UNUSED(exclusive) = mode == REC_EXCLUSIVE || mode == REC_EXCLUSIVE_IMMED;
+	bool exclusive = mode == REC_EXCLUSIVE || mode == REC_EXCLUSIVE_IMMED;
 
 #ifdef FSUAE
 	g_packet_delay = 2;
@@ -5218,7 +5220,7 @@ static void
 	* Above is wrong, it is always *_LOCK. TW. */
 	int mode = GET_PCK_ARG3 (packet);
 	unsigned long uniq;
-	a_inode *a = NULL, *UNUSED(olda) = NULL;
+	a_inode *a = NULL, *olda = NULL;
 	int err = 0;
 	TRACE((_T("ACTION_CHANGE_MODE(0x%x,%d,%d)\n"), object, type, mode));
 
@@ -6208,7 +6210,7 @@ static uae_u32 REGPARAM2 exter_int_helper (TrapContext *context)
 #ifdef UAE_FILESYS_THREADS
 		{
 			Unit *unit = find_unit (m68k_areg (regs, 5));
-			uaecptr UNUSED(msg) = m68k_areg (regs, 4);
+			uaecptr msg = m68k_areg (regs, 4);
 			unit->cmds_complete = unit->cmds_acked;
 			while (comm_pipe_has_data (unit->ui.back_pipe)) {
 				uaecptr locks, lockend;
@@ -6532,11 +6534,11 @@ error2:
 
 static void init_filesys_diagentry (void)
 {
-	do_put_mem_long ((uae_u32 *)(filesysory + 0x2100), EXPANSION_explibname);
-	do_put_mem_long ((uae_u32 *)(filesysory + 0x2104), filesys_configdev);
-	do_put_mem_long ((uae_u32 *)(filesysory + 0x2108), EXPANSION_doslibname);
-	do_put_mem_word ((uae_u16 *)(filesysory + 0x210e), nr_units ());
-	do_put_mem_word ((uae_u16 *)(filesysory + 0x210c), 0);
+	do_put_mem_long ((uae_u32 *)(filesys_bank.baseaddr + 0x2100), EXPANSION_explibname);
+	do_put_mem_long ((uae_u32 *)(filesys_bank.baseaddr + 0x2104), filesys_configdev);
+	do_put_mem_long ((uae_u32 *)(filesys_bank.baseaddr + 0x2108), EXPANSION_doslibname);
+	do_put_mem_word ((uae_u16 *)(filesys_bank.baseaddr + 0x210e), nr_units ());
+	do_put_mem_word ((uae_u16 *)(filesys_bank.baseaddr + 0x210c), 0);
 	native2amiga_startup ();
 }
 
@@ -6850,7 +6852,6 @@ static uae_u32 REGPARAM2 filesys_dev_bootfilesys (TrapContext *context)
 	return 0;
 }
 
-extern void picasso96_alloc (TrapContext*);
 static uae_u32 REGPARAM2 filesys_init_storeinfo (TrapContext *context)
 {
 	int ret = -1;
@@ -6878,9 +6879,9 @@ static uae_u32 REGPARAM2 filesys_dev_remember (TrapContext *context)
 {
 	int no = m68k_dreg (regs, 6) & 0x7fffffff;
 	int unit_no = no & 65535;
-	int UNUSED(sub_no) = no >> 16;
+	int sub_no = no >> 16;
 	UnitInfo *uip = &mountinfo.ui[unit_no];
-	int UNUSED(iscd) = (m68k_dreg (regs, 6) & 0x80000000) != 0 || uip->unit_type == UNIT_CDFS;
+	int iscd = (m68k_dreg (regs, 6) & 0x80000000) != 0 || uip->unit_type == UNIT_CDFS;
 	int i;
 	uaecptr devicenode = m68k_areg (regs, 3);
 	uaecptr parmpacket = m68k_areg (regs, 1);
@@ -6920,7 +6921,7 @@ static uae_u32 rl (uae_u8 *p)
 	return (p[0] << 24) | (p[1] << 16) | (p[2] << 8) | (p[3]);
 }
 
-int rdb_checksum (const uae_char *id, uae_u8 *p, int block)
+static int rdb_checksum (const uae_char *id, uae_u8 *p, int block)
 {
 	uae_u32 sum = 0;
 	int i, blocksize;
@@ -7588,7 +7589,7 @@ static uae_u32 REGPARAM2 filesys_dev_storeinfo (TrapContext *context)
 	put_long (parmpacket + PP_ADDTOFSRES, 0);
 	put_long (parmpacket + PP_FSSIZE, 0);
 	if (iscd) {
-		TCHAR *UNUSED(cdname) = NULL;
+		TCHAR *cdname = NULL;
 		uaecptr cdname_amiga;
 		int cd_unit_no = unit_no - cd_unit_offset;
 
@@ -7753,7 +7754,6 @@ static uae_u32 REGPARAM2 mousehack_done (TrapContext *context)
 static int g_hsync_line = 0;
 #endif
 
-extern void cia_heartbeat (void);
 void filesys_vsync (void)
 {
 	Unit *u;

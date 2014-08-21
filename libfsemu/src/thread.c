@@ -65,14 +65,17 @@ struct fs_semaphore {
 #endif
 };
 
-fs_thread *fs_thread_create(fs_thread_function fn, void *data) {
+fs_thread *fs_thread_create(
+        const char *name, fs_thread_function fn, void *data) {
     fs_thread *thread = (fs_thread *) malloc(sizeof(fs_thread));
 #if defined(USE_PTHREADS)
     pthread_attr_init(&thread->attr);
     pthread_attr_setdetachstate(&thread->attr, PTHREAD_CREATE_JOINABLE);
     pthread_create(&thread->thread, &thread->attr, fn, data);
 #elif defined(USE_GLIB)
-    thread->thread = g_thread_new("fs-thread", fn, data);
+    thread->thread = g_thread_new(name, fn, data);
+#else
+#error no thread support
 #endif
 
 /*
@@ -82,6 +85,24 @@ fs_thread *fs_thread_create(fs_thread_function fn, void *data) {
 */
     return thread;
 }
+
+#if 0
+fs_thread *fs_thread_create_detached(
+        const char *name, fs_thread_function fn, void *data) {
+    fs_thread *thread = (fs_thread *) malloc(sizeof(fs_thread));
+#if defined(USE_PTHREADS)
+    pthread_attr_init(&thread->attr);
+    pthread_attr_setdetachstate(&thread->attr, PTHREAD_CREATE_DETACHED);
+    pthread_create(&thread->thread, &thread->attr, fn, data);
+#elif defined(USE_GLIB)
+    //thread->thread = g_thread_new(name, fn, data);
+    thread->thread = g_thread_create(fn, data, FALSE, NULL);
+#else
+#error no thread support
+#endif
+    return thread;
+}
+#endif
 
 void *fs_thread_wait(fs_thread *thread) {
     void *result;
@@ -93,6 +114,8 @@ void *fs_thread_wait(fs_thread *thread) {
     // and implemented fs_thread_destroy separately
     //g_thread_ref(thread->thread);
     result = g_thread_join(thread->thread);
+#else
+#error no thread support
 #endif
 /*
 #ifdef USE_SDL
@@ -102,10 +125,16 @@ void *fs_thread_wait(fs_thread *thread) {
     return result;
 }
 
+/*
 void fs_thread_destroy(fs_thread *thread) {
 #ifdef USE_GLIB
     //g_thread_unref(thread->thread);
 #endif
+    free(thread);
+}
+*/
+
+void fs_thread_free(fs_thread *thread) {
     free(thread);
 }
 
@@ -117,6 +146,8 @@ fs_mutex *fs_mutex_create() {
     g_mutex_init(&mutex->mutex);
 #elif defined(USE_SDL)
     mutex->mutex = SDL_CreateMutex();
+#else
+#error no thread support
 #endif
     return mutex;
 }
@@ -128,6 +159,8 @@ void fs_mutex_destroy(fs_mutex *mutex) {
     g_mutex_clear(&mutex->mutex);
 #elif defined(USE_SDL)
     SDL_DestroyMutex(mutex->mutex);
+#else
+#error no thread support
 #endif
     free(mutex);
 }
@@ -140,6 +173,8 @@ int fs_mutex_lock(fs_mutex *mutex) {
     return 0;
 #elif defined(USE_SDL)
     return SDL_mutexP(mutex->mutex);
+#else
+#error no thread support
 #endif
 }
 
@@ -151,6 +186,8 @@ int fs_mutex_unlock(fs_mutex *mutex) {
     return 0;
 #elif defined(USE_SDL)
     return SDL_mutexV(mutex->mutex);
+#else
+#error no thread support
 #endif
 }
 
@@ -162,6 +199,8 @@ fs_condition *fs_condition_create(void) {
     g_cond_init(&condition->condition);
 #elif defined(USE_SDL)
     condition->condition = SDL_CreateCond();
+#else
+#error no thread support
 #endif
     return condition;
 }
@@ -173,6 +212,8 @@ void fs_condition_destroy(fs_condition *condition) {
     g_cond_clear(&condition->condition);
 #elif defined(USE_SDL)
     SDL_DestroyCond(condition->condition);
+#else
+#error no thread support
 #endif
     free(condition);
 }
@@ -185,6 +226,8 @@ int fs_condition_wait (fs_condition *condition, fs_mutex *mutex) {
     return 0;
 #elif defined(USE_SDL)
     return SDL_CondWait(condition->condition, mutex->mutex);
+#else
+#error no thread support
 #endif
 }
 
@@ -215,6 +258,8 @@ int fs_condition_wait_until(fs_condition *condition, fs_mutex *mutex,
 #elif defined(USE_SDL)
     // FIXME: no timed wait...
     return SDL_CondWait(condition->condition, mutex->mutex);
+#else
+#error no thread support
 #endif
 }
 
@@ -226,6 +271,8 @@ int fs_condition_signal(fs_condition *condition) {
     return 0;
 #elif defined(USE_SDL)
     return SDL_CondSignal(condition->condition);
+#else
+#error no thread support
 #endif
 }
 
@@ -235,6 +282,8 @@ fs_semaphore *fs_semaphore_create(int value) {
     sem_init(&semaphore->semaphore, 1, value);
 #elif defined(USE_SDL)
     semaphore->semaphore = SDL_CreateSemaphore(value);
+#else
+#error no thread support
 #endif
     return semaphore;
 }
@@ -244,6 +293,8 @@ void fs_semaphore_destroy(fs_semaphore *semaphore) {
     sem_destroy(&semaphore->semaphore);
 #elif defined(USE_SDL)
     SDL_DestroySemaphore(semaphore->semaphore);
+#else
+#error no thread support
 #endif
     free(semaphore);
 }
@@ -253,6 +304,8 @@ int fs_semaphore_post(fs_semaphore *semaphore) {
     return sem_post(&semaphore->semaphore);
 #elif defined(USE_SDL)
     return SDL_SemPost(semaphore->semaphore);
+#else
+#error no thread support
 #endif
 }
 
@@ -261,6 +314,8 @@ int fs_semaphore_wait(fs_semaphore *semaphore) {
     return sem_wait(&semaphore->semaphore);
 #elif defined(USE_SDL)
     return SDL_SemWait(semaphore->semaphore);
+#else
+#error no thread support
 #endif
 }
 
@@ -269,5 +324,7 @@ int fs_semaphore_try_wait(fs_semaphore *semaphore) {
     return sem_trywait(&semaphore->semaphore);
 #elif defined(USE_SDL)
     return SDL_SemTryWait(semaphore->semaphore);
+#else
+#error no thread support
 #endif
 }

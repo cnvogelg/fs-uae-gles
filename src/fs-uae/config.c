@@ -374,6 +374,27 @@ static void configure_memory(amiga_config *c) {
     }
 }
 
+static void configure_cpuboard(void)
+{
+    char *path;
+
+    path = fs_config_get_string("cpuboard_flash_file");
+    if (path) {
+        path = fs_uae_expand_path_and_free(path);
+        path = fs_uae_resolve_path_and_free(path, FS_UAE_ROM_PATHS);
+        amiga_set_option("cpuboard_rom_file", path);
+        free(path);
+    }
+
+    path = fs_config_get_string("cpuboard_flash_ext_file");
+    if (path) {
+        path = fs_uae_expand_path_and_free(path);
+        path = fs_uae_resolve_path_and_free(path, FS_UAE_ROM_PATHS);
+        amiga_set_option("cpuboard_ext_rom_file", path);
+        free(path);
+    }
+}
+
 void fs_uae_configure_amiga_hardware() {
     amiga_config *c = g_fs_uae_amiga_configs + g_fs_uae_amiga_config;
     char *path;
@@ -518,6 +539,8 @@ void fs_uae_configure_amiga_hardware() {
     if (c->enhanced_audio_filter) {
         amiga_set_option("sound_filter_type", "enhanced");
     }
+
+	configure_cpuboard();
 
     /*
     if (g_fs_uae_amiga_model == MODEL_A500) {
@@ -759,6 +782,11 @@ static void configure_hard_drive_image (int index, const char *path,
 void fs_uae_configure_hard_drives() {
     fs_emu_log("fs_uae_configure_hard_drives\n");
 
+    const char *flags = fs_config_get_const_string("uaem_write_flags");
+    if (flags != NULL) {
+        uae_set_uaem_write_flags_from_string(flags);
+    }
+
     for (int i = 0; i < 10; i++) {
         char *key = fs_strdup_printf("hard_drive_%d", i);
         char *path = fs_config_get_string(key);
@@ -766,9 +794,8 @@ void fs_uae_configure_hard_drives() {
         if (path == NULL) {
             continue;
         }
-        if (path[0] == '\0') {
-            continue;
-        }
+        /* fs_config_get_string never returns an empty string, NULL is
+         * returned if value is empty or key does not exist. */
         path = fs_uae_expand_path_and_free(path);
         path = fs_uae_resolve_path_and_free(path, FS_UAE_HD_PATHS);
         if (!fs_path_exists(path)) {
@@ -789,12 +816,12 @@ void fs_uae_configure_hard_drives() {
         char *device = fs_strdup_printf("DH%d", i);
 
         int read_only = 0;
-        int virtual = 0;
+        int virtual_hd = 0;
         if (fs_path_is_dir(path)) {
-            virtual = 1;
+            virtual_hd = 1;
         }
         else if (fs_str_has_suffix(path, ".zip")) {
-            virtual = 1;
+            virtual_hd = 1;
             //read_write = ro_string;
             read_only = 1;
         }
@@ -806,7 +833,7 @@ void fs_uae_configure_hard_drives() {
         }
         free(key);
 
-        if (virtual) {
+        if (virtual_hd) {
             configure_hard_drive_directory(i, path, device, read_only,
                     boot_priority);
         }

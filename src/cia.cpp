@@ -41,6 +41,10 @@
 #include "inputrecord.h"
 #include "autoconf.h"
 
+#ifdef FSUAE // NL
+#include "uae/fs.h"
+#endif
+
 #define CIAA_DEBUG_R 0
 #define CIAA_DEBUG_W 0
 #define CIAA_DEBUG_IRQ 0
@@ -1327,11 +1331,13 @@ static void WriteCIAA (uae_u16 addr, uae_u8 val)
 		val &= 0x7f; /* bit 7 is unused */
 		if ((val & 1) && !(ciaacra & 1))
 			ciaastarta = CIASTARTCYCLESCRA;
+#ifdef WITH_CPUBOARD
 		if (currprefs.cpuboard_type != 0 && (val & 0x40) != (ciaacra & 0x40)) {
 			/* bleh, Phase5 CPU timed early boot key check fix.. */
 			if (m68k_getpc() >= 0xf00000 && m68k_getpc() < 0xf80000)
 				check_keyboard();
 		}
+#endif
 		if ((val & 0x40) == 0 && (ciaacra & 0x40) != 0) {
 			/* todo: check if low to high or high to low only */
 			kblostsynccnt = 0;
@@ -1595,19 +1601,11 @@ void dumpcia (void)
 
 /* CIA memory access */
 
-static uae_u32 REGPARAM3 cia_lget (uaecptr) REGPARAM;
-static uae_u32 REGPARAM3 cia_wget (uaecptr) REGPARAM;
-static uae_u32 REGPARAM3 cia_bget (uaecptr) REGPARAM;
-static uae_u32 REGPARAM3 cia_lgeti (uaecptr) REGPARAM;
-static uae_u32 REGPARAM3 cia_wgeti (uaecptr) REGPARAM;
-static void REGPARAM3 cia_lput (uaecptr, uae_u32) REGPARAM;
-static void REGPARAM3 cia_wput (uaecptr, uae_u32) REGPARAM;
-static void REGPARAM3 cia_bput (uaecptr, uae_u32) REGPARAM;
-
+DECLARE_MEMORY_FUNCTIONS(cia);
 addrbank cia_bank = {
 	cia_lget, cia_wget, cia_bget,
 	cia_lput, cia_wput, cia_bput,
-	default_xlate, default_check, NULL, _T("CIA"),
+	default_xlate, default_check, NULL, NULL, _T("CIA"),
 	cia_lgeti, cia_wgeti, ABFLAG_IO, 0x3f01, 0xbfc000
 };
 
@@ -1909,7 +1907,7 @@ static void REGPARAM3 clock_bput (uaecptr, uae_u32) REGPARAM;
 addrbank clock_bank = {
 	clock_lget, clock_wget, clock_bget,
 	clock_lput, clock_wput, clock_bput,
-	default_xlate, default_check, NULL, _T("Battery backed up clock (none)"),
+	default_xlate, default_check, NULL, NULL, _T("Battery backed up clock (none)"),
 	dummy_lgeti, dummy_wgeti, ABFLAG_IO, 0x3f, 0xd80000
 };
 

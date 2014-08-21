@@ -26,10 +26,12 @@ struct flashrom_data
 	int mask;
 	int state;
 	int modified;
+	int sectorsize;
+	uae_u8 devicecode;
 	struct zfile *zf;
 };
 
-void *flash_new(uae_u8 *rom, int flashsize, int allocsize, struct zfile *zf)
+void *flash_new(uae_u8 *rom, int flashsize, int allocsize, uae_u8 devicecode, struct zfile *zf)
 {
 	struct flashrom_data *fd = xcalloc(struct flashrom_data, 1);
 	fd->flashsize = flashsize;
@@ -37,6 +39,8 @@ void *flash_new(uae_u8 *rom, int flashsize, int allocsize, struct zfile *zf)
 	fd->mask = fd->flashsize - 1;
 	fd->zf = zf;
 	fd->rom = rom;
+	fd->devicecode = devicecode;
+	fd->sectorsize = devicecode == 0x20 ? 16384 : 65536;
 	return fd;
 }
 
@@ -52,6 +56,14 @@ void flash_free(void *fdv)
 	xfree(fdv);
 }
 
+int flash_size(void *fdv)
+{
+	struct flashrom_data *fd = (struct flashrom_data*)fdv;
+	if (!fd)
+		return 0;
+	return fd->flashsize;
+}
+
 bool flash_active(void *fdv, uaecptr addr)
 {
 	struct flashrom_data *fd = (struct flashrom_data*)fdv;
@@ -63,12 +75,13 @@ bool flash_active(void *fdv, uaecptr addr)
 bool flash_write(void *fdv, uaecptr addr, uae_u8 v)
 {
 	struct flashrom_data *fd = (struct flashrom_data*)fdv;
-	int oldstate = fd->state;
+	int oldstate;
 	uae_u32 addr2;
 
 	if (!fd)
 		return false;
-#if FLASH_LOG
+	oldstate = fd->state;
+#if FLASH_LOG > 1
 	write_log(_T("flash write %08x %02x (%d) PC=%08x\n"), addr, v, fd->state, m68k_getpc());
 #endif
 
@@ -120,13 +133,13 @@ bool flash_write(void *fdv, uaecptr addr, uae_u8 v)
 #endif
 		return true;
 	} else if (fd->state == 6 && v == 0x30) {
-		int saddr = addr & ~0x3fff;
+		int saddr = addr & ~(fd->sectorsize - 1);
 		if (saddr < fd->allocsize)
-			memset(fd->rom + saddr, 0xff, 0x4000);
+			memset(fd->rom + saddr, 0xff, fd->sectorsize);
 		fd->state = 200;
 		fd->modified = 1;
 #if FLASH_LOG
-		write_log(_T("flash sector %d erased (%08x)\n"), saddr / 0x4000, addr);
+		write_log(_T("flash sector %d erased (%08x)\n"), saddr / fd->sectorsize, addr);
 #endif
 		return true;
 	}
@@ -150,7 +163,7 @@ uae_u32 flash_read(void *fdv, uaecptr addr)
 		if (a == 0)
 			v = 0x01;
 		if (a == 1)
-			v = 0x20;
+			v = fd->devicecode;
 		if (a == 2)
 			v = 0x00;
 	} else if (fd->state >= 200) {
@@ -175,7 +188,7 @@ uae_u32 flash_read(void *fdv, uaecptr addr)
 		else
 			v = fd->rom[addr];
 	}
-#if FLASH_LOG
+#if FLASH_LOG > 1
 	write_log(_T("flash read %08x = %02X (%d) PC=%08x\n"), addr, v, fd->state, m68k_getpc());
 #endif
 

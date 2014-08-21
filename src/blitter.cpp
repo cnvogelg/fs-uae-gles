@@ -82,7 +82,7 @@ extern uae_u8 cycle_line[256];
 static long blit_firstline_cycles;
 static long blit_first_cycle;
 static int blit_last_cycle, blit_dmacount, blit_dmacount2;
-static int UNUSED(blit_linecycles), UNUSED(blit_extracycles), blit_nod;
+static int blit_linecycles, blit_extracycles, blit_nod;
 static const int *blit_diag;
 static int blit_frozen, blit_faulty;
 static int blit_final;
@@ -341,7 +341,6 @@ int blitter_channel_state (void)
 	return channel_state (blit_cyclecounter);
 }
 
-extern int is_bitplane_dma (int hpos);
 STATIC_INLINE int canblit (int hpos)
 {
 	if (!dmaen (DMA_BLITTER))
@@ -1213,7 +1212,6 @@ void decide_blitter (int hpos)
 				break;
 			}
 
-			check_channel_mods (last_blitter_hpos, c);
 			blt_info.got_cycle = 1;
 			if (c == 4) {
 				blitter_doddma (last_blitter_hpos);
@@ -1233,6 +1231,8 @@ void decide_blitter (int hpos)
 					return;
 				}
 			}
+			// check this after end check because last D write won't cause any problems.
+			check_channel_mods (last_blitter_hpos, c);
 			break;
 		}
 
