@@ -4,6 +4,7 @@
 * Misc accelerator board special features
 * Blizzard 1230 IV, 1240/1260, 2040/2060, PPC
 * CyberStorm MK1, MK2, MK3, PPC.
+* TekMagic
 * Warp Engine
 *
 * Copyright 2014 Toni Wilen
@@ -14,7 +15,7 @@
 #include "sysdeps.h"
 
 #include "options.h"
-#include "memory_uae.h"
+#include "uae/memory.h"
 #include "zfile.h"
 #include "rommgr.h"
 #include "autoconf.h"
@@ -26,9 +27,7 @@
 #include "debug.h"
 #include "flashrom.h"
 #include "uae.h"
-#include "ppc.h"
-
-#ifdef WITH_CPUBOARD
+#include "uae/ppc.h"
 
 #define CPUBOARD_IO_LOG 0
 #define CPUBOARD_IRQ_LOG 0
@@ -150,6 +149,7 @@ static struct zfile *flashrom_file;
 static int flash_unlocked;
 static int csmk2_flashaddressing;
 static bool blizzardmaprom_bank_mapped, blizzardmaprom2_bank_mapped;
+static bool cpuboard_non_byte_ea;
 
 static int ppc_irq_pending;
 
@@ -252,7 +252,10 @@ static bool is_blizzardppc(void)
 static bool is_ppc(void)
 {
 	return currprefs.cpuboard_type == BOARD_BLIZZARDPPC || currprefs.cpuboard_type == BOARD_CSPPC;
-
+}
+static bool is_tekmagic(void)
+{
+	return currprefs.cpuboard_type == BOARD_TEKMAGIC;
 }
 
 DECLARE_MEMORY_FUNCTIONS(blizzardio);
@@ -260,7 +263,7 @@ static addrbank blizzardio_bank = {
 	blizzardio_lget, blizzardio_wget, blizzardio_bget,
 	blizzardio_lput, blizzardio_wput, blizzardio_bput,
 	default_xlate, default_check, NULL, NULL, _T("CPUBoard IO"),
-	blizzardio_wget, blizzardio_bget, ABFLAG_IO
+	blizzardio_wget, blizzardio_bget, ABFLAG_IO | ABFLAG_THREADSAFE
 };
 
 DECLARE_MEMORY_FUNCTIONS(blizzardram);
@@ -268,7 +271,7 @@ static addrbank blizzardram_bank = {
 	blizzardram_lget, blizzardram_wget, blizzardram_bget,
 	blizzardram_lput, blizzardram_wput, blizzardram_bput,
 	blizzardram_xlate, blizzardram_check, NULL, NULL, _T("CPUBoard RAM"),
-	blizzardram_lget, blizzardram_wget, ABFLAG_RAM
+	blizzardram_lget, blizzardram_wget, ABFLAG_RAM | ABFLAG_THREADSAFE
 };
 
 DECLARE_MEMORY_FUNCTIONS(blizzardea);
@@ -300,7 +303,7 @@ static addrbank blizzardram_nojit_bank = {
 	blizzardram_nojit_lget, blizzardram_nojit_wget, blizzardram_nojit_bget,
 	blizzardram_nojit_lput, blizzardram_nojit_wput, blizzardram_nojit_bput,
 	blizzardram_nojit_xlate, blizzardram_nojit_check, NULL, NULL, _T("CPUBoard RAM"),
-	blizzardram_nojit_lget, blizzardram_nojit_wget, ABFLAG_RAM
+	blizzardram_nojit_lget, blizzardram_nojit_wget, ABFLAG_RAM | ABFLAG_THREADSAFE
 };
 
 DECLARE_MEMORY_FUNCTIONS(blizzardmaprom);
@@ -576,22 +579,25 @@ static uae_u32 REGPARAM2 blizzardea_lget(uaecptr addr)
 #ifdef JIT
 	special_mem |= S_READ;
 #endif
-	uae_u32 *m;
-
-	addr &= blizzardea_bank.mask;
-	m = (uae_u32 *)(blizzardea_bank.baseaddr + addr);
-	return do_get_mem_long(m);
+	uae_u32 v = 0;
+	if (cpuboard_non_byte_ea) {
+		v = blizzardea_bget(addr + 3) <<  0;
+		v |= blizzardea_bget(addr + 2) <<  8;
+		v |= blizzardea_bget(addr + 1) << 16;
+		v |= blizzardea_bget(addr + 0) << 24;
+	}
+	return v;
 }
 static uae_u32 REGPARAM2 blizzardea_wget(uaecptr addr)
 {
 #ifdef JIT
 	special_mem |= S_READ;
 #endif
-	uae_u16 *m, v;
-
-	addr &= blizzardea_bank.mask;
-	m = (uae_u16 *)(blizzardea_bank.baseaddr + addr);
-	v = do_get_mem_word(m);
+	uae_u32 v = 0;
+	if (cpuboard_non_byte_ea) {
+		v  = blizzardea_bget(addr + 1) <<  0;
+		v |= blizzardea_bget(addr + 0) <<  8;
+	}
 	return v;
 }
 static uae_u32 REGPARAM2 blizzardea_bget(uaecptr addr)
@@ -602,7 +608,10 @@ static uae_u32 REGPARAM2 blizzardea_bget(uaecptr addr)
 	uae_u8 v;
 
 	addr &= blizzardea_bank.mask;
-	if (is_blizzard2060() && addr >= BLIZZARD_2060_SCSI_OFFSET) {
+	if (is_tekmagic()) {
+		cpuboard_non_byte_ea = true;
+		v = cpuboard_ncr710_io_bget(addr);
+	} else if (is_blizzard2060() && addr >= BLIZZARD_2060_SCSI_OFFSET) {
 		v = cpuboard_ncr9x_scsi_get(addr);
 	} else if ((currprefs.cpuboard_type == BOARD_BLIZZARD_1230_IV_SCSI || currprefs.cpuboard_type == BOARD_BLIZZARD_1260_SCSI) && addr >= BLIZZARD_SCSI_KIT_SCSI_OFFSET) {
 		v = cpuboard_ncr9x_scsi_get(addr);
@@ -628,26 +637,39 @@ static uae_u32 REGPARAM2 blizzardea_bget(uaecptr addr)
 	return v;
 }
 
-static void REGPARAM2 blizzardea_lput(uaecptr addr, uae_u32 b)
+static void REGPARAM2 blizzardea_lput(uaecptr addr, uae_u32 l)
 {
 #ifdef JIT
 	special_mem |= S_WRITE;
 #endif
+	if (cpuboard_non_byte_ea) {
+		blizzardea_bput(addr + 3, l >> 0);
+		blizzardea_bput(addr + 2, l >> 8);
+		blizzardea_bput(addr + 1, l >> 16);
+		blizzardea_bput(addr + 0, l >> 24);
+	}
 }
-static void REGPARAM2 blizzardea_wput(uaecptr addr, uae_u32 b)
+static void REGPARAM2 blizzardea_wput(uaecptr addr, uae_u32 w)
 {
 #ifdef JIT
 	special_mem |= S_WRITE;
 #endif
+	if (cpuboard_non_byte_ea) {
+		blizzardea_bput(addr + 1, w >> 0);
+		blizzardea_bput(addr + 0, w >> 8);
+	}
 }
 static void REGPARAM2 blizzardea_bput(uaecptr addr, uae_u32 b)
 {
 #ifdef JIT
 	special_mem |= S_WRITE;
 #endif
-	addr &= blizzardea_bank.mask;
 
-	if (is_blizzard2060() && addr >= BLIZZARD_2060_SCSI_OFFSET) {
+	addr &= blizzardea_bank.mask;
+	if (is_tekmagic()) {
+		cpuboard_non_byte_ea = true;
+		cpuboard_ncr710_io_bput(addr, b);
+	} else if (is_blizzard2060() && addr >= BLIZZARD_2060_SCSI_OFFSET) {
 		cpuboard_ncr9x_scsi_put(addr, b);
 	} else if ((currprefs.cpuboard_type == BOARD_BLIZZARD_1230_IV_SCSI || currprefs.cpuboard_type == BOARD_BLIZZARD_1260_SCSI) && addr >= BLIZZARD_SCSI_KIT_SCSI_OFFSET) {
 		cpuboard_ncr9x_scsi_put(addr, b);
@@ -691,13 +713,13 @@ static void REGPARAM2 blizzarde8_bput(uaecptr addr, uae_u32 b)
 		map_banks(&blizzardea_bank, b, 0x20000 >> 16, 0x20000);
 		write_log(_T("Blizzard/CyberStorm Z2 autoconfigured at %02X0000\n"), b);
 		configured = 1;
-		expamem_next();
+		expamem_next (&blizzardea_bank, NULL);
 		return;
 	}
 	if (addr == 0x4c && !configured) {
 		write_log(_T("Blizzard Z2 SHUT-UP!\n"));
 		configured = 1;
-		expamem_next();
+		expamem_next (NULL, NULL);
 		return;
 	}
 }
@@ -1191,6 +1213,10 @@ void cpuboard_map(void)
 		if (currprefs.maprom)
 			map_banks_nojitdirect(&blizzardmaprom_bank, (a3000hmem_bank.start + a3000hmem_bank.allocated - 524288) >> 16, 524288 >> 16, 0);
 	}
+	if (is_tekmagic()) {
+		map_banks(&blizzardf0_bank, 0xf00000 >> 16, 131072 >> 16, 0);
+		map_banks(&blizzardea_bank, 0xf40000 >> 16, 65536 >> 16, 0);
+	}
 }
 
 void cpuboard_reset(bool hardreset)
@@ -1211,6 +1237,7 @@ void cpuboard_reset(bool hardreset)
 		io_reg[CSIII_REG_LOCK] = 0x01;
 	}
 	flash_unlocked = 0;
+	cpuboard_non_byte_ea = false;
 
 	flash_free(flashrom);
 	flashrom = NULL;
@@ -1269,7 +1296,18 @@ void cpuboard_init(void)
 
 	cpuboard_size = currprefs.cpuboardmem1_size;
 
-	if (is_blizzard() || is_blizzardppc()) {
+	if (is_tekmagic()) {
+
+		blizzardf0_bank.start = 0x00f00000;
+		blizzardf0_bank.allocated = 131072;
+		blizzardf0_bank.mask = blizzardf0_bank.allocated - 1;
+		mapped_malloc(&blizzardf0_bank);
+
+		blizzardea_bank.allocated = 65536;
+		blizzardea_bank.mask = blizzardea_bank.allocated - 1;
+		mapped_malloc(&blizzardea_bank);
+
+	} else if (is_blizzard() || is_blizzardppc()) {
 		blizzardram_bank.start = BLIZZARD_RAM_ALIAS_BASE;
 		blizzardram_bank.allocated = cpuboard_size;
 		blizzardram_bank.mask = blizzardram_bank.allocated - 1;
@@ -1436,12 +1474,11 @@ bool cpuboard_08000000(struct uae_prefs *p)
 		case BOARD_CSMK3:
 		case BOARD_CSPPC:
 		case BOARD_WARPENGINE_A4000:
+		case BOARD_TEKMAGIC:
 		return true;
 	}
 	return false;
 }
-
-#endif
 
 bool cpuboard_blizzardram(struct uae_prefs *p)
 {
@@ -1454,8 +1491,6 @@ bool cpuboard_blizzardram(struct uae_prefs *p)
 	}
 	return false;
 }
-
-#ifdef WITH_CPUBOARD
 
 static void fixserial(uae_u8 *rom, int size)
 {
@@ -1540,7 +1575,7 @@ static struct zfile *board_rom_open(int *roms, const TCHAR *name)
 	struct romlist *rl = getromlistbyids(roms);
 	if (rl)
 		zf = read_rom(rl->rd);
-	if (!zf) {
+	if (!zf && name) {
 		TCHAR path[MAX_DPATH];
 		fetch_rompath(path, sizeof path / sizeof(TCHAR));
 		_tcscat(path, name);
@@ -1563,6 +1598,7 @@ addrbank *cpuboard_autoconfig_init(void)
 	roms[1] = -1;
 	roms2[0] = -1;
 	roms2[1] = -1;
+	cpuboard_non_byte_ea = false;
 	switch (currprefs.cpuboard_type)
 	{
 	case BOARD_BLIZZARD_1230_IV_SCSI:
@@ -1580,6 +1616,9 @@ addrbank *cpuboard_autoconfig_init(void)
 		break;
 	case BOARD_WARPENGINE_A4000:
 		return &expamem_null;
+	case BOARD_TEKMAGIC:
+		roms[0] = 105;
+		break;
 	case BOARD_CSMK1:
 		roms[0] = currprefs.cpu_model == 68040 ? 95 : 101;
 		isflashrom = true;
@@ -1608,7 +1647,7 @@ addrbank *cpuboard_autoconfig_init(void)
 #else
 	struct romlist *rl = getromlistbyids(roms);
 	if (!rl) {
-		rd = getromlistbyidsallroms(roms);
+		rd = getromdatabyids(roms);
 		if (!rd)
 			return &expamem_null;
 	} else {
@@ -1616,7 +1655,18 @@ addrbank *cpuboard_autoconfig_init(void)
 	}
 	defaultromname = rd->defaultfilename;
 	if (rl && !isflashrom) {
-		autoconfig_rom = zfile_fopen(romname, _T("rb"));
+		if (romname)
+			autoconfig_rom = zfile_fopen(romname, _T("rb"));
+		if (!autoconfig_rom && defaultromname)
+			autoconfig_rom = zfile_fopen(defaultromname, _T("rb"));
+		if (autoconfig_rom) {
+			struct romdata *rd2 = getromdatabyids(roms);
+			// Do not use image if it is not long enough (odd or even only?)
+			if (!rd2 || zfile_size(autoconfig_rom) < rd2->size) {
+				zfile_fclose(autoconfig_rom);
+				autoconfig_rom = NULL;
+			}
+		}
 		if (!autoconfig_rom)
 			autoconfig_rom = read_rom(rl->rd);
 	} else if (isflashrom) {
@@ -1646,8 +1696,18 @@ addrbank *cpuboard_autoconfig_init(void)
 		write_log (_T("ROM id %d not found for CPU board emulation\n"), roms[0]);
 		return &expamem_null;
 	}
+	if (autoconfig_rom)
+		write_log(_T("CPUBoard ROM '%s' %lld loaded\n"), zfile_getname(autoconfig_rom), zfile_size(autoconfig_rom));
+
 	protect_roms(false);
-	if (is_blizzard2060()) {
+	cpuboard_non_byte_ea = true;
+	if (is_tekmagic()) {
+		earom_size = 65536;
+		f0rom_size = 131072;
+		zfile_fread(blizzardf0_bank.baseaddr, 1, f0rom_size, autoconfig_rom);
+		autoconf = false;
+		cpuboard_non_byte_ea = false;
+	} else if (is_blizzard2060()) {
 		f0rom_size = 65536;
 		earom_size = 131072;
 		// 2060 = 2x32k
@@ -1729,7 +1789,6 @@ addrbank *cpuboard_autoconfig_init(void)
 		zfile_fclose(autoconfig_rom);
 		autoconfig_rom = NULL;
 		if (roms2[0] != -1) {
-			defaultromname = _T("blizzard_scsi_kit_iv.rom");
 			autoconfig_rom = board_rom_open(roms2, currprefs.acceleratorextromfile);
 			if (!autoconfig_rom)
 				autoconfig_rom = board_rom_open(roms2, defaultromname);
@@ -1751,5 +1810,3 @@ addrbank *cpuboard_autoconfig_init(void)
 		return &expamem_null;
 	return &blizzarde8_bank;
 }
-
-#endif // WITH_CPUBOARD

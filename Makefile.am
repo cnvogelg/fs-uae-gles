@@ -30,6 +30,8 @@ endif
 #CM_CFLAGS += -Wmissing-format-attribute
 #endif
 
+CM_CFLAGS += -fvisibility=hidden
+
 AM_CFLAGS =
 AM_CFLAGS += $(CM_CFLAGS) -std=gnu99
 
@@ -38,7 +40,7 @@ AM_CXXFLAGS += $(CM_CFLAGS)
 
 AM_CPPFLAGS =
 AM_CPPFLAGS += @OS_CPPFLAGS@
-AM_CPPFLAGS += -DFSUAE
+AM_CPPFLAGS += -DUAE -DFSUAE
 
 LIBS += @CARBON_LIBS@
 LIBS += @FREETYPE_LIBS@
@@ -54,6 +56,7 @@ LIBS += @X11_LIBS@
 LIBS += @ZLIB_LIBS@
 
 AM_LDFLAGS =
+# AM_LDFLAGS += -rdynamic
 AM_LDFLAGS += @OS_LDFLAGS@
 
 MSGFMT = @MSGFMT@
@@ -89,6 +92,7 @@ fs_uae_SOURCES = \
 	src/fs-uae/main.c \
 	src/fs-uae/menu.c \
 	src/fs-uae/mouse.c \
+	src/fs-uae/options.h \
 	src/fs-uae/paths.c \
 	src/fs-uae/paths.h \
 	src/fs-uae/plugins.c \
@@ -191,6 +195,7 @@ libuae_a_SOURCES = \
 	src/debuginfo.cpp \
 	src/disk.cpp \
 	src/diskutil.cpp \
+	src/dlopen.cpp \
 	src/dongle.cpp \
 	src/drawing.cpp \
 	src/driveclick.cpp \
@@ -271,7 +276,6 @@ libuae_a_SOURCES = \
 	src/include/keybuf.h \
 	src/include/luascript.h \
 	src/include/mackbd.h \
-	src/include/memory_uae.h \
 	src/include/mmu_common.h \
 	src/include/moduleripper.h \
 	src/include/native2amiga.h \
@@ -284,7 +288,6 @@ libuae_a_SOURCES = \
 	src/include/packed.h \
 	src/include/parallel.h \
 	src/include/picasso96.h \
-	src/include/ppc.h \
 	src/include/readcpu.h \
 	src/include/rommgr.h \
 	src/include/rtgmodes.h \
@@ -301,21 +304,30 @@ libuae_a_SOURCES = \
 	src/include/traps.h \
 	src/include/uae.h \
 	src/include/uae/ahi.h \
+	src/include/uae/api.h \
 	src/include/uae/asm.h \
 	src/include/uae/assert.h \
+	src/include/uae/attributes.h \
 	src/include/uae/caps.h \
 	src/include/uae/cdrom.h \
 	src/include/uae/cycleunit.h \
+	src/include/uae/dlopen.h \
 	src/include/uae/endian.h \
 	src/include/uae/enum.h \
 	src/include/uae/fs.h \
+	src/include/uae/funcattr.h \
 	src/include/uae/inline.h \
+	src/include/uae/io.h \
 	src/include/uae/jitconfig.h \
+	src/include/uae/likely.h \
 	src/include/uae/limits.h \
-	src/include/uae/logging.h \
+	src/include/uae/log.h \
 	src/include/uae/memory.h \
+	src/include/uae/mman.h \
 	src/include/uae/parser.h \
+	src/include/uae/ppc.h \
 	src/include/uae/regparam.h \
+	src/include/uae/seh.h \
 	src/include/uae/string.h \
 	src/include/uae/types.h \
 	src/include/uaeexe.h \
@@ -337,6 +349,7 @@ libuae_a_SOURCES = \
 	src/jit/compemu_fpp.cpp \
 	src/jit/compemu_support.cpp \
 	src/keybuf.cpp \
+	src/logging.cpp \
 	src/main.cpp \
 	src/memory.cpp \
 	src/native2amiga.cpp \
@@ -365,8 +378,13 @@ libuae_a_SOURCES = \
 	src/od-fs/fsdb_host.h \
 	src/od-fs/gui.cpp \
 	src/od-fs/hardfile_host.cpp \
+	src/od-fs/include/direct3d.h \
+	src/od-fs/include/registry.h \
+	src/od-fs/include/resource.h \
 	src/od-fs/include/uae/uae.h \
 	src/od-fs/include/uae/uae_inputevents_def.h \
+	src/od-fs/include/win32gfx.h \
+	src/od-fs/include/win32gui.h \
 	src/od-fs/input.cpp \
 	src/od-fs/inputrecord.cpp \
 	src/od-fs/joystick.cpp \
@@ -381,13 +399,10 @@ libuae_a_SOURCES = \
 	src/od-fs/machdep/ppc/maccess.h \
 	src/od-fs/machdep/rpt.h \
 	src/od-fs/machdep/x86/maccess.h \
-	src/od-fs/mman_uae.h \
 	src/od-fs/mouse.cpp \
 	src/od-fs/mp3decoder.h \
 	src/od-fs/parser.cpp \
 	src/od-fs/paths.cpp \
-	src/od-fs/picasso96.cpp \
-	src/od-fs/picasso96_host.h \
 	src/od-fs/roms.cpp \
 	src/od-fs/serial_host.cpp \
 	src/od-fs/sleep.h \
@@ -397,7 +412,6 @@ libuae_a_SOURCES = \
 	src/od-fs/support.cpp \
 	src/od-fs/sysconfig.h \
 	src/od-fs/target.h \
-	src/od-fs/tchar.h \
 	src/od-fs/threaddep/sem.h \
 	src/od-fs/threaddep/thread.h \
 	src/od-fs/threading.cpp \
@@ -414,8 +428,12 @@ libuae_a_SOURCES = \
 	src/od-win32/md-fpp.h \
 	src/od-win32/mman.cpp \
 	src/od-win32/parser.h \
+	src/od-win32/picasso96_win.cpp \
+	src/od-win32/picasso96_win.h \
 	src/od-win32/win32_uaenet.cpp \
 	src/patch.cpp \
+	src/ppc/pixman-stubs.cpp \
+	src/ppc/ppc.cpp \
 	src/qemuvga/cirrus_vga.cpp \
 	src/qemuvga/cirrus_vga_rop.h \
 	src/qemuvga/cirrus_vga_rop2.h \
@@ -623,7 +641,7 @@ libmanymouse_a_SOURCES = \
 	manymouse/x11_xinput2.c
 endif
 
-if WITH_PPC
+if WITH_PEARPC_CPU
 noinst_LIBRARIES += libpearpc.a
 AM_CPPFLAGS += -I$(s)/src/ppc/pearpc
 fs_uae_LDADD += libpearpc.a
@@ -667,8 +685,16 @@ libpearpc_a_SOURCES = \
 	src/ppc/pearpc/tools/snprintf.h \
 	src/ppc/pearpc/tracers.h \
 	src/ppc/pearpc/uaeglue.cpp
+endif
+
+if WITH_QEMU_CPU
+# fs_uae_LDADD += qemu/uae/libqemu.a
+# LIBS += -lutil
+# AM_CPPFLAGS += -I$(s)/qemu/uae
+endif
+
+if WITH_PPC
 fs_uae_SOURCES += \
-	src/ppc/ppc.cpp \
 	src/ppc/ppcd.cpp \
 	src/ppc/ppcd.h
 endif

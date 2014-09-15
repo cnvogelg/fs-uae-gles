@@ -278,6 +278,19 @@ struct gfx_filterdata
 	int gfx_filter_keep_autoscale_aspect;
 };
 
+struct romconfig
+{
+	TCHAR romfile[MAX_DPATH];
+	TCHAR romident[256];
+	uae_u32 board_ram_size;
+};
+#define MAX_BOARD_ROMS 2
+struct boardromconfig
+{
+	struct romconfig roms[MAX_BOARD_ROMS];
+};
+
+
 struct uae_prefs {
 
 	struct strlist *all_lines;
@@ -453,22 +466,17 @@ struct uae_prefs {
 	bool cs_z3autoconfig;
 	int cs_hacks;
 
+	struct boardromconfig a2091rom;
+	struct boardromconfig a4091rom;
+	struct boardromconfig fastlanerom;
+	struct boardromconfig oktagonrom;
+
 	TCHAR romfile[MAX_DPATH];
 	TCHAR romident[256];
 	TCHAR romextfile[MAX_DPATH];
 	uae_u32 romextfile2addr;
 	TCHAR romextfile2[MAX_DPATH];
 	TCHAR romextident[256];
-	TCHAR a2091romfile[MAX_DPATH];
-	TCHAR a2091romident[256];
-	TCHAR a2091romfile2[MAX_DPATH];
-	TCHAR a2091romident2[256];
-	bool a2091;
-	TCHAR a4091romfile[MAX_DPATH];
-	TCHAR a4091romident[256];
-	TCHAR a4091romfile2[MAX_DPATH];
-	TCHAR a4091romident2[256];
-	bool a4091;
 	TCHAR acceleratorromfile[MAX_DPATH];
 	TCHAR acceleratorromident[256];
 	TCHAR acceleratorextromfile[MAX_DPATH];
@@ -509,8 +517,8 @@ struct uae_prefs {
 	bool picasso96_nocustom;
 	int picasso96_modeflags;
 
+	uae_u32 z3autoconfig_start;
 	uae_u32 z3fastmem_size, z3fastmem2_size;
-	uae_u32 z3fastmem_start;
 	uae_u32 z3chipmem_size;
 	uae_u32 z3chipmem_start;
 	uae_u32 fastmem_size, fastmem2_size;
@@ -523,6 +531,7 @@ struct uae_prefs {
 	int cpuboard_type;
 	uae_u32 cpuboardmem1_size;
 	uae_u32 cpuboardmem2_size;
+	int ppc_implementation;
 	bool rtg_hardwareinterrupt;
 	bool rtg_hardwaresprite;
 	int rtgmem_type;
@@ -710,6 +719,7 @@ extern int cfgfile_configuration_change (int);
 extern void fixup_prefs_dimensions (struct uae_prefs *prefs);
 extern void fixup_prefs (struct uae_prefs *prefs);
 extern void fixup_cpu (struct uae_prefs *prefs);
+extern bool cfgfile_board_enabled(struct boardromconfig *br);
 
 extern void check_prefs_changed_custom (void);
 extern void check_prefs_changed_cpu (void);

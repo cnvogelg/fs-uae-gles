@@ -13,7 +13,7 @@
 #ifdef A2065
 
 #include "options.h"
-#include "memory_uae.h"
+#include "uae/memory.h"
 #include "custom.h"
 #include "newcpu.h"
 #include "a2065.h"
@@ -869,15 +869,13 @@ static void REGPARAM2 a2065_bput (uaecptr addr, uae_u32 b)
 	addr &= 65535;
 	if (addr == 0x48 && !configured) {
 		map_banks (&a2065_bank, b, 0x10000 >> 16, 0x10000);
-		write_log (_T("A2065 Z2 autoconfigured at %02X0000\n"), b);
 		configured = b;
-		expamem_next ();
+		expamem_next(&a2065_bank, NULL);
 		return;
 	}
 	if (addr == 0x4c && !configured) {
-		write_log (_T("A2065 DMAC AUTOCONFIG SHUT-UP!\n"));
 		configured = 0xff;
-		expamem_next ();
+		expamem_shutup(&a2065_bank);
 		return;
 	}
 	if (!configured)

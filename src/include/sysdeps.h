@@ -26,7 +26,11 @@ using namespace std;
 #include <errno.h>
 #include <assert.h>
 #include <limits.h>
+#ifdef FSUAE
+#include "uae/types.h"
+#else
 #include <tchar.h>
+#endif
 
 #ifndef __STDC__
 #ifndef _MSC_VER
@@ -193,7 +197,6 @@ typedef char uae_char;
 typedef struct { uae_u8 RGB[3]; } RGB;
 
 #ifdef FSUAE
-#include "uae/types.h"
 #define VAL64(a) (a ## LL)
 #define UVAL64(a) (a ## uLL)
 
@@ -298,7 +301,7 @@ extern void to_upper (TCHAR *s, int len);
 #define DONT_HAVE_POSIX
 #endif
 
-#if !defined(FS_UAE) && defined _WIN32
+#if !defined(FSUAE) && defined _WIN32
 
 //#ifdef FSUAE
 //#error _WIN32 should not be defined here
@@ -313,8 +316,12 @@ extern void to_upper (TCHAR *s, int len);
 
 #elif defined __MINGW32__
 
+#include <winsock.h>
+
 #define O_NDELAY 0
 #define mkdir(a,b) mkdir(a)
+
+#include "uae/regparam.h"
 
 #elif defined _MSC_VER
 
@@ -465,19 +472,16 @@ extern void mallocemu_free (void *ptr);
 #define write_log write_log_standard
 #endif
 
-#if __GNUC__ - 1 > 1 || __GNUC_MINOR__ - 1 > 6
 #ifdef FSUAE
+#include "uae/log.h"
 #else
+#if __GNUC__ - 1 > 1 || __GNUC_MINOR__ - 1 > 6
 extern void write_log (const TCHAR *, ...) __attribute__ ((format (printf, 1, 2)));
-#endif
-#if defined(FSUAE) && defined(__MINGW32__)
-extern void write_log (const char *, ...) __attribute__ ((format (gnu_printf, 1, 2)));
-#else
 extern void write_log (const char *, ...) __attribute__ ((format (printf, 1, 2)));
-#endif
 #else
 extern void write_log (const TCHAR *, ...);
 extern void write_log (const char *, ...);
+#endif
 #endif
 extern void write_dlog (const TCHAR *, ...);
 
@@ -604,5 +608,5 @@ extern void xfree (const void*);
 #ifdef HAVE_VAR_ATTRIBUTE_UNUSED
 #define NOWARN_UNUSED(x) __attribute__((unused)) x
 #else
-#define NOWARN_UNUSED(x)
+#define NOWARN_UNUSED(x) x
 #endif

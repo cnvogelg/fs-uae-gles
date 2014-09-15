@@ -21,7 +21,6 @@ int64_t uae_ftello64(FILE *stream);
 int uae_fseeko64(FILE *stream, int64_t offset, int whence);
 
 char *uae_expand_path(const char *path);
-FILE *uae_fopen(const char *path, const char *mode);
 
 struct tm *uae_get_amiga_time();
 

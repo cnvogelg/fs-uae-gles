@@ -1,6 +1,31 @@
+Version 2.5.15dev:
+
+* Fixed bug when adding 2nd fast memory bank in non-autoconfig mode.
+* Allow 1 to be used as true/yes for boolean uae_* options.
+* Removed cpu_idle override, added new cpu_idle option (0 - 10).
+* Implemented support for growable VHD hard drive images.
+* Added proper error message when libcapsimage plugin is missing.
+* Use new dlopen plugin interface to load ppc and libcapsimage plugins.
+
+Version 2.5.14dev:
+
+* Updated emulation core from WinUAE 2900b15.
+* Updates to Qemu PPC CPU integration.
+* New option: cdrom_drive_0_controller (to specify for example ide1)
+* Fixed problem when inserting, ejecting and then inserting a CD again.
+* Changes to how fastest-possible-mode works and interacts with
+  frame rendering (solves some issues, might introduce new ones...)
+* Fixed and activated more recent Picasso96 (uaegfx) code.
+* Enabled emulation of GFX hardware boards (Picassso IV, etc).
+* A bit more code cleanup and fixes to make code compatible with MSVC.
+
 Version 2.5.13dev:
 
-* Added another fix for --disable-cpuboard.
+* Updated emulation core from WinUAE 2900b14.
+* Harmonize CD IOCTL / image initialization with WinUAE.
+* Initial version of QEmu PPC CPU integration (not fully working yet).
+* Removed --disable-cpuboard option to configure (no longer needed).
+* Updated Picasso96 code, but old version is still used (needs more work).
 * Add internal HRTMon rom to the rom list on startup.
 * Show GUI warning when some config incompatibilities are detected.
 * GUI warning when custom uae_ options fails or are not recognized.

@@ -28,7 +28,7 @@
 #include "threaddep/thread.h"
 #include "options.h"
 #include "uae.h"
-#include "memory_uae.h"
+#include "uae/memory.h"
 #include "custom.h"
 #include "events.h"
 #include "newcpu.h"
@@ -41,6 +41,7 @@
 #include "uaeserial.h"
 #include "fsdb.h"
 #include "zfile.h"
+#include "zarchive.h"
 #include "gui.h"
 #include "gayle.h"
 #include "savestate.h"
@@ -458,23 +459,27 @@ static void fixcharset (TCHAR *s)
 	au_fs_copy (s, strlen (tmp) + 1, tmp);
 }
 
-TCHAR *validatevolumename (TCHAR *s)
+TCHAR *validatevolumename (TCHAR *s, const TCHAR *def)
 {
 	stripsemicolon (s);
 	fixcharset (s);
 	striplength (s, 30);
+	if (_tcslen(s) == 0 && def)
+		_tcscpy(s, def);
 	return s;
 }
-TCHAR *validatedevicename (TCHAR *s)
+TCHAR *validatedevicename (TCHAR *s, const TCHAR *def)
 {
 	stripsemicolon (s);
 	stripspace (s);
 	fixcharset (s);
 	striplength (s, 30);
+	if (_tcslen(s) == 0 && def)
+		_tcscpy(s, def);
 	return s;
 }
 
-TCHAR *filesys_createvolname (const TCHAR *volname, const TCHAR *rootdir, const TCHAR *def)
+TCHAR *filesys_createvolname (const TCHAR *volname, const TCHAR *rootdir, struct zvolume *zv, const TCHAR *def)
 {
 	TCHAR *nvol = NULL;
 	int i, archivehd;
@@ -485,6 +490,12 @@ TCHAR *filesys_createvolname (const TCHAR *volname, const TCHAR *rootdir, const 
 		archivehd = 1;
 	else if (my_existsdir (rootdir))
 		archivehd = 0;
+
+	if (zv && zv->volumename && _tcslen(zv->volumename) > 0) {
+		nvol = my_strdup(zv->volumename);
+		validatevolumename (nvol, def);
+		return nvol;
+	}
 
 	if ((!volname || _tcslen (volname) == 0) && rootdir && archivehd >= 0) {
 		p = my_strdup (rootdir);
@@ -520,7 +531,7 @@ TCHAR *filesys_createvolname (const TCHAR *volname, const TCHAR *rootdir, const 
 		else
 			nvol = my_strdup (_T(""));
 	}
-	validatevolumename (nvol);
+	validatevolumename (nvol, def);
 	xfree (p);
 	return nvol;
 }
@@ -630,7 +641,7 @@ static int set_filesys_unit_1 (int nr, struct uaedev_config_info *ci)
 			if (set_filesys_volume (c.rootdir, &flags, &c.readonly, &emptydrive, &ui->zarchive) < 0)
 				return -1;
 		}
-		ui->volname = filesys_createvolname (c.volname, c.rootdir, _T("harddrive"));
+		ui->volname = filesys_createvolname (c.volname, c.rootdir, ui->zarchive, _T("harddrive"));
 		ui->volflags = flags;
 	} else {
 		ui->unit_type = UNIT_FILESYSTEM;
@@ -778,6 +789,121 @@ static void allocuci (struct uae_prefs *p, int nr, int idx)
 	allocuci (p, nr, idx, -1);
 }
 
+static bool add_cpuboard_scsi_unit(int unit, struct uaedev_config_info *uci)
+{
+	bool added = false;
+#ifdef NCR
+	if (currprefs.cpuboard_type == BOARD_WARPENGINE_A4000) {
+		warpengine_add_scsi_unit(unit, uci);
+		added = true;
+	} else if (currprefs.cpuboard_type == BOARD_TEKMAGIC) {
+		tekmagic_add_scsi_unit(unit, uci);
+		added = true;
+	} else if (currprefs.cpuboard_type == BOARD_CSMK3 || currprefs.cpuboard_type == BOARD_CSPPC) {
+		cyberstorm_add_scsi_unit(unit, uci);
+		added = true;
+	} else if (currprefs.cpuboard_type == BOARD_BLIZZARDPPC) {
+		blizzardppc_add_scsi_unit(unit, uci);
+		added = true;
+	} else if (currprefs.cpuboard_type == BOARD_BLIZZARD_2060 ||
+		currprefs.cpuboard_type == BOARD_BLIZZARD_1230_IV_SCSI ||
+		currprefs.cpuboard_type == BOARD_BLIZZARD_1260_SCSI ||
+		currprefs.cpuboard_type == BOARD_CSMK1 ||
+		currprefs.cpuboard_type == BOARD_CSMK2) {
+			cpuboard_ncr9x_add_scsi_unit(unit, uci);
+			added = true;
+	}
+#endif
+	return added;
+}
+
+static bool add_scsi_unit(int type, int unit, struct uaedev_config_info *uci)
+{
+	bool added = false;
+	if (type == HD_CONTROLLER_TYPE_SCSI_A2091) {
+#ifdef A2091
+		if (cfgfile_board_enabled(&currprefs.a2091rom)) {
+			a2091_add_scsi_unit (unit, uci, 0);
+			added = true;
+		}
+#endif
+	} else if (type == HD_CONTROLLER_TYPE_SCSI_A2091_2) {
+#ifdef A2091
+		if (cfgfile_board_enabled(&currprefs.a2091rom)) {
+			a2091_add_scsi_unit (unit, uci, 1);
+			added = true;
+		}
+#endif
+	} else if (type == HD_CONTROLLER_TYPE_SCSI_A3000) {
+#ifdef A2091
+		if (currprefs.cs_mbdmac == 1) {
+			a3000_add_scsi_unit (unit, uci);
+			added = true;
+		}
+#endif
+	} else if (type == HD_CONTROLLER_TYPE_SCSI_A4091) {
+#ifdef NCR
+		if (cfgfile_board_enabled(&currprefs.a4091rom)) {
+			a4091_add_scsi_unit (unit, uci, 0);
+			added = true;
+		}
+#endif
+	} else if (type == HD_CONTROLLER_TYPE_SCSI_A4091_2) {
+#ifdef NCR
+		if (cfgfile_board_enabled(&currprefs.a4091rom)) {
+			a4091_add_scsi_unit (unit, uci, 1);
+			added = true;
+		}
+#endif
+	} else if (type == HD_CONTROLLER_TYPE_SCSI_FASTLANE) {
+#ifdef NCR
+		if (cfgfile_board_enabled(&currprefs.fastlanerom)) {
+			fastlane_add_scsi_unit (unit, uci, 0);
+			added = true;
+		}
+#endif
+	} else if (type == HD_CONTROLLER_TYPE_SCSI_FASTLANE_2) {
+#ifdef NCR
+		if (cfgfile_board_enabled(&currprefs.fastlanerom)) {
+			fastlane_add_scsi_unit (unit, uci, 1);
+			added = true;
+		}
+#endif
+	} else if (type == HD_CONTROLLER_TYPE_SCSI_OKTAGON) {
+#ifdef NCR
+		if (cfgfile_board_enabled(&currprefs.oktagonrom)) {
+			oktagon_add_scsi_unit (unit, uci, 0);
+			added = true;
+		}
+#endif
+	} else if (type == HD_CONTROLLER_TYPE_SCSI_OKTAGON_2) {
+#ifdef NCR
+		if (cfgfile_board_enabled(&currprefs.oktagonrom)) {
+			oktagon_add_scsi_unit (unit, uci, 1);
+			added = true;
+		}
+#endif
+	} else if (type == HD_CONTROLLER_TYPE_SCSI_CPUBOARD) {
+		added = add_cpuboard_scsi_unit(unit, uci);
+	} else if (type == HD_CONTROLLER_TYPE_SCSI_A4000T) {
+#ifdef NCR
+		if (currprefs.cs_mbdmac == 2) {
+			a4000t_add_scsi_unit (unit, uci);
+			added = true;
+		}
+#endif
+	} else if (type == HD_CONTROLLER_TYPE_SCSI_CDTV) {
+#ifdef CDTV
+		if (currprefs.cs_cdtvscsi) {
+			cdtv_add_scsi_hd_unit (unit, uci);
+			added = true;
+		}
+#endif
+	}
+	return added;
+}
+
+
 static void initialize_mountinfo (void)
 {
 	int nr;
@@ -843,103 +969,13 @@ static void initialize_mountinfo (void)
 		} else if (type >= HD_CONTROLLER_TYPE_IDE_FIRST && type <= HD_CONTROLLER_TYPE_IDE_LAST) {
 			gayle_add_ide_unit (unit, uci);
 			added = true;
-		} else if (type == HD_CONTROLLER_TYPE_SCSI_A2091) {
-#ifdef A2091
-			if (currprefs.a2091) {
-				a2091_add_scsi_unit (unit, uci, 0);
-				added = true;
-			}
-#endif
-		} else if (type == HD_CONTROLLER_TYPE_SCSI_A2091_2) {
-#ifdef A2091
-			if (currprefs.a2091) {
-				a2091_add_scsi_unit (unit, uci, 1);
-				added = true;
-			}
-#endif
-		} else if (type == HD_CONTROLLER_TYPE_SCSI_A3000) {
-#ifdef A2091
-			if (currprefs.cs_mbdmac == 1) {
-				a3000_add_scsi_unit (unit, uci);
-				added = true;
-			}
-#endif
-		} else if (type == HD_CONTROLLER_TYPE_SCSI_A4091) {
-#ifdef NCR
-			if (currprefs.a4091) {
-				a4091_add_scsi_unit (unit, uci, 0);
-				added = true;
-			}
-#endif
-		} else if (type == HD_CONTROLLER_TYPE_SCSI_A4091_2) {
-#ifdef NCR
-			if (currprefs.a4091) {
-				a4091_add_scsi_unit (unit, uci, 1);
-				added = true;
-			}
-#endif
-#ifdef WITH_CPUBOARD
-		} else if (type == HD_CONTROLLER_TYPE_SCSI_CPUBOARD) {
-#ifdef NCR
-			if (currprefs.cpuboard_type == BOARD_WARPENGINE_A4000) {
-				warpengine_add_scsi_unit(unit, uci);
-				added = true;
-			} else if (currprefs.cpuboard_type == BOARD_CSMK3 || currprefs.cpuboard_type == BOARD_CSPPC) {
-				cyberstorm_add_scsi_unit(unit, uci);
-				added = true;
-			} else if (currprefs.cpuboard_type == BOARD_BLIZZARDPPC) {
-				blizzardppc_add_scsi_unit(unit, uci);
-				added = true;
-			} else if (currprefs.cpuboard_type == BOARD_BLIZZARD_2060 ||
-				currprefs.cpuboard_type == BOARD_BLIZZARD_1230_IV_SCSI ||
-				currprefs.cpuboard_type == BOARD_BLIZZARD_1260_SCSI ||
-				currprefs.cpuboard_type == BOARD_CSMK1 ||
-				currprefs.cpuboard_type == BOARD_CSMK2) {
-					cpuboard_ncr9x_add_scsi_unit(unit, uci);
-					added = true;
-			}
-#endif
-#endif
-		} else if (type == HD_CONTROLLER_TYPE_SCSI_A4000T) {
-#ifdef NCR
-			if (currprefs.cs_mbdmac == 2) {
-				a4000t_add_scsi_unit (unit, uci);
-				added = true;
-			}
-#endif
-		} else if (type == HD_CONTROLLER_TYPE_SCSI_CDTV) {
-#ifdef CDTV
-			if (currprefs.cs_cdtvscsi) {
-				cdtv_add_scsi_hd_unit (unit, uci);
-				added = true;
-			}
-#endif
+		} else if (type != HD_CONTROLLER_TYPE_SCSI_AUTO && type >= HD_CONTROLLER_TYPE_SCSI_FIRST && type <= HD_CONTROLLER_TYPE_SCSI_LAST) {
+			added = add_scsi_unit(type, unit, uci);
 		} else if (type == HD_CONTROLLER_TYPE_SCSI_AUTO) {
-			if (currprefs.cs_mbdmac == 1) {
-#ifdef A2091
-				a3000_add_scsi_unit (unit, uci);
-				added = true;
-#endif
-			} else if (currprefs.cs_mbdmac == 2) {
-#ifdef NCR
-				a4000t_add_scsi_unit (unit, uci);	
-				added = true;
-#endif
-			} else if (currprefs.a2091) {
-#ifdef A2091
-				a2091_add_scsi_unit (unit, uci, 0);
-				added = true;
-#endif
-			} else if (currprefs.a4091) {
-#ifdef NCR
-				a4091_add_scsi_unit (unit, uci, 0);
-				added = true;
-#endif
-			} else if (currprefs.cs_cdtvscsi) {
-#ifdef CDTV
-				cdtv_add_scsi_hd_unit (unit, uci);
-				added = true;
-#endif
+			for (int st = HD_CONTROLLER_TYPE_SCSI_FIRST; st <= HD_CONTROLLER_TYPE_SCSI_LAST; st++) {
+				added = add_scsi_unit(st, unit, uci);
+				if (added)
+					break;
 			}
 		} else if (type == HD_CONTROLLER_TYPE_PCMCIA_SRAM) {
 			gayle_add_pcmcia_sram_unit (uci->rootdir, uci->readonly);
@@ -1784,7 +1820,7 @@ static uae_u32 filesys_media_change_reply (TrapContext *ctx, int mode)
 				if (emptydrive)
 					return 0;
 				xfree (u->ui.volname);
-				ui->volname = u->ui.volname = filesys_createvolname (u->mount_volume, u->mount_rootdir, _T("removable"));
+				ui->volname = u->ui.volname = filesys_createvolname (u->mount_volume, u->mount_rootdir, u->zarchive, _T("removable"));
 #ifdef RETROPLATFORM
 				rp_harddrive_image_change (nr, u->mount_readonly, u->mount_rootdir);
 #endif
@@ -1882,7 +1918,7 @@ int filesys_media_change (const TCHAR *rootdir, int inserted, struct uaedev_conf
 			}
 		}
 		if (!volptr) {
-			volptr = filesys_createvolname (NULL, rootdir, _T("removable"));
+			volptr = filesys_createvolname (NULL, rootdir, NULL, _T("removable"));
 			_tcscpy (volname, volptr);
 			xfree (volptr);
 			volptr = volname;

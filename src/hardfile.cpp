@@ -12,7 +12,7 @@
 
 #include "threaddep/thread.h"
 #include "options.h"
-#include "memory_uae.h"
+#include "uae/memory.h"
 #include "custom.h"
 #include "newcpu.h"
 #include "disk.h"
@@ -51,6 +51,8 @@
 #undef scsi_log
 #define scsi_log write_log
 #endif
+
+extern int log_scsiemu;
 
 #define MAX_ASYNC_REQUESTS 50
 #define ASYNC_REQUEST_NONE 0
@@ -511,10 +513,10 @@ int hdf_open (struct hardfiledata *hfd, const TCHAR *pname)
 			}
 			if (chd_readonly)
 				hfd->ci.readonly = true;
-			hfd->virtsize = cf->logical_bytes ();
+			hfd->virtsize = cf->logical_bytes();
 			hfd->handle_valid = -1;
 			write_log(_T("CHD '%s' mounted as %s, %s.\n"), pname, chdf ? _T("HD") : _T("OTHER"), hfd->ci.readonly ? _T("read only") : _T("read/write"));
-			goto nonvhd;
+			return 1;
 		}
 	}
 #endif
@@ -573,6 +575,7 @@ int hdf_open (struct hardfiledata *hfd, const TCHAR *pname)
 	hdf_init_cache (hfd);
 	return 1;
 nonvhd:
+	hfd->hfd_type = 0;
 	return 1;
 end:
 	hdf_close_target (hfd);
@@ -1178,6 +1181,8 @@ static int checkbounds (struct hardfiledata *hfd, uae_u64 offset, uae_u64 len)
 		return 0;
 	if (offset + len > hfd->virtsize)
 		return 0;
+	if (offset > 0xffffffff && (uae_s64)offset < 0)
+		return 0;
 	return 1;
 }
 
@@ -1197,6 +1202,13 @@ int scsi_hd_emulate (struct hardfiledata *hfd, struct hd_hardfiledata *hdhfd, ua
 	int status = 0;
 	int i, lun;
 	char *ss;
+
+	if (log_scsiemu) {
+		write_log (_T("SCSIEMU HD %d: %02X.%02X.%02X.%02X.%02X.%02X.%02X.%02X.%02X.%02X.%02X.%02X CMDLEN=%d DATA=%p\n"), hfd->unitnum,
+			cmdbuf[0], cmdbuf[1], cmdbuf[2], cmdbuf[3], cmdbuf[4], cmdbuf[5], cmdbuf[6], 
+			cmdbuf[7], cmdbuf[8], cmdbuf[9], cmdbuf[10], cmdbuf[11],
+			scsi_cmd_len, scsi_data);
+	}
 
 	*reply_len = *sense_len = 0;
 	lun = cmdbuf[1] >> 5;
@@ -1553,6 +1565,14 @@ miscompare:
 		ls = 0x12;
 		break;
 	}
+
+	if (log_scsiemu && ls) {
+		write_log (_T("-> SENSE STATUS: KEY=%d ASC=%02X ASCQ=%02X\n"), s[2], s[12], s[13]);
+	}
+
+	if (cmdbuf[0] && log_scsiemu)
+		write_log (_T("-> DATAOUT=%d ST=%d SENSELEN=%d REPLYLEN=%d\n"), scsi_len, status, ls, lr);
+
 	*data_len = scsi_len;
 	*reply_len = lr;
 	*sense_len = ls;
@@ -1880,7 +1900,7 @@ static uae_u32 hardfile_do_io (struct hardfiledata *hfd, struct hardfileprivdata
 			unaligned (cmd, offset64, len, hfd->ci.blocksize);
 			goto bad_len;
 		}
-		if (len + offset64 > hfd->virtsize) {
+		if (len + offset64 > hfd->virtsize || (uae_s64)offset64 < 0) {
 			outofbounds (cmd, offset64, len, hfd->virtsize);
 			goto bad_len;
 		}
@@ -1931,7 +1951,7 @@ static uae_u32 hardfile_do_io (struct hardfiledata *hfd, struct hardfileprivdata
 				unaligned (cmd, offset64, len, hfd->ci.blocksize);
 				goto bad_len;
 			}
-			if (len + offset64 > hfd->virtsize) {
+			if (len + offset64 > hfd->virtsize || (uae_s64)offset64 < 0) {
 				outofbounds (cmd, offset64, len, hfd->virtsize);
 				goto bad_len;
 			}

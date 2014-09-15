@@ -15,6 +15,8 @@
 #include "filesys.h"
 #include "zfile.h"
 #include "uae/fs.h"
+#include "uae/io.h"
+#include "uae/log.h"
 
 #ifdef MACOSX
 #include <sys/stat.h>
@@ -90,7 +92,7 @@ static void rdbdump (FILE *h, uae_u64 offset, uae_u8 *buf, int blocksize)
     if (blocks < 0 || blocks > 100000)
         return;
     _stprintf (name, "rdb_dump_%d.rdb", cnt);
-    f = uae_fopen (name, "wb");
+    f = uae_tfopen (name, "wb");
     if (!f)
         return;
     for (i = 0; i <= blocks; i++) {
@@ -243,7 +245,7 @@ int hdf_open_target (struct hardfiledata *hfd, const char *pname)
                 hfd->drive_empty = -1;
             if (udi->readonly)
                 hfd->ci.readonly = 1;
-            h = uae_fopen (udi->device_path, hfd->ci.readonly ? "rb" : "r+b");
+            h = uae_tfopen (udi->device_path, hfd->ci.readonly ? "rb" : "r+b");
             hfd->handle->h = h;
             if (h == INVALID_HANDLE_VALUE)
                 goto end;
@@ -262,7 +264,7 @@ int hdf_open_target (struct hardfiledata *hfd, const char *pname)
                     hfd->dangerous = 1;
                     // clear GENERIC_WRITE
                     fclose (h);
-                    h = uae_fopen (udi->device_path, "r+b");
+                    h = uae_tfopen (udi->device_path, "r+b");
                     hfd->handle->h = h;
                     if (h == INVALID_HANDLE_VALUE)
                         goto end;
@@ -285,7 +287,7 @@ int hdf_open_target (struct hardfiledata *hfd, const char *pname)
                     zmode = 1;
             }
         }
-        h = uae_fopen (name, hfd->ci.readonly ? "rb" : "r+b");
+        h = uae_tfopen (name, hfd->ci.readonly ? "rb" : "r+b");
         if (h == INVALID_HANDLE_VALUE)
             goto end;
         hfd->handle->h = h;
@@ -694,12 +696,29 @@ int hdf_write_target (struct hardfiledata *hfd, void *buffer, uae_u64 offset, in
     return got;
 }
 
-int hdf_resize_target (struct hardfiledata *hfd, uae_u64 newsize)
+int hdf_resize_target(struct hardfiledata *hfd, uae_u64 newsize)
 {
-    int err = 0;
-
-    write_log ("hdf_resize_target: SetEndOfFile() %d\n", err);
-    return 0;
+    if (newsize < hfd->physsize) {
+        uae_log("hdf_resize_target: truncation not implemented\n");
+        return 0;
+    }
+    if (newsize == hfd->physsize) {
+        return 1;
+    }
+    /* Now, newsize must be larger than hfd->physsize, we seek to newsize - 1
+     * and write a single 0 byte to make the file exactly newsize bytes big. */
+    if (uae_fseeko64(hfd->handle->h, newsize - 1, SEEK_SET) != 0) {
+        uae_log("hdf_resize_target: fseek failed errno %d\n", errno);
+        return 0;
+    }
+    if (fwrite("", 1, 1, hfd->handle->h) != 1) {
+        uae_log("hdf_resize_target: failed to write byte at position "
+                "%lld errno %d\n", newsize - 1, errno);
+        return 0;
+    }
+    uae_log("hdf_resize_target: %lld -> %lld\n", hfd->physsize, newsize);
+    hfd->physsize = newsize;
+    return 1;
 }
 
 static int num_drives;

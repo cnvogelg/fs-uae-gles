@@ -16,7 +16,7 @@
 #include "sysconfig.h"
 #include "sysdeps.h"
 #include "options.h"
-#include "memory_uae.h"
+#include "uae/memory.h"
 
 #include "uae/uae.h"
 #include "uae/assert.h"
@@ -61,7 +61,7 @@ extern "C" {
 
 #define PARSE_WF(flag, name) \
     else if (*c == flag) { \
-        write_log("- " #name "n"); \
+        write_log("- " #name "\n"); \
         g_uaem_flags |= name; \
     }
 

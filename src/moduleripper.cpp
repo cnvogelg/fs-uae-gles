@@ -12,7 +12,9 @@
 #ifdef PROWIZARD
 
 #include "options.h"
-#include "memory_uae.h"
+#include "uae/io.h"
+#include "uae/memory.h"
+#include "uae/seh.h"
 #include "moduleripper.h"
 #include "gui.h"
 #include "uae.h"
@@ -98,7 +100,7 @@ FILE *moduleripper_fopen (const char *aname, const char *amode)
 	name = au (aname);
 	mode = au (amode);
 	_stprintf (tmp2, _T("%s%s"), tmp, name);
-	f = _tfopen (tmp2, mode);
+	f = uae_tfopen (tmp2, mode);
 	xfree (mode);
 	xfree (name);
 	return f;

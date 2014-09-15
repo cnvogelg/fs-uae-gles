@@ -21,7 +21,7 @@
 #include "audio.h"
 #include "sounddep/sound.h"
 #include "events.h"
-#include "memory_uae.h"
+#include "uae/memory.h"
 #include "custom.h"
 #include "newcpu.h"
 #include "cia.h"
@@ -66,7 +66,7 @@
 #endif
 #include "luascript.h"
 #include "statusline.h"
-#include "ppc.h"
+#include "uae/ppc.h"
 
 #define CUSTOM_DEBUG 0
 #define SPRITE_DEBUG 0
@@ -4657,9 +4657,7 @@ static void rethink_intreq (void)
 #ifdef NCR9X
 	ncr9x_rethink();
 #endif
-#ifdef WITH_CPUBOARD
 	cpuboard_rethink();
-#endif
 	rethink_gayle ();
 }
 
@@ -6727,6 +6725,11 @@ static bool framewait (void)
 			t += (int)start - (int)vsync_time;
 
 		if (!frame_shown) {
+#ifdef FSUAE
+#ifdef DEBUG_SHOW_SCREEN
+			printf("vframewait_2 -> show_screen(1)\n");
+#endif
+#endif
 			show_screen (1);
 			if (currprefs.gfx_apmode[0].gfx_strobo)
 				show_screen (2);
@@ -6766,7 +6769,7 @@ static bool framewait (void)
 
 		int freetime;
 		extern int extraframewait;
-		
+
 		if (!vblank_hz_state)
 			return status != 0;
 
@@ -7000,6 +7003,11 @@ static bool framewait (void)
 		vsyncmintime = curr_time;
 		vsyncmaxtime = vsyncwaittime = curr_time + vstb;
 		if (frame_rendered) {
+#ifdef FSUAE
+#ifdef DEBUG_SHOW_SCREEN
+			printf("framewait_2 -> show_screen(0)\n");
+#endif
+#endif
 			show_screen (0);
 			t += read_processor_time () - curr_time;
 		}
@@ -7020,17 +7028,24 @@ static bool framewait (void)
 
 static bool framewait (void) {
     //printf("fw\n");
-    //if (currprefs.m68k_speed == -1) {
-    //    return framewait_2();
-    //}
+    if (currprefs.m68k_speed == -1) {
+        return framewait_2();
+    }
     //currprefs.cpu_idle = 150;
     //rtg_vsync ();
 
-    //if (!frame_rendered && !picasso_on)
-    if (!frame_rendered) {
+    if (!frame_rendered && !picasso_on) {
+    // if (!frame_rendered) {
         frame_rendered = render_screen (false);
     }
-    if (!frame_shown) {
+    //if (!frame_shown) {
+    // FIXME: hack: don't show frame if picasso is enabled
+    if (!frame_shown && !picasso_on) {
+#ifdef FSUAE
+#ifdef DEBUG_SHOW_SCREEN
+                        printf("framewait -> show_screen(0)\n");
+#endif
+#endif
         show_screen (0);
         frame_shown = true;
     }
@@ -7153,6 +7168,11 @@ static void vsync_handler_pre (void)
 		// we are paused, do all config checks but don't do any emulation
 		if (vsync_handle_check ()) {
 			redraw_frame ();
+#ifdef FSUAE
+#ifdef DEBUG_SHOW_SCREEN
+			printf("vsync_handler_pre -> render_screen + show_screen\n");
+#endif
+#endif
 			render_screen (true);
 			show_screen (0);
 		}
@@ -7189,9 +7209,7 @@ static void vsync_handler_pre (void)
 #ifdef CD32
 	cd32_fmv_vsync_handler();
 #endif
-#ifdef WITH_CPUBOARD
 	cpuboard_vsync();
-#endif
 	statusline_vsync();
 
 	if (!vsync_rendered) {
@@ -7207,9 +7225,19 @@ static void vsync_handler_pre (void)
 	
 	if (!picasso_on) {
 		if (!frame_rendered && vblank_hz_state) {
+#ifdef FSUAE
+#ifdef DEBUG_SHOW_SCREEN
+			printf("vsync_handler_pre -> render_screen\n");
+#endif
+#endif
 			frame_rendered = render_screen (false);
 		}
 		if (frame_rendered && !frame_shown) {
+#ifdef FSUAE
+#ifdef DEBUG_SHOW_SCREEN
+			printf("vsync_handler_pre -> show_screen_maybe\n");
+#endif
+#endif
 			frame_shown = show_screen_maybe (isvsync_chipset () >= 0);
 		}
 	}
@@ -7829,7 +7857,7 @@ static void hsync_handler_post (bool onvsync)
 			} else {
 				vsyncmintime = vsyncmaxtime; /* emulate if still time left */
 				is_syncline_end = read_processor_time () + vsynctimebase; /* far enough in future, we never wait that long */
-				is_syncline = 1;
+				is_syncline = 2;
 			}
 		} else {
 			static int linecounter;
@@ -8397,7 +8425,7 @@ addrbank custom_bank = {
 	custom_lget, custom_wget, custom_bget,
 	custom_lput, custom_wput, custom_bput,
 	default_xlate, default_check, NULL, NULL, _T("Custom chipset"),
-	custom_lgeti, custom_wgeti, ABFLAG_IO, 0x1ff, 0xdff000
+	custom_lgeti, custom_wgeti, ABFLAG_IO, NULL, 0x1ff, 0xdff000
 };
 
 static uae_u32 REGPARAM2 custom_wgeti (uaecptr addr)
@@ -9302,8 +9330,10 @@ uae_u8 *restore_custom_extra (uae_u8 *src)
 	currprefs.cs_a1000ram = changed_prefs.cs_a1000ram = RBB;
 	currprefs.cs_slowmemisfast = changed_prefs.cs_slowmemisfast = RBB;
 
-	currprefs.a2091 = changed_prefs.a2091 = RBB;
-	currprefs.a4091 = changed_prefs.a4091 = RBB;
+	//currprefs.a2091rom.enabled = changed_prefs.a2091rom.enabled = RBB;
+	//currprefs.a4091rom.enabled = changed_prefs.a4091rom.enabled = RBB;
+	RBB;
+	RBB;
 	currprefs.cs_cdtvscsi = changed_prefs.cs_cdtvscsi = RBB;
 
 	currprefs.cs_pcmcia = changed_prefs.cs_pcmcia = RBB;
@@ -9354,8 +9384,8 @@ uae_u8 *save_custom_extra (int *len, uae_u8 *dstptr)
 	SB (currprefs.cs_a1000ram ? 1 : 0);
 	SB (currprefs.cs_slowmemisfast ? 1 : 0);
 
-	SB (currprefs.a2091 ? 1 : 0);
-	SB (currprefs.a4091 ? 1 : 0);
+	SB (cfgfile_board_enabled(&currprefs.a2091rom) ? 1 : 0);
+	SB (cfgfile_board_enabled(&currprefs.a4091rom) ? 1 : 0);
 	SB (currprefs.cs_cdtvscsi ? 1 : 0);
 
 	SB (currprefs.cs_pcmcia ? 1 : 0);

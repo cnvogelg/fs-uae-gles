@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.67])
-AC_INIT([FS-UAE], [2.5.12dev],
+AC_INIT([FS-UAE], [2.5.14dev],
         [frode@fs-uae.net], [fs-uae], [http://fs-uae.net])
 AC_CONFIG_AUX_DIR([.])
 AC_CANONICAL_SYSTEM
@@ -13,7 +13,7 @@ AM_INIT_AUTOMAKE([tar-ustar subdir-objects])
 
 AC_SUBST([PACKAGE_SERIES], [devel])
 
-AC_DEFINE_UNQUOTED([UAE_BASE_VERSION], ["WinUAE 2.9.0 beta 12"],
+AC_DEFINE_UNQUOTED([UAE_BASE_VERSION], ["WinUAE 2.9.0 beta 15"],
 [Which UAE core this version is based on.])
 
 PACKAGE_MAJOR=`echo ${PACKAGE_VERSION} | sed -e 's,\(\.*\)\..*\..*,\1,g'`
@@ -57,6 +57,10 @@ AX_CHECK_COMPILE_FLAG(-Wmissing-format-attribute,
 [w_missing_format_attribute=no])
 AM_CONDITIONAL([W_MISSING_FORMAT_ATTRIBUTE],
 [test x$w_missing_format_attribute = xyes])
+
+# Compiler features
+
+AX_C___BUILTIN_EXPECT
 
 # Misc system checks.
 
@@ -521,33 +525,42 @@ AS_IF([test x$enable_$2 = xyes], [
 AM_CONDITIONAL([$1], [test x$enable_$2 = xyes])
 ])
 
+AC_DEFUN([REQ_FEATURE], [
+AC_DEFINE([$1], [1], [Define to 1 to $4])
+AM_CONDITIONAL([$1], [true])
+])
+
 OPT_FEATURE([A2065], [a2065], [a2065],
 	[enable A2065 ethernet card], [yes])
-OPT_FEATURE([A2091], [a2091], [a2091],
+REQ_FEATURE([A2091], [a2091], [a2091],
 	[enable A590/A2091 SCSI], [yes])
-OPT_FEATURE([ACTION_REPLAY], [action_replay], [action-replay],
+REQ_FEATURE([ACTION_REPLAY], [action_replay], [action-replay],
 	[enable Action Replay 1/2/3 support], [yes])
 OPT_FEATURE([CAPS], [caps], [caps],
 	[enable IPF support via libcapsimage], [yes])
-OPT_FEATURE([CD32], [cd32], [cd32],
+REQ_FEATURE([CD32], [cd32], [cd32],
 	[enable CD32 emulation], [yes])
-OPT_FEATURE([CDTV], [cdtv], [cdtv],
+REQ_FEATURE([CDTV], [cdtv], [cdtv],
 	[enable CDTV emulation], [yes])
-OPT_FEATURE([WITH_CPUBOARD], [cpuboard], [cpuboard],
+REQ_FEATURE([WITH_CPUBOARD], [cpuboard], [cpuboard],
 	[enable cpu board emulation], [yes])
 OPT_FEATURE([A_DMS], [dms], [dms],
         [enable DMS support], [yes])
 OPT_FEATURE([DRIVESOUND], [drivesound], [drivesound],
 	[enable drive sound emulation], [yes])
-OPT_FEATURE([FPUEMU], [fpuemu], [fpuemu],
+REQ_FEATURE([FPUEMU], [fpuemu], [fpuemu],
 	[enable FPU emulation], [yes])
+OPT_FEATURE([GFXBOARD], [gfxboard], [gfxboard],
+	[enable GFX hardware boards], [yes])
 OPT_FEATURE([WITH_LUA], [lua], [lua],
 	[enable LUA scripting], [no])
 OPT_FEATURE([WITH_NETPLAY], [netplay], [netplay],
 	[enable netplay support], [yes])
-OPT_FEATURE([NCR9X], [ncr9x], [ncr9x],
+REQ_FEATURE([NCR9X], [ncr9x], [ncr9x],
 	[enable 53C9X SCSI], [yes])
-OPT_FEATURE([WITH_PPC], [ppc], [ppc],
+REQ_FEATURE([PICASSO96], [picasso96], [picasso96],
+	[enable Picasso 96 (uaegfx.card)], [yes])
+REQ_FEATURE([WITH_PPC], [ppc], [ppc],
 	[enable PPC (requires cpu board)], [yes])
 OPT_FEATURE([WITH_SLIRP], [slirp], [slirp],
 	[enable SLIRP (user mode NAT)], [yes])
@@ -562,6 +575,10 @@ OPT_FEATURE([WITH_XML_SHADER], [xml_shader], [xml-shader],
 OPT_FEATURE([A_ZIP], [zip], [zip],
 	[enable ZIP archive support], [yes])
 
+OPT_FEATURE([WITH_PEARPC_CPU], [pearpc_cpu], [pearpc-cpu],
+	[use PearPC for PPC emulation], [yes])
+OPT_FEATURE([WITH_QEMU_CPU], [qemu_cpu], [qemu-cpu],
+	[use QEmu for PPC emulation], [yes])
 
 AC_DEFINE([FPU_UAE], [1], [Define to 1])
 

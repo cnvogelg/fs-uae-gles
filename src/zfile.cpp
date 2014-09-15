@@ -23,6 +23,7 @@
 #include "zarchive.h"
 #include "diskutil.h"
 #include "fdi2raw.h"
+#include "uae/io.h"
 
 #include "archivers/zip/unzip.h"
 #include "archivers/dms/pfile.h"
@@ -1413,7 +1414,7 @@ static int iszip (struct zfile *z, int mask)
 		}
 	}
 #if defined(ARCHIVEACCESS)
-	for (i = 0; plugins_7z_x[i]; i++) {
+	for (int i = 0; plugins_7z_x[i]; i++) {
 		if ((plugins_7z_m[i] & mask) && plugins_7z_x[i] && !strcasecmp (ext + 1, plugins_7z[i]) &&
 			!memcmp (header, plugins_7z_x[i], strlen (plugins_7z_x[i])))
 			return plugins_7z_t[i];
@@ -1493,7 +1494,7 @@ struct zfile *zuncompress (struct znode *parent, struct zfile *z, int dodefault,
 		}
 #if defined(ARCHIVEACCESS)
 		if (index == 0) {
-			for (i = 0; plugins_7z_x[i]; i++) {
+			for (int i = 0; plugins_7z_x[i]; i++) {
 				if ((plugins_7z_t[i] & mask) && strcasecmp (ext, plugins_7z[i]) == 0)
 					return archive_access_arcacc_select (z, plugins_7z_t[i], retcode);
 			}
@@ -1622,7 +1623,7 @@ static struct zfile *zfile_fopen_nozip (const TCHAR *name, const TCHAR *mode)
 	l = zfile_create (NULL);
 	l->name = my_strdup (name);
 	l->mode = my_strdup (mode);
-	f = _tfopen (name, mode);
+	f = uae_tfopen (name, mode);
 	if (!f) {
 		zfile_fclose (l);
 		return 0;
@@ -1702,7 +1703,7 @@ static struct zfile *zfile_fopen_2 (const TCHAR *name, const TCHAR *mode, int ma
 			f = my_opentext (l->name);
 			l->textmode = 1;
 		} else {
-			f = _tfopen (l->name, mode);
+			f = uae_tfopen (l->name, mode);
 		}
 		if (!f) {
 			zfile_fclose (l);
@@ -1990,7 +1991,7 @@ struct zfile *zfile_dup (struct zfile *zf)
 			if (nzf)
 				return nzf;
 		}
-		FILE *ff = _tfopen (zf->name, zf->mode);
+		FILE *ff = uae_tfopen (zf->name, zf->mode);
 		if (!ff)
 			return NULL;
 		nzf = zfile_create (zf);
@@ -3206,7 +3207,8 @@ void zfile_fclose_archive (struct zvolume *zv)
 			v = v->next;
 		}
 	}
-	xfree (zv);
+	xfree(zv->volumename);
+	xfree(zv);
 }
 
 struct zdirectory {

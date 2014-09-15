@@ -17,17 +17,14 @@
 
 #if defined(BSDSOCKET)
 
-#ifdef FSUAE
-// only using default values instead for FS-UAE
-#else
 #include "resource.h"
-#endif
 
 #include <stddef.h>
 #include <process.h>
 
 #include "options.h"
-#include "memory_uae.h"
+#include "uae/memory.h"
+#include "uae/seh.h"
 #include "custom.h"
 #include "events.h"
 #include "newcpu.h"
@@ -52,14 +49,10 @@
 #include "win32.h"
 #endif
 
-#ifdef FSUAE
+#ifdef FSUAE // NL
 
 // __try and __except is a MS extension to C/C++. What are the consequence
 // of ignoring these constructs in the code below?
-#undef __try
-#undef __except
-#define __try
-#define __except(x)
 
 #define hInst GetModuleHandle(NULL)
 
@@ -1687,7 +1680,7 @@ int host_CloseSocket(TrapContext *context, SB, int sd)
 			sb->mtable[sd-1] = 0;
 		}
 
-		if (checksd(context, sb ,sd) == TRUE)
+		if (checksd(context, sb ,sd) == true)
 			return 0;
 
 		BEGINBLOCKING;

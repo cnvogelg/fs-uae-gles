@@ -13,12 +13,8 @@
 
 #include "sysconfig.h"
 #include "sysdeps.h"
-#include "memory_uae.h"
-#ifdef FSUAE
-#include "mman_uae.h"
-#else
-#include "sys/mman.h"
-#endif
+#include "uae/memory.h"
+#include "uae/mman.h"
 #include "options.h"
 #include "autoconf.h"
 #include "gfxboard.h"
@@ -190,7 +186,7 @@ uae_u32 max_z3fastmem;
 #define MAXZ3MEM32 0x7F000000
 #define MAXZ3MEM64 0xF0000000
 
-static struct shmid_ds shmids[MAX_SHMID];
+static struct uae_shmid_ds shmids[MAX_SHMID];
 uae_u8 *natmem_offset_allocated, *natmem_offset, *natmem_offset_end;
 static uae_u8 *p96mem_offset;
 static int p96mem_size;
@@ -297,7 +293,7 @@ static void clear_shm (void)
 {
 	shm_start = NULL;
 	for (int i = 0; i < MAX_SHMID; i++) {
-		memset (&shmids[i], 0, sizeof (struct shmid_ds));
+		memset (&shmids[i], 0, sizeof (struct uae_shmid_ds));
 		shmids[i].key = -1;
 	}
 }
@@ -462,7 +458,7 @@ static void resetmem (bool decommit)
 	if (!shm_start)
 		return;
 	for (i = 0; i < MAX_SHMID; i++) {
-		struct shmid_ds *s = &shmids[i];
+		struct uae_shmid_ds *s = &shmids[i];
 		int size = s->size;
 		uae_u8 *shmaddr;
 		uae_u8 *result;
@@ -538,8 +534,10 @@ static int doinit_shm (void)
 		if (changed_prefs.cpu_model >= 68020)
 			size = 0x10000000;
 		z3size = ((changed_prefs.z3fastmem_size + align) & ~align) + ((changed_prefs.z3fastmem2_size + align) & ~align) + ((changed_prefs.z3chipmem_size + align) & ~align);
-		if (currprefs.a4091)
+		if (cfgfile_board_enabled(&currprefs.a4091rom))
 			othersize += 2 * 16 * 1024 * 1024;
+		if (cfgfile_board_enabled(&currprefs.fastlanerom))
+			othersize += 2 * 32 * 1024 * 1024;
 		totalsize = size + z3size + z3rtgmem_size + othersize;
 		while (totalsize > size64) {
 			int change = lowmem ();
@@ -565,14 +563,14 @@ static int doinit_shm (void)
 	}
 
 	z3offset = 0;
-	if ((changed_prefs.z3fastmem_start == 0x10000000 || changed_prefs.z3fastmem_start == 0x40000000) && !changed_prefs.force_0x10000000_z3 && !cpuboard_blizzardram(&changed_prefs)) {
-		if (natmem_size > 0x40000000 && natmem_size - 0x40000000 >= (totalsize - 0x10000000 - ((changed_prefs.z3chipmem_size + align) & ~align)) && changed_prefs.z3chipmem_size <= 512 * 1024 * 1024) {
-			changed_prefs.z3fastmem_start = currprefs.z3fastmem_start = 0x40000000;
+	if ((changed_prefs.z3autoconfig_start == 0x10000000 || changed_prefs.z3autoconfig_start == 0x40000000) && !changed_prefs.force_0x10000000_z3 && !cpuboard_blizzardram(&changed_prefs)) {
+		if (1 && natmem_size > 0x40000000 && natmem_size - 0x40000000 >= (totalsize - 0x10000000 - ((changed_prefs.z3chipmem_size + align) & ~align)) && changed_prefs.z3chipmem_size <= 512 * 1024 * 1024) {
+			changed_prefs.z3autoconfig_start = currprefs.z3autoconfig_start = 0x40000000;
 			z3offset += 0x40000000 - 0x10000000 - ((changed_prefs.z3chipmem_size + align) & ~align);
 			if (currprefs.cpuboard_type == BOARD_WARPENGINE_A4000)
 				z3offset += 0x01000000;
 		} else {
-			changed_prefs.z3fastmem_start = currprefs.z3fastmem_start = 0x10000000;
+			changed_prefs.z3autoconfig_start = currprefs.z3autoconfig_start = 0x10000000;
 		}
 	}
 
@@ -669,11 +667,12 @@ void free_shm (void)
 void mapped_free (addrbank *ab)
 {
 	shmpiece *x = shm_start;
+	bool rtgmem = (ab->flags & ABFLAG_RTG) != 0;
 
 	if (ab->baseaddr == NULL)
 		return;
 
-	if (!currprefs.jit_direct_compatible_memory && ab->baseaddr != rtgmem_mapped_memory) {
+	if (!currprefs.jit_direct_compatible_memory && !rtgmem) {
 		if (!(ab->flags & ABFLAG_NOALLOC)) {
 			xfree(ab->baseaddr);
 			ab->baseaddr = NULL;
@@ -712,7 +711,7 @@ void mapped_free (addrbank *ab)
 	}
 	x = shm_start;
 	while(x) {
-		struct shmid_ds blah;
+		struct uae_shmid_ds blah;
 		if (ab->baseaddr == x->native_address) {
 			if (uae_shmctl (x->id, IPC_STAT, &blah) == 0)
 				uae_shmctl (x->id, IPC_RMID, &blah);
@@ -745,21 +744,12 @@ STATIC_INLINE uae_key_t find_shmkey (uae_key_t key)
 	return result;
 }
 
-int mprotect (void *addr, size_t len, int prot)
-#ifdef PANDORA
-	__THROW
-#endif
-{
-	int result = 0;
-	return result;
-}
-
 void *uae_shmat (addrbank *ab, int shmid, void *shmaddr, int shmflg)
 {
 	write_log("uae_shmat shmid %d shmaddr %p, shmflg %d natmem_offset = %p\n",
 			shmid, shmaddr, shmflg, natmem_offset);
 	void *result = (void *)-1;
-	BOOL got = FALSE, readonly = FALSE, maprom = FALSE;
+	bool got = FALSE, readonly = FALSE, maprom = FALSE;
 	int p96special = FALSE;
 
 #ifdef NATMEM_OFFSET
@@ -980,7 +970,7 @@ void unprotect_maprom (void)
 {
 	bool protect = false;
 	for (int i = 0; i < MAX_SHMID; i++) {
-		struct shmid_ds *shm = &shmids[i];
+		struct uae_shmid_ds *shm = &shmids[i];
 		if (shm->mode != PAGE_READONLY)
 			continue;
 		if (!shm->attached || !shm->rosize)
@@ -1007,7 +997,7 @@ void protect_roms (bool protect)
 			return;
 	}
 	for (int i = 0; i < MAX_SHMID; i++) {
-		struct shmid_ds *shm = &shmids[i];
+		struct uae_shmid_ds *shm = &shmids[i];
 		if (shm->mode != PAGE_READONLY)
 			continue;
 		if (!shm->attached || !shm->rosize)
@@ -1046,7 +1036,7 @@ int uae_shmget (uae_key_t key, size_t size, int shmflg, const TCHAR *name)
 	return result;
 }
 
-int uae_shmctl (int shmid, int cmd, struct shmid_ds *buf)
+int uae_shmctl (int shmid, int cmd, struct uae_shmid_ds *buf)
 {
 	int result = -1;
 

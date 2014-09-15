@@ -10,7 +10,7 @@
 #include "sysconfig.h"
 #include "sysdeps.h"
 #include "options.h"
-#include "memory_uae.h"
+#include "uae/memory.h"
 
 #include "blkdev.h"
 #include "scsidev.h"
@@ -20,6 +20,7 @@
 #include "execio.h"
 #include "zfile.h"
 #include "scsi.h"
+#include "statusline.h"
 #ifdef RETROPLATFORM
 #include "rp.h"
 #endif
@@ -370,7 +371,7 @@ static int get_standard_cd_unit2 (struct uae_prefs *p, cd_standard_unit csu)
 	int isaudio = 0;
 	if (p->cdslots[unitnum].name[0] || p->cdslots[unitnum].inuse) {
 		if (p->cdslots[unitnum].name[0]) {
-#ifdef FSUAE
+#ifdef FSUAE_XXX
             if (cdscsidevicetype[unitnum]) {
                 device_func_init (cdscsidevicetype[unitnum]);
                 if (!sys_command_open_internal (unitnum, p->cdslots[unitnum].name, csu)) {
@@ -587,8 +588,16 @@ static void check_changes (int unitnum)
 	bool changed = false;
 	bool gotsem = false;
 
-	if (st->device_func == NULL)
+	if (st->device_func == NULL) {
+#ifdef FSUAE
+#if 0
+		if (unitnum == 0) {
+			printf("st->device_func == NULL\n");
+		}
+#endif
+#endif
 		return;
+	}
 
 	if (st->delayed) {
 		st->delayed--;
@@ -630,6 +639,9 @@ static void check_changes (int unitnum)
 			}
 		}
 		write_log (_T("CD: eject (%s) open=%d\n"), pollmode ? _T("slow") : _T("fast"), st->wasopen ? 1 : 0);
+		if (wasimage)
+			statusline_add_message(_T("CD%d: -"), unitnum);
+
 #ifdef RETROPLATFORM
 		rp_cd_image_change (unitnum, NULL); 
 #endif
@@ -650,6 +662,8 @@ static void check_changes (int unitnum)
 	currprefs.cdslots[unitnum].inuse = changed_prefs.cdslots[unitnum].inuse = st->cdimagefileinuse;
 	st->newimagefile[0] = 0;
 	write_log (_T("CD: delayed insert '%s' (open=%d,unit=%d)\n"), currprefs.cdslots[unitnum].name[0] ? currprefs.cdslots[unitnum].name : _T("<EMPTY>"), st->wasopen ? 1 : 0, unitnum);
+	if (currprefs.cdslots[unitnum].name[0])
+		statusline_add_message(_T("CD%d: %s"), unitnum, currprefs.cdslots[unitnum].name);
 	device_func_init (0);
 	if (st->wasopen) {
 		if (!st->device_func->opendev (unitnum, currprefs.cdslots[unitnum].name, 0)) {
@@ -1243,8 +1257,6 @@ static int scsi_read_cd_data (int unitnum, uae_u8 *scsi_data, uae_u32 offset, ua
 		*scsi_len = 0;
 		return 0;
 	} else {
-		if (len * di->bytespersector > SCSI_DATA_BUFFER_SIZE)
-			return -3;
 		if (offset >= di->sectorspertrack * di->cylinders * di->trackspercylinder)
 			return -1;
 		int v = cmd_readx (unitnum, scsi_data, offset, len) * di->bytespersector;
@@ -1281,7 +1293,7 @@ int scsi_cd_emulate (int unitnum, uae_u8 *cmdbuf, int scsi_cmd_len,
 	sys_command_info (unitnum, &di, 1);
 
 	if (log_scsiemu) {
-		write_log (_T("SCSIEMU %d: %02X.%02X.%02X.%02X.%02X.%02X.%02X.%02X.%02X.%02X.%02X.%02X CMDLEN=%d DATA=%p LEN=%d\n"), unitnum,
+		write_log (_T("SCSIEMU CD %d: %02X.%02X.%02X.%02X.%02X.%02X.%02X.%02X.%02X.%02X.%02X.%02X CMDLEN=%d DATA=%p LEN=%d\n"), unitnum,
 			cmdbuf[0], cmdbuf[1], cmdbuf[2], cmdbuf[3], cmdbuf[4], cmdbuf[5], cmdbuf[6], 
 			cmdbuf[7], cmdbuf[8], cmdbuf[9], cmdbuf[10], cmdbuf[11],
 			scsi_cmd_len, scsi_data, dlen);
@@ -1568,8 +1580,6 @@ int scsi_cd_emulate (int unitnum, uae_u8 *cmdbuf, int scsi_cmd_len,
 				goto outofbounds;
 			if (v == -2)
 				goto readerr;
-			if (v == -3)
-				goto toolarge;
 		} else {
 			goto notdatatrack;
 		}
@@ -1603,8 +1613,6 @@ int scsi_cd_emulate (int unitnum, uae_u8 *cmdbuf, int scsi_cmd_len,
 				goto outofbounds;
 			if (v == -2)
 				goto readerr;
-			if (v == -3)
-				goto toolarge;
 		} else {
 			goto notdatatrack;
 		}
@@ -1626,8 +1634,6 @@ int scsi_cd_emulate (int unitnum, uae_u8 *cmdbuf, int scsi_cmd_len,
 				goto outofbounds;
 			if (v == -2)
 				goto readerr;
-			if (v == -3)
-				goto toolarge;
 		} else {
 			goto notdatatrack;
 		}
@@ -2006,14 +2012,6 @@ outofbounds:
 		s[0] = 0x70;
 		s[2] = 5; /* ILLEGAL REQUEST */
 		s[12] = 0x21; /* LOGICAL BLOCK OUT OF RANGE */
-		ls = 0x12;
-	break;
-toolarge:
-		write_log (_T("CDEMU: too large scsi data tranfer %d > %d\n"), len, dlen);
-		status = 2; /* CHECK CONDITION */
-		s[0] = 0x70;
-		s[2] = 2; /* NOT READY */
-		s[12] = 0x11; /* UNRECOVERED READ ERROR */
 		ls = 0x12;
 	break;
 errreq:
