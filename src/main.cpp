@@ -658,9 +658,16 @@ void fixup_prefs (struct uae_prefs *p)
 #endif
 	}
 #endif
-	if (p->maprom && !p->address_space_24)
+	if (p->maprom && !p->address_space_24) {
+#ifdef FSUAE
+		write_log("MAPROM: Setting address 0x0f000000 (was 0x%08x)\n", p->maprom);
+#endif
 		p->maprom = 0x0f000000;
+	}
 	if (((p->maprom & 0xff000000) && p->address_space_24) || (p->maprom && p->mbresmem_high_size == 0x08000000)) {
+#ifdef FSUAE
+		write_log("MAPROM: Setting address 0x00e00000 (was 0x%08x)\n", p->maprom);
+#endif
 		p->maprom = 0x00e00000;
 	}
 	if (p->tod_hack && p->cs_ciaatod == 0)
@@ -908,6 +915,9 @@ void reset_all_systems (void)
 {
 	init_eventtab ();
 
+#ifdef WITH_PPC
+	uae_ppc_reset(false);
+#endif
 #ifdef PICASSO96
 	picasso_reset ();
 #endif
@@ -946,9 +956,6 @@ void reset_all_systems (void)
 	native2amiga_reset ();
 	dongle_reset ();
 	sampler_init ();
-#ifdef WITH_PPC
-	uae_ppc_reset(false);
-#endif
 }
 
 /* Okay, this stuff looks strange, but it is here to encourage people who

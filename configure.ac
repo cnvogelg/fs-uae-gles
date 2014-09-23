@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.67])
-AC_INIT([FS-UAE], [2.5.14dev],
+AC_INIT([FS-UAE], [2.5.15dev],
         [frode@fs-uae.net], [fs-uae], [http://fs-uae.net])
 AC_CONFIG_AUX_DIR([.])
 AC_CANONICAL_SYSTEM
@@ -13,7 +13,7 @@ AM_INIT_AUTOMAKE([tar-ustar subdir-objects])
 
 AC_SUBST([PACKAGE_SERIES], [devel])
 
-AC_DEFINE_UNQUOTED([UAE_BASE_VERSION], ["WinUAE 2.9.0 beta 15"],
+AC_DEFINE_UNQUOTED([UAE_BASE_VERSION], ["WinUAE 2900b16"],
 [Which UAE core this version is based on.])
 
 PACKAGE_MAJOR=`echo ${PACKAGE_VERSION} | sed -e 's,\(\.*\)\..*\..*,\1,g'`
@@ -51,6 +51,12 @@ AX_CHECK_COMPILE_FLAG(-Wmissing-declarations,
 [w_missing_declarations=no])
 AM_CONDITIONAL([W_MISSING_DECLARATIONS],
 [test x$w_missing_declarations = xyes])
+
+AX_CHECK_COMPILE_FLAG(-Waddress,
+[w_address=yes],
+[w_address=no])
+AM_CONDITIONAL([W_ADDRESS],
+[test x$w_address = xyes])
 
 AX_CHECK_COMPILE_FLAG(-Wmissing-format-attribute,
 [w_missing_format_attribute=yes],
@@ -213,7 +219,7 @@ AS_CASE([$target_os],
 	OS_NAME="macosx"
 	OS_CPPFLAGS="-DMACOSX"
 	LOADABLE_MODULE_EXT=".so"
-	OS_LDFLAGS="-headerpad_max_install_names -pagezero_size 0x2000"
+	OS_LDFLAGS="-headerpad_max_install_names -pagezero_size 0x2000 -rpath @executable_path/../Frameworks"
 ],
 [freebsd*], [
 	OS_NAME="freebsd"

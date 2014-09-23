@@ -26,6 +26,10 @@ if W_MISSING_DECLARATIONS
 CM_CFLAGS += -Wmissing-declarations
 endif
 
+if W_ADDRESS
+CM_CFLAGS += -Waddress
+endif
+
 #if W_MISSING_FORMAT_ATTRIBUTE
 #CM_CFLAGS += -Wmissing-format-attribute
 #endif
@@ -85,6 +89,18 @@ BUILT_SOURCES = \
 
 fs_uae_SOURCES = \
 	src/fs-uae/config.c \
+	src/fs-uae/config-accelerator.c \
+	src/fs-uae/config-accelerator.h \
+	src/fs-uae/config-common.c \
+	src/fs-uae/config-common.h \
+	src/fs-uae/config-drives.c \
+	src/fs-uae/config-drives.h \
+	src/fs-uae/config-graphics.c \
+	src/fs-uae/config-graphics.h \
+	src/fs-uae/config-hardware.c \
+	src/fs-uae/config-hardware.h \
+	src/fs-uae/config-model.c \
+	src/fs-uae/config-model.h \
 	src/fs-uae/fs-uae.h \
 	src/fs-uae/input.c \
 	src/fs-uae/joystick.c \
@@ -316,6 +332,7 @@ libuae_a_SOURCES = \
 	src/include/uae/enum.h \
 	src/include/uae/fs.h \
 	src/include/uae/funcattr.h \
+	src/include/uae/glib.h \
 	src/include/uae/inline.h \
 	src/include/uae/io.h \
 	src/include/uae/jitconfig.h \
@@ -328,6 +345,7 @@ libuae_a_SOURCES = \
 	src/include/uae/ppc.h \
 	src/include/uae/regparam.h \
 	src/include/uae/seh.h \
+	src/include/uae/specialmonitors.h \
 	src/include/uae/string.h \
 	src/include/uae/types.h \
 	src/include/uaeexe.h \
@@ -507,7 +525,7 @@ fs_uae_LDADD += libfsemu.a
 fs_uae_device_helper_LDADD += libfsemu.a
 libfsemu_a_SOURCES = \
 	libfsemu/include/fs/base.h \
-	libfsemu/include/fs/config.h \
+	libfsemu/include/fs/conf.h \
 	libfsemu/include/fs/data.h \
 	libfsemu/include/fs/defines.h \
 	libfsemu/include/fs/emu.h \
@@ -517,26 +535,23 @@ libfsemu_a_SOURCES = \
 	libfsemu/include/fs/eventlog.h \
 	libfsemu/include/fs/filesys.h \
 	libfsemu/include/fs/fs.h \
+	libfsemu/include/fs/glib.h \
 	libfsemu/include/fs/glu.h \
-	libfsemu/include/fs/hashtable.h \
 	libfsemu/include/fs/i18n.h \
 	libfsemu/include/fs/image.h \
 	libfsemu/include/fs/inifile.h \
 	libfsemu/include/fs/init.h \
-	libfsemu/include/fs/list.h \
 	libfsemu/include/fs/log.h \
 	libfsemu/include/fs/main.h \
+	libfsemu/include/fs/malloc.h \
 	libfsemu/include/fs/ml.h \
 	libfsemu/include/fs/ml/opengl.h \
-	libfsemu/include/fs/queue.h \
-	libfsemu/include/fs/random.h \
 	libfsemu/include/fs/ref.h \
-	libfsemu/include/fs/string.h \
 	libfsemu/include/fs/thread.h \
 	libfsemu/include/fs/time.h \
-	libfsemu/include/fs/unicode.h \
+	libfsemu/include/fs/util.h \
 	libfsemu/src/base.c \
-	libfsemu/src/config.c \
+	libfsemu/src/conf.c \
 	libfsemu/src/data.c \
 	libfsemu/src/emu/actions.c \
 	libfsemu/src/emu/actions.h \
@@ -582,11 +597,10 @@ libfsemu_a_SOURCES = \
 	libfsemu/src/emu/xml_shader.h \
 	libfsemu/src/eventlog.c \
 	libfsemu/src/filesys.c \
-	libfsemu/src/hashtable.c \
+	libfsemu/src/malloc.c \
 	libfsemu/src/image.c \
 	libfsemu/src/inifile.c \
 	libfsemu/src/init.c \
-	libfsemu/src/list.c \
 	libfsemu/src/log.c \
 	libfsemu/src/ml/clock.c \
 	libfsemu/src/ml/config.c \
@@ -609,13 +623,9 @@ libfsemu_a_SOURCES = \
 	libfsemu/src/ml/windows.c \
 	libfsemu/src/ml/x11.c \
 	libfsemu/src/opengl.c \
-	libfsemu/src/queue.c \
-	libfsemu/src/random.c \
 	libfsemu/src/ref.c \
-	libfsemu/src/string.c \
 	libfsemu/src/thread.c \
-	libfsemu/src/time.c \
-	libfsemu/src/unicode.c
+	libfsemu/src/time.c
 
 if BUILTIN_GLEE
 noinst_LIBRARIES += libglee.a

@@ -7,7 +7,6 @@
 
 #include <string.h>
 #include <string.h>
-#include <fs/string.h>
 
 #include "uae/memory.h"
 #include "options.h"
@@ -21,8 +20,8 @@
 #include "luascript.h"
 
 #include "uae/fs.h"
-#include <glib.h>
 #include "uae/log.h"
+#include "uae/glib.h"
 
 void keyboard_settrans (void);
 libamiga_callbacks g_libamiga_callbacks = {};
@@ -112,11 +111,11 @@ void amiga_init_lua_state(lua_State *L) {
 void amiga_set_floppy_sounds_dir(const char *path) {
     int len = strlen(path);
     if (path[len - 1] == '/') {
-        g_floppy_sounds_dir = fs_strdup(path);
+        g_floppy_sounds_dir = g_strdup(path);
     }
     else {
         // must have directory separator at the end
-        g_floppy_sounds_dir = fs_strconcat(path, "/", NULL);
+        g_floppy_sounds_dir = g_strconcat(path, "/", NULL);
     }
 }
 
@@ -208,49 +207,53 @@ void amiga_write_uae_config(const char *path) {
     cfgfile_save(&currprefs, path, 0);
 }
 
+static void set_path(TCHAR *d1, TCHAR *d2, const TCHAR *s)
+{
+    /* Use PATH_MAX - 1 so we have space for any trailing slash */
+    uae_strlcpy(d1, s, PATH_MAX - 1);
+    int d1_len = strlen(d1);
+    if (d1[d1_len - 1] != '/') {
+        strcat(d1, "/");
+    }
+    uae_strlcpy(d2, d1, PATH_MAX);
+}
+
 void amiga_set_paths(const char **rom_paths, const char **floppy_paths,
-        const char **cd_paths, const char **hd_paths) {
+                     const char **cd_paths, const char **hd_paths)
+{
     for (int i = 0; i < MAX_PATHS; i++) {
         if (floppy_paths[i] == NULL || floppy_paths[i][0] == '\0') {
             break;
         }
-        strncpy(&(currprefs.path_floppy.path[i][0]),
-                floppy_paths[i], MAX_PATH - 1);
-        strncpy(&(changed_prefs.path_floppy.path[i][0]),
-                floppy_paths[i], MAX_PATH - 1);
+        set_path(currprefs.path_floppy.path[i],
+                 changed_prefs.path_floppy.path[i], floppy_paths[i]);
     }
     for (int i = 0; i < MAX_PATHS; i++) {
         if (cd_paths[i] == NULL || cd_paths[i][0] == '\0') {
             break;
         }
-        strncpy(&(currprefs.path_cd.path[i][0]),
-                cd_paths[i], MAX_PATH - 1);
-        strncpy(&(changed_prefs.path_cd.path[i][0]),
-                cd_paths[i], MAX_PATH - 1);
+        set_path(currprefs.path_cd.path[i],
+                 changed_prefs.path_cd.path[i], cd_paths[i]);
     }
     for (int i = 0; i < MAX_PATHS; i++) {
         if (hd_paths[i] == NULL || hd_paths[i][0] == '\0') {
             break;
         }
-        strncpy(&(currprefs.path_hardfile.path[i][0]),
-                hd_paths[i], MAX_PATH - 1);
-        strncpy(&(changed_prefs.path_hardfile.path[i][0]),
-                hd_paths[i], MAX_PATH - 1);
+        set_path(currprefs.path_hardfile.path[i],
+                 changed_prefs.path_hardfile.path[i], hd_paths[i]);
     }
     for (int i = 0; i < MAX_PATHS; i++) {
         if (rom_paths[i] == NULL || rom_paths[i][0] == '\0') {
             break;
         }
-        strncpy(&(currprefs.path_rom.path[i][0]),
-                rom_paths[i], MAX_PATH - 1);
-        strncpy(&(changed_prefs.path_rom.path[i][0]),
-                rom_paths[i], MAX_PATH - 1);
+        set_path(currprefs.path_rom.path[i],
+                 changed_prefs.path_rom.path[i], rom_paths[i]);
     }
 }
 
 int amiga_set_synchronization_log_file(const char *path) {
 #ifdef DEBUG_SYNC
-    FILE *f = fs_fopen(path, "wb");
+    FILE *f = g_fopen(path, "wb");
     if (f) {
         write_log("sync debug log to %s\n", path);
         g_fs_uae_sync_debug_file = f;
@@ -275,7 +278,7 @@ int amiga_quickstart(int quickstart_model, int quickstart_config,
 
 void amiga_set_save_image_dir(const char *path) {
     write_log("amiga_set_save_image_dir %s\n", path);
-    g_libamiga_save_image_path = fs_strdup(path);
+    g_libamiga_save_image_path = g_strdup(path);
 }
 
 int amiga_get_rand_checksum() {
@@ -605,9 +608,9 @@ int amiga_set_hardware_option(const char *option, const char *value) {
 }
 
 int amiga_set_int_option(const char *option, int value) {
-    char *str_value = fs_strdup_printf("%d", value);
+    char *str_value = g_strdup_printf("%d", value);
     int result = amiga_set_option(option, str_value);
-    free(str_value);
+    g_free(str_value);
     return result;
 }
 

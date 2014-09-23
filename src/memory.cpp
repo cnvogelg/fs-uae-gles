@@ -36,6 +36,7 @@
 #include "gfxboard.h"
 #include "clockport.h"
 #include "cpuboard.h"
+#include "uae/ppc.h"
 
 #ifdef FSUAE // NL
 #undef _WIN32
@@ -2334,6 +2335,10 @@ void memory_reset (void)
 	}
 
 	if ((cloanto_rom || extendedkickmem_bank.allocated) && currprefs.maprom && currprefs.maprom < 0x01000000) {
+#ifdef FSUAE
+	    write_log("MAPROM: cloanto_rom=%d extendedkickmem_bank.allocated=%u\n", cloanto_rom, extendedkickmem_bank.allocated);
+	    write_log("MAPROM: Setting address 0x00a80000 (was 0x%08x)\n", currprefs.maprom);
+#endif
 		currprefs.maprom = changed_prefs.maprom = 0x00a80000;
 		if (extendedkickmem2_bank.allocated) // can't do if 2M ROM
 			currprefs.maprom = changed_prefs.maprom = 0;
@@ -2462,8 +2467,17 @@ void memory_reset (void)
 		map_banks (&rtarea_bank, rtarea_base >> 16, 1, 0);
 #endif
 
-	if ((cloanto_rom || currprefs.cs_ksmirror_e0) && (currprefs.maprom != 0xe00000) && !extendedkickmem_type)
+	if ((cloanto_rom || currprefs.cs_ksmirror_e0) && (currprefs.maprom != 0xe00000) && !extendedkickmem_type) {
+#ifdef FSUAE
+		if (currprefs.cs_ksmirror_e0) {
+			write_log("MAPROM: cs_ksmirror_e0 set - mirroring kickstart at 0x00e00000\n");
+		}
+		else if (cloanto_rom) {
+			write_log("MAPROM: cloanto_rom set - mirroring kickstart at 0x00e00000\n");
+		}
+#endif
 		map_banks (&kickmem_bank, 0xE0, 8, 0);
+	}
 	if (currprefs.cs_ksmirror_a8) {
 		if (extendedkickmem2_bank.allocated) {
 			map_banks (&extendedkickmem2_bank, 0xa8, 16, 0);
@@ -2693,17 +2707,49 @@ static void map_banks2 (addrbank *bank, int start, int size, int realsize, int q
 	fill_ce_banks ();
 }
 
+#ifdef WITH_PPC
+static void ppc_generate_map_banks(addrbank *bank, int start, int size)
+{
+	uae_u32 bankaddr = start << 16;
+	uae_u32 banksize = size << 16;
+	if (bank->sub_banks) {
+		uae_u32 subbankaddr = bankaddr;
+		addrbank *ab = NULL;
+		for (int i = 0; i <= 65536; i += MEMORY_MIN_SUBBANK) {
+			uae_u32 addr = bankaddr + i;
+			addrbank *ab2 = get_sub_bank(&addr);
+			if (ab2 != ab && ab != NULL) {
+				ppc_map_banks(subbankaddr, (bankaddr + i) - subbankaddr, ab->name, ab->baseaddr, ab == &dummy_bank);
+				subbankaddr = bankaddr + i;
+			}
+			ab = ab2;
+		}
+	} else {
+		ppc_map_banks(bankaddr, banksize, bank->name, bank->baseaddr, bank == &dummy_bank);
+	}
+}
+#endif
+
 void map_banks (addrbank *bank, int start, int size, int realsize)
 {
 	map_banks2 (bank, start, size, realsize, 0);
+#ifdef WITH_PPC
+	ppc_generate_map_banks(bank, start, size);
+#endif
 }
 void map_banks_quick (addrbank *bank, int start, int size, int realsize)
 {
 	map_banks2 (bank, start, size, realsize, 1);
+#ifdef WITH_PPC
+	ppc_generate_map_banks(bank, start, size);
+#endif
 }
 void map_banks_nojitdirect (addrbank *bank, int start, int size, int realsize)
 {
 	map_banks2 (bank, start, size, realsize, -1);
+#ifdef WITH_PPC
+	ppc_generate_map_banks(bank, start, size);
+#endif
 }
 
 #ifdef SAVESTATE

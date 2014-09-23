@@ -1,5 +1,23 @@
 Version 2.5.15dev:
 
+* FS-UAE memory options are more clever, and can take arguments as both
+  KB or MB (with recommended explicit K/M suffix). For example, for memory
+  options which are always in MB, 8M == 8192K == 8192 == 8.
+* Flexible value matching for choice-based FS-UAE configuration options
+  (i.e. cyberstorm-ppc == CyberStormPPC)
+* New model A4000/PPC (auto-enables CyberStorm PPC).
+* New model A4000/OS4 (CyberStorm PPC, Picasso IV, default to onboard SCSI).
+* New options graphics_card and graphics_card_memory (supercedes uaegfx_card).
+* New options accelerator, accelerator_rom, graphics_card_rom.
+* New --workbench option useful for command line testing (automatically
+  inserts an appropriate wb disk in DF0).
+* Show GUI warning when floppy_drive_x files are not found.
+* Enabled A500/512K model (same as A500 but without slow RAM).
+* Enabled A4000 model (68030, 3.1 ROM, 2MB Chip + 8 MB Fast).
+* Added .bin extension to internal FS-UAE rom scanner.
+* More code cleanup / fixes, reduces compiler warnings.
+* Enabled floating point control.
+* Updated emulation core from WinUAE 2900b16.
 * Fixed bug when adding 2nd fast memory bank in non-autoconfig mode.
 * Allow 1 to be used as true/yes for boolean uae_* options.
 * Removed cpu_idle override, added new cpu_idle option (0 - 10).

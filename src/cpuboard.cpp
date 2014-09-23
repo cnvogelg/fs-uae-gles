@@ -1408,7 +1408,7 @@ void cpuboard_init(void)
 		mapped_malloc(&blizzardmaprom_bank);
 
 	} else if (is_csmk3()) {
-	
+
 		blizzardram_bank.start = CS_RAM_BASE;
 		blizzardram_bank.allocated = cpuboard_size;
 		blizzardram_bank.mask = blizzardram_bank.allocated - 1;
@@ -1617,7 +1617,7 @@ addrbank *cpuboard_autoconfig_init(void)
 	case BOARD_WARPENGINE_A4000:
 		return &expamem_null;
 	case BOARD_TEKMAGIC:
-		roms[0] = 105;
+		roms[0] = 104;
 		break;
 	case BOARD_CSMK1:
 		roms[0] = currprefs.cpu_model == 68040 ? 95 : 101;
@@ -1643,8 +1643,6 @@ addrbank *cpuboard_autoconfig_init(void)
 		return &expamem_null;
 	}
 
-#ifdef FSUAE
-#else
 	struct romlist *rl = getromlistbyids(roms);
 	if (!rl) {
 		rd = getromdatabyids(roms);
@@ -1670,26 +1668,19 @@ addrbank *cpuboard_autoconfig_init(void)
 		if (!autoconfig_rom)
 			autoconfig_rom = read_rom(rl->rd);
 	} else if (isflashrom) {
-#endif
 		autoconfig_rom = flashfile_open(romname);
-#ifdef FSUAE
-#else
 		if (!autoconfig_rom) {
 			if (rl)
 				autoconfig_rom = flashfile_open(rl->path);
 			if (!autoconfig_rom)
 				autoconfig_rom = flashfile_open(defaultromname);
 		}
-#endif
 		if (!autoconfig_rom) {
 			romwarning(roms);
 			write_log(_T("Couldn't open CPU board rom '%s'\n"), defaultromname);
 			return &expamem_null;
 		}
-#ifdef FSUAE
-#else
 	}
-#endif
 
 	if (!autoconfig_rom && roms[0] != -1) {
 		romwarning(roms);
