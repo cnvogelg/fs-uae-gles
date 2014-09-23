@@ -54,6 +54,7 @@ static bool rom_write_enabled;
 int special_mem;
 #endif
 static int mem_hardreset;
+static bool roms_modified;
 
 #define FLASHEMU 0
 
@@ -1333,6 +1334,23 @@ void a3000_fakekick (int map)
 
 static const uae_char *kickstring = "exec.library";
 
+#ifdef FSUAE // NL
+
+static void log_kickstart(uae_u8 *mem, int size)
+{
+	uae_u32 crc32 = get_crc32(mem, size);
+	struct romdata *rd = getromdatabycrc(crc32);
+	if (rd) {
+		char tmp[MAX_DPATH];
+		getromname(rd, tmp);
+		printf("KICKSTART: %s\n", tmp);
+	} else {
+		printf("KICKSTART: Unknown %08x (size %d)\n", crc32, size);
+	}
+}
+
+#endif
+
 static int read_kickstart (struct zfile *f, uae_u8 *mem, int size, int dochecksum, int noalias)
 {
 	uae_char buffer[20];
@@ -1382,7 +1400,6 @@ static int read_kickstart (struct zfile *f, uae_u8 *mem, int size, int dochecksu
 #endif
 	if (i < size - 20)
 		kickstart_fix_checksum (mem, size);
-
 	j = 1;
 	while (j < i)
 		j <<= 1;
@@ -1395,9 +1412,17 @@ static int read_kickstart (struct zfile *f, uae_u8 *mem, int size, int dochecksu
 		if (!decode_rom (mem, size, cr, i))
 			return 0;
 	}
-	if (currprefs.cs_a1000ram) {
+	/* When i >= ROM_SIZE_256, a full kickstart ROM is in use, and we
+	 * don't want the A1000 KS bootstrap-specific behavior in this case. */
+	if (currprefs.cs_a1000ram && i < ROM_SIZE_256) {
 		int off = 0;
-		a1000_bootrom = xcalloc (uae_u8, ROM_SIZE_256);
+		if (!a1000_bootrom)
+			a1000_bootrom = xcalloc (uae_u8, ROM_SIZE_256);
+		/* FIXME: This loop looks a bit suspicious. When the A1000 bootstrap
+		 * ROM is 64 KB, this loop looks like it repeats the ROM. Fair enough,
+		 * but with <, it will only fill it three times and leave the upper
+		 * 64 KB alone (will be zeroed by xcalloc). Is this intentional, or
+		 * should it be <= here? -Frode. */
 		while (off + i < ROM_SIZE_256) {
 			memcpy (a1000_bootrom + off, kickmem_bank.baseaddr, i);
 			off += i;
@@ -1417,6 +1442,9 @@ static int read_kickstart (struct zfile *f, uae_u8 *mem, int size, int dochecksu
 		dochecksum = 0;
 	if (dochecksum)
 		kickstart_checksum (mem, size);
+#ifdef FSUAE
+	log_kickstart(mem, i);
+#endif
 	return i;
 }
 
@@ -1627,6 +1655,9 @@ static int load_kickstart (void)
 		goto err;
 
 	if (f != NULL) {
+#ifdef FSUAE
+		printf("KICKSTART: %s\n", currprefs.romfile);
+#endif
 		int filesize, size, maxsize;
 		int kspos = ROM_SIZE_512;
 		int extpos = 0;
@@ -2258,7 +2289,7 @@ void memory_reset (void)
 	currprefs.cs_ide = changed_prefs.cs_ide;
 	currprefs.cs_fatgaryrev = changed_prefs.cs_fatgaryrev;
 	currprefs.cs_ramseyrev = changed_prefs.cs_ramseyrev;
-	cpuboard_reset(mem_hardreset > 2);
+	cpuboard_reset();
 
 	gayleorfatgary = (currprefs.chipset_mask & CSMASK_AGA) || currprefs.cs_pcmcia || currprefs.cs_ide > 0 || currprefs.cs_mbdmac;
 
@@ -2266,10 +2297,11 @@ void memory_reset (void)
 	allocate_memory ();
 	chipmem_setindirect ();
 
-	if (mem_hardreset > 1
+	if (mem_hardreset > 1 || ((roms_modified || a1000_bootrom) && is_hardreset())
 		|| _tcscmp (currprefs.romfile, changed_prefs.romfile) != 0
 		|| _tcscmp (currprefs.romextfile, changed_prefs.romextfile) != 0)
 	{
+		roms_modified = false;
 		protect_roms (false);
 		write_log (_T("ROM loader.. (%s)\n"), currprefs.romfile);
 		kickstart_rom = 1;
@@ -2564,7 +2596,7 @@ void memory_init (void)
 	memset (kickmem_bank.baseaddr, 0, ROM_SIZE_512);
 	_tcscpy (currprefs.romfile, _T("<none>"));
 	currprefs.romextfile[0] = 0;
-	cpuboard_reset(0);
+	cpuboard_reset();
 
 #ifdef ACTION_REPLAY
 	action_replay_unload (0);
@@ -2614,6 +2646,11 @@ void memory_cleanup (void)
 #endif
 
 	clockport_cleanup();
+}
+
+void set_roms_modified(void)
+{
+	roms_modified = true;
 }
 
 void memory_hardreset (int mode)
