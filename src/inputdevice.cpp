@@ -62,6 +62,12 @@
 #undef _WIN32
 #endif
 
+// FIXME: replace strcasecmp with _tcsicmp instead
+#if SIZEOF_TCHAR != 1
+#undef strcasecmp
+#define strcasecmp _tcsicmp
+#endif
+
 // 01 = host events
 // 02 = joystick
 // 04 = cia buttons
@@ -1186,6 +1192,9 @@ static bool mousehack_enabled;
 
 static void mousehack_reset (void)
 {
+#ifdef FSUAE
+	write_log(_T("mousehack_reset\n"));
+#endif
 	dimensioninfo_width = dimensioninfo_height = 0;
 	mouseoffset_x = mouseoffset_y = 0;
 	dimensioninfo_dbl = 0;
@@ -1605,6 +1614,7 @@ static void mousehack_helper (uae_u32 buttonmask)
 #endif
 	x = lastmx;
 	y = lastmy;
+
 	getgfxoffset (&fdx, &fdy, &fmx, &fmy);
 
 #ifdef PICASSO96
@@ -7590,6 +7600,15 @@ void clear_inputstate (void)
 }
 
 #ifdef FSUAE // NL
+
+void uae_mousehack_helper(int x, int y)
+{
+	/* Register last absolute mouse position */
+	lastmx = x;
+	lastmy = y;
+	/* FIXME: not really sure what the buttonmask parameter does */
+	mousehack_helper(0xffffffff);
+}
 
 #include <fs/i18n.h>
 

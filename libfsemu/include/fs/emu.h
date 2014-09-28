@@ -19,6 +19,8 @@
 #endif
 #endif
 
+#include <stdbool.h>
+
 //#ifdef MACOSX
 // SDL.h must be included in the compilation unit containing main
 // on Mac OS X
@@ -272,11 +274,11 @@ double fs_emu_audio_get_measured_output_frequency();
 
 // video interface
 
-int fs_emu_get_video_frame_rate();
+double fs_emu_get_video_frame_rate();
 /**
  * Specify the frame rate for emulated video (typically 50 or 60).
  */
-void fs_emu_set_video_frame_rate(int frame_rate);
+void fs_emu_set_video_frame_rate(double frame_rate);
 
 int fs_emu_video_get_aspect_correction();
 /**
@@ -403,12 +405,15 @@ void fs_emu_set_audio_buffer_frequency(int stream, int frequency);
 // end deprecated
 #endif
 
-void fs_emu_show_pointer(int show);
-void fs_emu_show_pointer_msec(int duration);
-int fs_emu_is_pointer_visible();
-int64_t fs_emu_pointer_is_visible_to();
+bool fs_emu_mouse_integration(void);
+void fs_emu_show_cursor(int show);
+void fs_emu_show_cursor_msec(int duration);
+int fs_emu_is_cursor_visible(void);
+bool fs_emu_cursor_allowed(void);
+int64_t fs_emu_cursor_is_visible_to(void);
+
 void fs_emu_grab_input(int mode);
-int fs_emu_has_input_grab();
+int fs_emu_has_input_grab(void);
 
 void fs_emu_screenshot(const char *path, int crop);
 

@@ -915,6 +915,13 @@ static void render_overlays(void) {
     }
 }
 
+#include <fs/emu/hacks.h>
+
+double fs_emu_video_scale_x = 0.0;
+double fs_emu_video_scale_y = 0.0;
+double fs_emu_video_offset_x = 1.0;
+double fs_emu_video_offset_y = 1.0;
+
 static void render_frame(double alpha, int perspective) {
 #ifdef WITH_LUA
     fs_emu_lua_run_handler("on_fs_emu_render_frame");
@@ -1062,6 +1069,12 @@ static void render_frame(double alpha, int perspective) {
     int offset_y = (screen_h - output_h) * (1.0 - g_align_y);
 
     //printf("w %d h %d x %d y %d\n", output_w, output_h, offset_x, offset_y);
+
+    fs_emu_video_scale_x = (double) input_w / output_w;
+    fs_emu_video_scale_y = (double) input_h / output_h;
+
+    fs_emu_video_offset_x = offset_x - g_crop.x / fs_emu_video_scale_x;
+    fs_emu_video_offset_y = offset_y - g_crop.y / fs_emu_video_scale_y;
 
     double s1 = 0.0;
     double t1 = 0.0;
@@ -2190,8 +2203,19 @@ void fs_emu_video_render_function() {
         free(str);
         */
 
-        str = g_strdup_printf("%0.1f",
-                fs_emu_audio_get_measured_avg_buffer_fill(0) / 1000.0);
+        static double avg_emu = 0.0;
+        static double avg_sys = 0.0;
+        static double avg_fill = 0.0;
+        static int avg_throttle = 0;
+        if (avg_throttle == 0) {
+            avg_emu = fs_emu_get_average_emu_fps();
+            avg_sys = fs_emu_get_average_sys_fps();
+            avg_fill = fs_emu_audio_get_measured_avg_buffer_fill(0);
+            avg_throttle = 10;
+        }
+        avg_throttle -= 1;
+
+        str = g_strdup_printf("%0.1f", avg_fill / 1000.0);
         fs_emu_font_render(menu_font, str, 1920 / 2 + 220, 3,
                 1.0, 1.0, 1.0, 1.0);
         free(str);
@@ -2201,7 +2225,7 @@ void fs_emu_video_render_function() {
         free(str);
 
         fs_emu_font_render(menu_font, "EMU", 20, 3, 1.0, 1.0, 1.0, 1.0);
-        str = g_strdup_printf("%0.1f", fs_emu_get_average_emu_fps());
+        str = g_strdup_printf("%0.2f", avg_emu);
         fs_emu_font_render(menu_font, str, 220, 3, 1.0, 1.0, 1.0, 1.0);
         free(str);
         str = g_strdup_printf("%d", g_fs_emu_lost_frames);
@@ -2212,7 +2236,7 @@ void fs_emu_video_render_function() {
         free(str);
 
         fs_emu_font_render(menu_font, "SYS", 20, 140, 1.0, 1.0, 1.0, 1.0);
-        str = g_strdup_printf("%0.1f", fs_emu_get_average_sys_fps());
+        str = g_strdup_printf("%0.2f", avg_sys);
         fs_emu_font_render(menu_font, str, 220, 140, 1.0, 1.0, 1.0, 1.0);
         free(str);
         str = g_strdup_printf("%d", g_fs_emu_lost_vblanks);

@@ -78,11 +78,11 @@ void romlist_patch_rom (uae_u8 *buf, size_t size)
 		write_log ("\n");
 	}
 #if 0
-	struct romdata *rd = getromdatabydata(buf, size);
+	struct romdata *rd = getromdatabydata (buf, size);
 	if (rd) {
 		char tmp[MAX_DPATH];
-		getromname(rd, tmp);
-		printf("KICKSTART: %s\n", tmp);
+		getromname (rd, tmp);
+		printf ("KICKSTART: %s\n", tmp);
 	}
 #endif
 }
