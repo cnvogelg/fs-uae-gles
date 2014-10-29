@@ -693,8 +693,11 @@ static void resetwarning_check (void)
 	}
 }
 
+extern void vpar_update(void);
+
 void CIA_hsync_prehandler (void)
 {
+	vpar_update();
 }
 
 static void keyreq (void)

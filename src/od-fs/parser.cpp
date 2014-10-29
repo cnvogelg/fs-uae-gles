@@ -403,7 +403,7 @@ static const char *get_ts(void)
 {
     struct timeval tv;
     gettimeofday(&tv, NULL);
-    sprintf(buf2,"%8d.%06d",tv.tv_sec,tv.tv_usec);
+    sprintf(buf2,"%8ld.%06d",tv.tv_sec,tv.tv_usec);
     return buf2;
 }
 
@@ -581,6 +581,29 @@ static void vpar_exit(void)
 
 // --- worker thread ---
 
+static int ack_flag;
+static uint64_t ts_req;
+
+static uint64_t get_ts_uint64(void)
+{
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    return tv.tv_sec * 1000000UL + tv.tv_usec;
+}
+
+void vpar_update(void)
+{
+    // report 
+    if(ack_flag) {
+        if(vpar_debug) {
+            uint64_t delta = get_ts_uint64() - ts_req;
+            printf("%s th: ACK done. delta=%llu\n",get_ts(), delta);
+        }
+        ack_flag = 0;
+        cia_parallelack();
+    }
+}
+
 void *vpar_thread(void *)
 {
     if(vpar_debug) {
@@ -598,9 +621,10 @@ void *vpar_thread(void *)
             uae_sem_post(&vpar_sem);
             if(do_ack) {
                 if(vpar_debug) {
-                    printf("%s th: ACK\n",get_ts());
+                    ts_req = get_ts_uint64();
+                    printf("%s th: ACK req\n",get_ts());
                 }
-                cia_parallelack();
+                ack_flag = 1;
                 pctl &= ~8; // clear ack
             }
         }
