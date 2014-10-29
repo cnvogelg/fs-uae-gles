@@ -331,7 +331,9 @@ extern short test_smps ( long, long, long, Uchar, Uchar );
 extern long  PWGetFileSize ( char * );
 extern FILE * PW_fopen ( char *, char * );
 extern void fillPTKtable ( Uchar[37][2] );
+#ifndef __APPLE__
 extern int htonl(int);
+#endif
 
 /* globals */
 /* Some say it's badly coding when using Globals ... sure it is, now what's the solution ? */

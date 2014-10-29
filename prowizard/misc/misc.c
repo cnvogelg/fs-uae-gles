@@ -509,8 +509,10 @@ void fillPTKtable (Uchar poss[37][2])
 }
 
 #ifndef _WIN64
+#ifndef __APPLE__
 int htonl(int v)
 {
 	return ((v >> 24) & 0x000000ff) | ((v >> 8) & 0x0000ff00) | ((v << 8) & 0x00ff0000) | ((v << 24) & 0xff000000);
 }
+#endif
 #endif
