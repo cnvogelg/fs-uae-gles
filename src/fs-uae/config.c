@@ -210,6 +210,7 @@ void fs_uae_configure_amiga_hardware()
 
     if (fs_config_get_boolean(OPTION_BSDSOCKET_LIBRARY) == 1) {
         amiga_set_option("bsdsocket_emu", "yes");
+    }
 
     /* CV: added parallel_port */
     const char *parallel_port = fs_config_get_const_string("parallel_port");
