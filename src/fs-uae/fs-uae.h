@@ -55,6 +55,7 @@ const char *fs_uae_state_dir();
 //const char *fs_uae_floppy_overlays_dir();
 const char *fs_uae_controllers_dir();
 const char *fs_uae_logs_dir();
+const char *fs_uae_module_ripper_dir();
 const char *fs_uae_exe_dir();
 const char *fs_uae_themes_dir();
 const char *fs_uae_cache_dir();
@@ -94,7 +95,6 @@ char *fs_uae_resolve_path_and_free(char *name, int type);
 void fs_uae_set_uae_paths();
 
 //extern char *g_fs_uae_default_dir;
-extern int g_fs_uae_fastest_possible;
 extern char *g_fs_uae_config_file_path;
 extern char *g_fs_uae_config_dir_path;
 

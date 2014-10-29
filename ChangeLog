@@ -1,3 +1,41 @@
+Version 2.5.20dev:
+
+* Use qemu-uae for slirp support.
+* Added support for softfloat library (not tested).
+* Enabled support for prowizard module ripper.
+* New action "action_module_ripper" available for custom input mapping.
+
+Version 2.5.19dev:
+
+* Restore kickstart ROM when CSMK3/CSPPC/BPPC maprom is disabled.
+* New PPC lock implemented, fixes occasional PPC lockup.
+* Fix crash during PPC reset (missing lock when memory regions were updated).
+* Stop PPC CPU before resetting Amiga.
+* Floating point fixes for PowerPC hosts.
+* New options cpu, fpu, mmu, changes to how CPU is configured.
+* Defaults for fpu, mmu, cpu speed, cpu accuracy, blitter mode now
+  automatically depends on specified (or implied) cpu option. Example,
+  cpu = 68040 will automatically enable 68040 FPU (and MMU), set fastest
+  possible mode, less compatible CPU and enable waiting blits.
+* A3000/A4000 models now use waiting blits by default (was immediate).
+* Fix reset problem while PPC CPU is active.
+* Workaround for Hexagons Joystick Adapter (name is a single non-ASCII letter).
+* Workaround for SDL 2 XInput Controller names with #x in the name.
+* Recognize --version and --help arguments.
+* The bitmap fonts are also now loaded from fs-uae.dat.
+* Don't add RTC module on stock A600, A1200 (exp) defaults to MSM6242B.
+* Fixed loading CD into drive from CD image list (full path wasn't resolved).
+* Added new boolean option uaenative_library.
+* Updated emulation core from WinUAE 2900b19.
+
+Version 2.5.18dev:
+
+* Disabled / soft-removed PearPC PPC implementation.
+* Changed A4000 default floppy drive type to 3.5" HD.
+* New option cdfs (boolean). Can be used to disable builtin CDFS.
+* Reduced number of OpenAL buffers to pre-2.5.17dev level.
+* Updated emulation core from WinUAE 2900b18.
+
 Version 2.5.17dev:
 
 * Initial support for magic mouse / virtual mouse.

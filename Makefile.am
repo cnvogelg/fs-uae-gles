@@ -343,8 +343,10 @@ libuae_a_SOURCES = \
 	src/include/uae/mman.h \
 	src/include/uae/parser.h \
 	src/include/uae/ppc.h \
+	src/include/uae/qemu.h \
 	src/include/uae/regparam.h \
 	src/include/uae/seh.h \
+	src/include/uae/slirp.h \
 	src/include/uae/specialmonitors.h \
 	src/include/uae/string.h \
 	src/include/uae/types.h \
@@ -452,6 +454,7 @@ libuae_a_SOURCES = \
 	src/patch.cpp \
 	src/ppc/pixman-stubs.cpp \
 	src/ppc/ppc.cpp \
+	src/qemu.cpp \
 	src/qemuvga/cirrus_vga.cpp \
 	src/qemuvga/cirrus_vga_rop.h \
 	src/qemuvga/cirrus_vga_rop2.h \
@@ -480,6 +483,7 @@ libuae_a_SOURCES = \
 	src/scsiemul.cpp \
 	src/scsitape.cpp \
 	src/segtracker.cpp \
+	src/slirp.cpp \
 	src/specialmonitors.cpp \
 	src/statusline.cpp \
 	src/traps.cpp \
@@ -634,6 +638,7 @@ if BUILTIN_GLEE
 noinst_LIBRARIES += libglee.a
 AM_CPPFLAGS += -I$(s)/glee
 fs_uae_LDADD += libglee.a
+fs_uae_device_helper_LDADD += libglee.a
 libglee_a_SOURCES = \
 	glee/GLee.c \
 	glee/GLee.h
@@ -713,6 +718,7 @@ fs_uae_SOURCES += \
 endif
 
 if WITH_SLIRP
+if WITH_BUILTIN_SLIRP
 noinst_LIBRARIES += libslirp.a
 AM_CPPFLAGS += -I$(s)/src/slirp/include
 fs_uae_LDADD += libslirp.a
@@ -756,6 +762,7 @@ libslirp_a_SOURCES = \
 	src/slirp/tftp.h \
 	src/slirp/udp.cpp \
 	src/slirp/udp.h
+endif
 endif
 
 if WITH_UDIS86
@@ -844,6 +851,158 @@ fs_uae_SOURCES += \
 	src/luascript.cpp
 libfsemu_a_SOURCES += \
 	libfsemu/src/emu/emu_lua.c
+endif
+
+if PROWIZARD
+noinst_LIBRARIES += libprowizard.a
+AM_CPPFLAGS += -I$(s)/prowizard/include
+fs_uae_LDADD += libprowizard.a
+fs_uae_SOURCES += src/moduleripper.cpp
+libprowizard_a_SOURCES = \
+	prowizard/include/extern.h \
+	prowizard/include/globals.h \
+	prowizard/include/ptktable.h \
+	prowizard/include/tuning.h \
+	prowizard/include/vars.h \
+	prowizard/misc/misc.c \
+	prowizard/misc/testbag.c \
+	prowizard/prowiz.c \
+	prowizard/r/AC1D_packer.c \
+	prowizard/r/AMOS-MusicBank.c \
+	prowizard/r/AMOS-PowerPackerBank.c \
+	prowizard/r/BP-Soundmonitor.c \
+	prowizard/r/BSI-FutureComposer.c \
+	prowizard/r/Bytekiller.c \
+	prowizard/r/ChipTracker.c \
+	prowizard/r/Crunchmania-Address.c \
+	prowizard/r/Crunchmania-Simple.c \
+	prowizard/r/datacrunchers.c \
+	prowizard/r/DefjamCruncher32-pro.c \
+	prowizard/r/DigiBooster17.c \
+	prowizard/r/DigitalIllusion.c \
+	prowizard/r/DoubleAction.c \
+	prowizard/r/Dragpack100.c \
+	prowizard/r/Dragpack252.c \
+	prowizard/r/EurekaPacker.c \
+	prowizard/r/FastTracker2.c \
+	prowizard/r/FC-M-Packer.c \
+	prowizard/r/FuchsTracker.c \
+	prowizard/r/FutureComposer13.c \
+	prowizard/r/FutureComposer14.c \
+	prowizard/r/FuzzacPacker.c \
+	prowizard/r/GMC.c \
+	prowizard/r/GNUPacker12.c \
+	prowizard/r/GnuPlayer.c \
+	prowizard/r/GPMO.c \
+	prowizard/r/HeatseekerMC10.c \
+	prowizard/r/HornetPacker.c \
+	prowizard/r/HQC2.c \
+	prowizard/r/JamCracker.c \
+	prowizard/r/KefrensSoundMachine.c \
+	prowizard/r/MasterCruncher30-Address.c \
+	prowizard/r/MaxPacker12.c \
+	prowizard/r/MED-Octamed.c \
+	prowizard/r/MegaCruncher.c \
+	prowizard/r/MegaCruncher-Object.c \
+	prowizard/r/MOD-compatible.c \
+	prowizard/r/ModuleProtector.c \
+	prowizard/r/Mugician.c \
+	prowizard/r/Newtron.c \
+	prowizard/r/NewtronOld.c \
+	prowizard/r/NoiseFromHeaven.c \
+	prowizard/r/NoisePacker1.c \
+	prowizard/r/NoisePacker2.c \
+	prowizard/r/NoiseRunner.c \
+	prowizard/r/NovoTrade.c \
+	prowizard/r/NP3.c \
+	prowizard/r/PhaPacker.c \
+	prowizard/r/PolkaPacker.c \
+	prowizard/r/PowerMusic.c \
+	prowizard/r/PowerPacker23.c \
+	prowizard/r/PowerPacker30.c \
+	prowizard/r/PowerPacker40.c \
+	prowizard/r/PowerPacker40-library.c \
+	prowizard/r/Promizer01.c \
+	prowizard/r/Promizer10c.c \
+	prowizard/r/Promizer18a.c \
+	prowizard/r/Promizer20.c \
+	prowizard/r/Promizer40.c \
+	prowizard/r/ProPacker10.c \
+	prowizard/r/ProPacker21.c \
+	prowizard/r/ProPacker30.c \
+	prowizard/r/Prorunner10.c \
+	prowizard/r/Prorunner20.c \
+	prowizard/r/QuadraComposer.c \
+	prowizard/r/RelokIt10.c \
+	prowizard/r/SGT-Packer.c \
+	prowizard/r/skizzo.c \
+	prowizard/r/SkytPacker.c \
+	prowizard/r/SoundFX.c \
+	prowizard/r/SoundTracker26.c \
+	prowizard/r/SoundTracker.c \
+	prowizard/r/SpikeCruncher.c \
+	prowizard/r/StartrekkerPack.c \
+	prowizard/r/StimPacker.c \
+	prowizard/r/StoneArtsPlayer.c \
+	prowizard/r/StoneCracker270.c \
+	prowizard/r/StoneCracker299b.c \
+	prowizard/r/StoneCracker299.c \
+	prowizard/r/StoneCracker299d.c \
+	prowizard/r/StoneCracker300.c \
+	prowizard/r/StoneCracker310.c \
+	prowizard/r/SuperCruncher27.c \
+	prowizard/r/SyncroPacker46.c \
+	prowizard/r/TetraPack102.c \
+	prowizard/r/TetraPack21.c \
+	prowizard/r/TetraPack22.c \
+	prowizard/r/TheDarkDemon.c \
+	prowizard/r/ThePlayer22a.c \
+	prowizard/r/ThePlayer30a.c \
+	prowizard/r/ThePlayer40.c \
+	prowizard/r/ThePlayer41a.c \
+	prowizard/r/ThePlayer50a.c \
+	prowizard/r/ThePlayer60a.c \
+	prowizard/r/ThePlayer61a.c \
+	prowizard/r/TimeCruncher17.c \
+	prowizard/r/TitanicsPlayer.c \
+	prowizard/r/TMK.c \
+	prowizard/r/TNMCruncher.c \
+	prowizard/r/TrackerPacker1.c \
+	prowizard/r/TrackerPacker2.c \
+	prowizard/r/TrackerPacker3.c \
+	prowizard/r/TreasurePattern.c \
+	prowizard/r/TryItCruncher101.c \
+	prowizard/r/TurboSqueezer61.c \
+	prowizard/r/UnicTracker2.c \
+	prowizard/r/UnicTracker.c \
+	prowizard/r/Viruz2.c \
+	prowizard/r/WantonPacker.c \
+	prowizard/r/XannPlayer.c \
+	prowizard/r/ZenPacker.c
+endif
+
+if WITH_SOFTFLOAT
+noinst_LIBRARIES += libsoftfloat.a
+AM_CPPFLAGS += -I$(s)/softfloat
+fs_uae_LDADD += libsoftfloat.a
+libsoftfloat_a_SOURCES = \
+	softfloat/softfloat-uae.h \
+	softfloat/fprem.cc \
+	softfloat/fpu_constant.h \
+	softfloat/fsincos.cc \
+	softfloat/poly.cc \
+	softfloat/softfloat16.cc \
+	softfloat/softfloat.cc \
+	softfloat/softfloat-compare.h \
+	softfloat/softfloat.h \
+	softfloat/softfloat-macros.h \
+	softfloat/softfloat-muladd.cc \
+	softfloat/softfloat-round-pack.cc \
+	softfloat/softfloat-round-pack.h \
+	softfloat/softfloat-specialize.cc \
+	softfloat/softfloat-specialize.h \
+	softfloat/softfloatx80.cc \
+	softfloat/softfloatx80.h
 endif
 
 if BUILTIN_LIBMPEG2

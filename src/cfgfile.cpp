@@ -242,6 +242,7 @@ static const TCHAR *cpuboards[] = {
 	_T("BlizzardPPC"),
 	_T("WarpEngineA4000"),
 	_T("TekMagic"),
+	_T("A2630"),
 	NULL
 };
 static const TCHAR *ppc_implementations[] = {
@@ -251,6 +252,15 @@ static const TCHAR *ppc_implementations[] = {
 	_T("qemu"),
 	NULL
 };
+#ifdef FSUAE
+static const TCHAR *slirp_implementations[] = {
+	_T("auto"),
+	_T("none"),
+	_T("builtin"),
+	_T("qemu"),
+	NULL
+};
+#endif
 static const TCHAR *ppc_cpu_idle[] = {
 	_T("disabled"),
 	_T("1"),
@@ -1213,6 +1223,9 @@ void cfgfile_save_options (struct zfile *f, struct uae_prefs *p, int type)
 		cfgfile_write_str (f, _T("a2065"), p->a2065name);
 
 #ifdef WITH_SLIRP
+#ifdef FSUAE
+	cfgfile_dwrite_str(f, _T("slirp_implementation"), slirp_implementations[p->slirp_implementation]);
+#endif
 	tmp[0] = 0;
 	for (i = 0; i < MAX_SLIRP_REDIRS; i++) {
 		struct slirp_redir *sr = &p->slirp_redirs[i];
@@ -2853,6 +2866,10 @@ static int cfgfile_parse_host (struct uae_prefs *p, TCHAR *option, TCHAR *value)
 	}
 
 #ifdef WITH_SLIRP
+#ifdef FSUAE
+	if (cfgfile_strval(option, value, _T("slirp_implementation"), &p->slirp_implementation, slirp_implementations, 0))
+		return 1;
+#endif
 	if (cfgfile_string (option, value, _T("slirp_ports"), tmpbuf, sizeof (tmpbuf) / sizeof (TCHAR))) {
 		TCHAR *tmpp2 = tmpbuf;
 		_tcscat (tmpbuf, _T(","));
@@ -6041,7 +6058,7 @@ static int bip_a1200 (struct uae_prefs *p, int config, int compa, int romcheck)
 	p->cs_rtc = 0;
 	if (config == 1) {
 		p->fastmem_size = 0x400000;
-		p->cs_rtc = 2;
+		p->cs_rtc = 1;
 	}
 	set_68020_compa (p, compa, 0);
 	p->cs_compatible = CP_A1200;
@@ -6277,6 +6294,13 @@ int built_in_prefs (struct uae_prefs *p, int model, int config, int compa, int r
 	return v;
 }
 
+#ifdef FSUAE
+/**
+ * This function will be called (twice) by fixup_prefs after custom uae_
+ * options have been applied, and may reset some (chipset) options overriden
+ * by the user unless also uae_chipset_compatible has been set to -.
+ */
+#endif
 int built_in_chipset_prefs (struct uae_prefs *p)
 {
 #ifdef FSUAE
@@ -6345,7 +6369,12 @@ int built_in_chipset_prefs (struct uae_prefs *p)
 		p->cs_ciatodbug = true;
 		break;
 	case CP_A600: // A600
-		p->cs_rtc = 1;
+#ifdef FSUAE
+		if (p->chipmem_size > 0x100000 || p->fastmem_size)
+			p->cs_rtc = 1;
+#else
+
+#endif
 		p->cs_ide = IDE_A600A1200;
 		p->cs_pcmcia = 1;
 		p->cs_ksmirror_a8 = 1;

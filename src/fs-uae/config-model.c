@@ -4,6 +4,7 @@
 
 #include <stddef.h>
 #include <fs/conf.h>
+#include <fs/emu.h>
 #include "config-model.h"
 
 amiga_config g_fs_uae_amiga_configs[CONFIG_LAST + 1] = {};
@@ -33,9 +34,14 @@ static void init_common(amiga_config *c, const char *id, const char *name,
     c->model = model;
     c->quickstart_model = quickstart;
     c->quickstart_config = quickstart_config;
-    c->fast_on_accuracy_level = -999;
     c->cpu_idle = FS_CONFIG_NONE;
     c->z3realmapping = FS_CONFIG_NONE;
+    c->default_floppy_drive_count = 1;
+
+    c->default_cpu = "68000";
+    c->default_fpu = "0";
+    c->default_fpu_noninternal = "0";
+    c->default_mmu = "0";
 }
 
 static void init_a1200(amiga_config *c, const char *id, const char *name,
@@ -43,11 +49,8 @@ static void init_a1200(amiga_config *c, const char *id, const char *name,
 {
     init_common(c, id, name, MODEL_A1200, 4, quickstart_config);
     c->enhanced_audio_filter = 1;
-#ifndef NEW_ACCURACY_SYSTEM
-#error do not use
-    c->fast_on_accuracy_level = 0;
-#endif
     c->wb_disk = wb_disk_3_1_0;
+    c->default_cpu = "68020";
 }
 
 static void init_cd32(amiga_config *c, const char *id, const char *name,
@@ -55,41 +58,59 @@ static void init_cd32(amiga_config *c, const char *id, const char *name,
 {
     init_common(c, id, name, MODEL_CD32, 8, quickstart_config);
     c->enhanced_audio_filter = 1;
-#ifndef NEW_ACCURACY_SYSTEM
-    c->fast_on_accuracy_level = 0;
-#endif
+    c->default_cpu = "68020";
 }
 
 static void init_a3000(amiga_config *c, const char *id, const char *name,
                        int quickstart_config)
 {
     init_common(c, id, name, MODEL_A3000, 5, quickstart_config);
-    c->fast_on_accuracy_level = 1;
-    c->no_accuracy_adjustment = 1;
     c->allow_z3_memory = 1;
     // c->enhanced_audio_filter = 1;
     c->wb_disk = wb_disk_3_1_0;
+    c->default_cpu = "68030";
+    c->default_fpu = "68882";
+    c->default_fpu_noninternal = "68882";
+    c->default_mmu = "68030";
+    c->cpu_32bit_addressing = 1;
 }
 
 static void init_a4000(amiga_config *c, const char *id, const char *name,
                        int quickstart_config)
 {
     init_common(c, id, name, MODEL_A4000, 6, quickstart_config);
-    c->fast_on_accuracy_level = 1;
-    c->no_accuracy_adjustment = 1;
     c->allow_z3_memory = 1;
     c->enhanced_audio_filter = 1;
     c->wb_disk = wb_disk_3_1_0;
+    c->default_floppy_drive_type = 1; // 3.5" HD
+    c->default_floppy_drive_count = 2;
+    if (quickstart_config == 0) {
+        c->default_cpu = "68030";
+        c->default_fpu = "68882";
+        c->default_fpu_noninternal = "68882";
+        c->default_mmu = "68030";
+    } else if (quickstart_config == 1) {
+        c->default_cpu = "68040";
+        c->default_fpu = "68040";
+        //c->default_mmu = "68040";
+    } else {
+        fs_emu_warning("Unknown A4000 quickstart model\n");
+    }
+    c->cpu_32bit_addressing = 1;
 }
 
 static void init_a4000_ppc(amiga_config *c, const char *id, const char *name,
                            int quickstart_config)
 {
     init_a4000(c, id, name, quickstart_config);
-    c->cpu_model = "68060";
+    //c->cpu_model = "68060";
     c->cpu_idle = 0;
     c->z3realmapping = 0;
     c->accelerator = "cyberstorm-ppc";
+
+    c->default_cpu = "68060";
+    c->default_fpu = "68060";
+    //c->default_mmu = "68060";
 }
 
 void fs_uae_init_configs()
@@ -129,7 +150,7 @@ void fs_uae_init_configs()
 
     c = g_fs_uae_amiga_configs + CONFIG_A1200_020;
     init_a1200(c, "A1200/020", "Amiga 1200 (68020)", 0);
-    c->cpu_model = "68020";
+    //c->cpu_model = "68020";
     c->cpu_32bit_addressing = 1;
     c->allow_z3_memory = 1;
 
@@ -181,8 +202,6 @@ void fs_uae_init_configs()
     c->name = "Amiga (Super)";
     //c->quickstart = "A1200,,";
     c->quickstart_model = 11;
-    c->fast_on_accuracy_level = 1;
-    c->no_accuracy_adjustment = 1;
     //c->cpu_model = "68020";
     //c->cpu_32bit_addressing = 1;
     c->allow_z3_memory = 1;

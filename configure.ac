@@ -2,26 +2,29 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.67])
-AC_INIT([FS-UAE], [2.5.17dev],
+AC_INIT([FS-UAE], [2.5.19dev],
         [frode@fs-uae.net], [fs-uae], [http://fs-uae.net])
 AC_CONFIG_AUX_DIR([.])
 AC_CANONICAL_SYSTEM
 AC_CONFIG_SRCDIR([src/main.cpp])
 AC_CONFIG_HEADERS([config.h])
-AC_CONFIG_MACRO_DIRS([m4])
+# AC_CONFIG_MACRO_DIRS([m4])
 AM_INIT_AUTOMAKE([tar-ustar subdir-objects])
 
 AC_SUBST([PACKAGE_SERIES], [devel])
 
-AC_DEFINE_UNQUOTED([UAE_BASE_VERSION], ["WinUAE 2900b17"],
+AC_DEFINE_UNQUOTED([UAE_BASE_VERSION], ["WinUAE 2900b19"],
 [Which UAE core this version is based on.])
 
 PACKAGE_MAJOR=`echo ${PACKAGE_VERSION} | sed -e 's,\(\.*\)\..*\..*,\1,g'`
 PACKAGE_MINOR=`echo ${PACKAGE_VERSION} | sed -e 's,.*\.\(.*\)\..*,\1,g'`
 PACKAGE_REVISION=`echo ${PACKAGE_VERSION} | sed -e 's,.*\..*\.\([[0-9]]*\).*,\1,g'`
 AC_SUBST(PACKAGE_MAJOR)
+AC_DEFINE_UNQUOTED([PACKAGE_MAJOR], [$PACKAGE_MAJOR], [Package major version])
 AC_SUBST(PACKAGE_MINOR)
+AC_DEFINE_UNQUOTED([PACKAGE_MINOR], [$PACKAGE_MINOR], [Package minor version])
 AC_SUBST(PACKAGE_REVISION)
+AC_DEFINE_UNQUOTED([PACKAGE_REVISION], [$PACKAGE_REVISION], [Package revision])
 
 # Checks for programs.
 
@@ -542,6 +545,8 @@ REQ_FEATURE([A2091], [a2091], [a2091],
 	[enable A590/A2091 SCSI], [yes])
 REQ_FEATURE([ACTION_REPLAY], [action_replay], [action-replay],
 	[enable Action Replay 1/2/3 support], [yes])
+OPT_FEATURE([WITH_BUILTIN_SLIRP], [builtin_slirp], [builtin-slirp],
+	[enable builtin SLIRP implementation], [yes])
 OPT_FEATURE([CAPS], [caps], [caps],
 	[enable IPF support via libcapsimage], [yes])
 REQ_FEATURE([CD32], [cd32], [cd32],
@@ -568,8 +573,14 @@ REQ_FEATURE([PICASSO96], [picasso96], [picasso96],
 	[enable Picasso 96 (uaegfx.card)], [yes])
 REQ_FEATURE([WITH_PPC], [ppc], [ppc],
 	[enable PPC (requires cpu board)], [yes])
+OPT_FEATURE([PROWIZARD], [prowizard], [prowizard],
+	[enable prowizard request], [yes])
 OPT_FEATURE([WITH_SLIRP], [slirp], [slirp],
 	[enable SLIRP (user mode NAT)], [yes])
+OPT_FEATURE([WITH_SOFTFLOAT], [softfloat], [softfloat],
+	[enable use of softfloat library], [yes])
+OPT_FEATURE([WITH_QEMU_SLIRP], [qemu_slirp], [qemu-slirp],
+	[enable QEMU SLIRP implementation], [yes])
 OPT_FEATURE([WITH_UAENATIVE], [uaenative], [uaenative],
 	[enable uaenative.library], [yes])
 OPT_FEATURE([SANA2], [uaenet], [uaenet],
@@ -582,7 +593,7 @@ OPT_FEATURE([A_ZIP], [zip], [zip],
 	[enable ZIP archive support], [yes])
 
 OPT_FEATURE([WITH_PEARPC_CPU], [pearpc_cpu], [pearpc-cpu],
-	[use PearPC for PPC emulation], [yes])
+	[use PearPC for PPC emulation], [no])
 OPT_FEATURE([WITH_QEMU_CPU], [qemu_cpu], [qemu-cpu],
 	[use QEmu for PPC emulation], [yes])
 

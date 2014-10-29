@@ -26,6 +26,8 @@
 
 #ifdef UAE
 
+void uae_ppc_get_model(const TCHAR **model, uint32_t *hid1);
+
 void uae_ppc_doze(void);
 void uae_ppc_crash(void);
 void uae_ppc_cpu_reboot(void);
@@ -36,6 +38,7 @@ void uae_ppc_cpu_lock(void);
 bool uae_ppc_cpu_unlock(void);
 void uae_ppc_emulate(void);
 void uae_ppc_reset(bool hardreset);
+void uae_ppc_free(void);
 void uae_ppc_hsync_handler(void);
 void uae_ppc_wakeup(void);
 void ppc_map_banks(uae_u32, uae_u32, const TCHAR*, void*, bool);
@@ -98,7 +101,7 @@ typedef struct PPCMemoryRegion {
 void PPCCALL ppc_cpu_version(int *major, int *minor, int *revision);
 bool PPCCALL ppc_cpu_init(const char *model, uint32_t hid1);
 bool PPCCALL ppc_cpu_init_pvr(uint32_t pvr);
-void PPCCALL ppc_cpu_free(void);
+void PPCCALL ppc_cpu_close(void);
 void PPCCALL ppc_cpu_stop(void);
 void PPCCALL ppc_cpu_atomic_raise_ext_exception(void);
 void PPCCALL ppc_cpu_atomic_cancel_ext_exception(void);

@@ -3186,21 +3186,21 @@ void cpu_sleep_millis(int ms)
 
 static bool haltloop(void)
 {
+#ifdef WITH_PPC
 	if (regs.halted < 0) {
-
-		int vsynctimeline = vsynctimebase / (maxvpos_display + 1);
 		int rpt_end = 0;
 		int ovpos = vpos;
 
 		while (regs.halted) {
+			int vsynctimeline = vsynctimebase / (maxvpos_display + 1);
 			int lines;
+			int rpt_scanline = read_processor_time();
+			int rpt_end = rpt_scanline + vsynctimeline;
 
 			if (currprefs.ppc_cpu_idle) {
 
 				int maxlines = 100 - (currprefs.ppc_cpu_idle - 1) * 10;
 				int i;
-
-				int rpt_scanline = read_processor_time();
 
 				event_wait = false;
 				for (i = 0; i < ev_max; i++) {
@@ -3216,6 +3216,7 @@ static bool haltloop(void)
 				if (currprefs.ppc_cpu_idle >= 10 || (i == ev_max && vpos > 0 && vpos < maxvpos - maxlines)) {
 					cpu_sleep_millis(1);
 				}
+				uae_ppc_execute_check();
 
 				lines = (read_processor_time() - rpt_scanline) / vsynctimeline + 1;
 
@@ -3226,28 +3227,45 @@ static bool haltloop(void)
 
 			}
 
+			if (lines > maxvpos / 2)
+				lines = maxvpos / 2;
+
 			while (lines-- >= 0) {
 				ovpos = vpos;
 				while (ovpos == vpos) {
-					x_do_cycles(4 * CYCLE_UNIT);
-					if (regs.spcflags) {
-						if (regs.spcflags & SPCFLAG_COPPER)
-							do_copper();
-						if (regs.spcflags & (SPCFLAG_BRK | SPCFLAG_MODE_CHANGE))
-							return true;
+					x_do_cycles(8 * CYCLE_UNIT);
+					uae_ppc_execute_check();
+					if (regs.spcflags & SPCFLAG_COPPER)
+						do_copper();
+					if (regs.spcflags & (SPCFLAG_BRK | SPCFLAG_MODE_CHANGE)) {
+						if (regs.spcflags & SPCFLAG_BRK) {
+							unset_special(SPCFLAG_BRK);
+#ifdef DEBUGGER
+							if (debugging)
+								debug();
+#endif
+						}
+						return true;
 					}
+				}
+
+				// sync chipset with real time
+				for (;;) {
+					ppc_interrupt(intlev());
+					uae_ppc_execute_check();
+					if (event_wait)
+						break;
+					int d = read_processor_time() - rpt_end;
+					if (d < -2 * vsynctimeline || d >= 0)
+						break;
 				}
 			}
 
-#ifdef WITH_PPC
-			if (regs.halted < 0)
-				uae_ppc_emulate();
-#endif
 
 		}
 
 	} else  {
-
+#endif
 		while (regs.halted) {
 			static int prevvpos;
 			if (vpos == 0 && prevvpos) {
@@ -3266,7 +3284,9 @@ static bool haltloop(void)
 					return true;
 			}
 		}
+#ifdef WITH_PPC
 	}
+#endif
 
 	return false;
 }
@@ -4544,13 +4564,16 @@ static void exception2_handle (uaecptr addr, uaecptr fault)
 	Exception (2);
 }
 
-static bool cpu_hardreset;
+static bool cpu_hardreset, cpu_keyboardreset;
 
 bool is_hardreset(void)
 {
 	return cpu_hardreset;
 }
-
+bool is_keyboardreset(void)
+{
+	return  cpu_keyboardreset;
+}
 
 void m68k_go (int may_quit)
 {
@@ -4585,7 +4608,7 @@ void m68k_go (int may_quit)
 
 		if (quit_program > 0) {
 			int restored = 0;
-			bool kbreset = quit_program == UAE_RESET_KEYBOARD;
+			cpu_keyboardreset = quit_program == UAE_RESET_KEYBOARD;
 			cpu_hardreset = ((quit_program == UAE_RESET_HARD ? 1 : 0) | hardboot) != 0;
 
 			if (quit_program == UAE_QUIT)
@@ -4605,7 +4628,7 @@ void m68k_go (int may_quit)
 				savestate_rewind ();
 #endif
 			set_cycles (start_cycles);
-			custom_reset (cpu_hardreset != 0, kbreset);
+			custom_reset (cpu_hardreset != 0, cpu_keyboardreset);
 			m68k_reset2 (cpu_hardreset != 0);
 			if (cpu_hardreset) {
 				memory_clear ();
@@ -4698,6 +4721,9 @@ void m68k_go (int may_quit)
 			protect_roms (true);
 		}
 		startup = 0;
+		event_wait = true;
+		unset_special(SPCFLAG_MODE_CHANGE);
+
 		if (regs.halted) {
 			cpu_halt (regs.halted);
 			if (regs.halted < 0)
@@ -4729,8 +4755,6 @@ void m68k_go (int may_quit)
 #if 0
 		}
 #endif
-		event_wait = true;
-		unset_special(SPCFLAG_MODE_CHANGE);
 		run_func();
 	}
 	protect_roms (false);

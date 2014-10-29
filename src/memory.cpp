@@ -47,7 +47,6 @@ extern uae_u8 *natmem_offset, *natmem_offset_end;
 #endif
 
 bool canbang;
-int candirect = -1;
 static bool rom_write_enabled;
 #ifdef JIT
 /* Set by each memory handler that does not simply access real memory. */
@@ -1856,6 +1855,8 @@ static void add_shmmaps (uae_u32 start, addrbank *what)
 	shm_start = y;
 }
 
+#define MAPPED_MALLOC_DEBUG 1
+
 bool mapped_malloc (addrbank *ab)
 {
 	int id;
@@ -1867,9 +1868,17 @@ bool mapped_malloc (addrbank *ab)
 	ab->startmask = ab->start;
 	if (!needmman () && (!rtgmem || currprefs.cpu_model < 68020)) {
 		nocanbang ();
-		if (ab->flags & ABFLAG_NOALLOC)
+		ab->flags &= ~ABFLAG_DIRECTMAP;
+		if (ab->flags & ABFLAG_NOALLOC) {
+#if MAPPED_MALLOC_DEBUG
+			write_log(_T("mapped_malloc noalloc %s\n"), ab->name);
+#endif
 			return true;
+		}
 		ab->baseaddr = xcalloc (uae_u8, ab->allocated + 4);
+#if MAPPED_MALLOC_DEBUG
+		write_log(_T("mapped_malloc nodirect %s %p\n"), ab->name, ab->baseaddr);
+#endif
 		return ab->baseaddr != NULL;
 	}
 
@@ -1901,6 +1910,10 @@ bool mapped_malloc (addrbank *ab)
 			x->next->prev = x;
 		shm_start = x;
 		ab->baseaddr = x->native_address;
+		ab->flags |= ABFLAG_DIRECTMAP;
+#if MAPPED_MALLOC_DEBUG
+		write_log(_T("mapped_malloc direct %s %p\n"), ab->name, ab->baseaddr);
+#endif
 		return ab->baseaddr != NULL;
 	}
 	if (recurse)
@@ -1909,6 +1922,9 @@ bool mapped_malloc (addrbank *ab)
 	recurse++;
 	mapped_malloc (ab);
 	recurse--;
+#if MAPPED_MALLOC_DEBUG
+	write_log(_T("mapped_malloc indirect %s %p\n"), ab->name, ab->baseaddr);
+#endif
 	return ab->baseaddr != NULL;
 }
 
@@ -2212,6 +2228,7 @@ void map_overlay (int chip)
 		map_banks (rb, 0, size, 0x80000);
 	}
 	fill_ce_banks ();
+	cpuboard_overlay_override();
 	if (!isrestore () && valid_address (regs.pc, 4))
 		m68k_setpc_normal (m68k_getpc ());
 }
@@ -2260,6 +2277,79 @@ void memory_clear (void)
 	cpuboard_clear();
 }
 
+static void restore_roms(void)
+{
+	roms_modified = false;
+	protect_roms (false);
+	write_log (_T("ROM loader.. (%s)\n"), currprefs.romfile);
+	kickstart_rom = 1;
+	a1000_handle_kickstart (0);
+	xfree (a1000_bootrom);
+	a1000_bootrom = 0;
+	a1000_kickstart_mode = 0;
+
+	memcpy (currprefs.romfile, changed_prefs.romfile, sizeof currprefs.romfile);
+	memcpy (currprefs.romextfile, changed_prefs.romextfile, sizeof currprefs.romextfile);
+	need_hardreset = true;
+	mapped_free (&extendedkickmem_bank);
+	mapped_free (&extendedkickmem2_bank);
+	extendedkickmem_bank.allocated = 0;
+	extendedkickmem2_bank.allocated = 0;
+	extendedkickmem_type = 0;
+	load_extendedkickstart (currprefs.romextfile, 0);
+	load_extendedkickstart (currprefs.romextfile2, EXTENDED_ROM_CDTV);
+	kickmem_bank.mask = ROM_SIZE_512 - 1;
+	if (!load_kickstart ()) {
+		if (_tcslen (currprefs.romfile) > 0) {
+			error_log (_T("Failed to open '%s'\n"), currprefs.romfile);
+			notify_user (NUMSG_NOROM);
+		}
+		load_kickstart_replacement ();
+	} else {
+		struct romdata *rd = getromdatabydata (kickmem_bank.baseaddr, kickmem_bank.allocated);
+		if (rd) {
+			write_log (_T("Known ROM '%s' loaded\n"), rd->name);
+			if ((rd->cpu & 8) && changed_prefs.cpu_model < 68030) {
+				notify_user (NUMSG_KS68030PLUS);
+				uae_restart (-1, NULL);
+			} else if ((rd->cpu & 3) == 3 && changed_prefs.cpu_model != 68030) {
+				notify_user (NUMSG_KS68030);
+				uae_restart (-1, NULL);
+			} else if ((rd->cpu & 3) == 1 && changed_prefs.cpu_model < 68020) {
+				notify_user (NUMSG_KS68EC020);
+				uae_restart (-1, NULL);
+			} else if ((rd->cpu & 3) == 2 && (changed_prefs.cpu_model < 68020 || changed_prefs.address_space_24)) {
+				notify_user (NUMSG_KS68020);
+				uae_restart (-1, NULL);
+			}
+			if (rd->cloanto)
+				cloanto_rom = 1;
+			kickstart_rom = 0;
+			if ((rd->type & (ROMTYPE_SPECIALKICK | ROMTYPE_KICK)) == ROMTYPE_KICK)
+				kickstart_rom = 1;
+			if ((rd->cpu & 4) && currprefs.cs_compatible) {
+				/* A4000 ROM = need ramsey, gary and ide */
+				if (currprefs.cs_ramseyrev < 0)
+					changed_prefs.cs_ramseyrev = currprefs.cs_ramseyrev = 0x0f;
+				changed_prefs.cs_fatgaryrev = currprefs.cs_fatgaryrev = 0;
+				if (currprefs.cs_ide != IDE_A4000)
+					changed_prefs.cs_ide = currprefs.cs_ide = -1;
+			}
+		} else {
+			write_log (_T("Unknown ROM '%s' loaded\n"), currprefs.romfile);
+		}
+	}
+	patch_kick ();
+	write_log (_T("ROM loader end\n"));
+	protect_roms (true);
+}
+
+void reload_roms(void)
+{
+	if (roms_modified)
+		restore_roms();
+}
+
 void memory_reset (void)
 {
 	int bnk, bnk_end;
@@ -2301,69 +2391,7 @@ void memory_reset (void)
 		|| _tcscmp (currprefs.romfile, changed_prefs.romfile) != 0
 		|| _tcscmp (currprefs.romextfile, changed_prefs.romextfile) != 0)
 	{
-		roms_modified = false;
-		protect_roms (false);
-		write_log (_T("ROM loader.. (%s)\n"), currprefs.romfile);
-		kickstart_rom = 1;
-		a1000_handle_kickstart (0);
-		xfree (a1000_bootrom);
-		a1000_bootrom = 0;
-		a1000_kickstart_mode = 0;
-
-		memcpy (currprefs.romfile, changed_prefs.romfile, sizeof currprefs.romfile);
-		memcpy (currprefs.romextfile, changed_prefs.romextfile, sizeof currprefs.romextfile);
-		need_hardreset = true;
-		mapped_free (&extendedkickmem_bank);
-		mapped_free (&extendedkickmem2_bank);
-		extendedkickmem_bank.allocated = 0;
-		extendedkickmem2_bank.allocated = 0;
-		extendedkickmem_type = 0;
-		load_extendedkickstart (currprefs.romextfile, 0);
-		load_extendedkickstart (currprefs.romextfile2, EXTENDED_ROM_CDTV);
-		kickmem_bank.mask = ROM_SIZE_512 - 1;
-		if (!load_kickstart ()) {
-			if (_tcslen (currprefs.romfile) > 0) {
-				error_log (_T("Failed to open '%s'\n"), currprefs.romfile);
-				notify_user (NUMSG_NOROM);
-			}
-			load_kickstart_replacement ();
-		} else {
-			struct romdata *rd = getromdatabydata (kickmem_bank.baseaddr, kickmem_bank.allocated);
-			if (rd) {
-				write_log (_T("Known ROM '%s' loaded\n"), rd->name);
-				if ((rd->cpu & 8) && changed_prefs.cpu_model < 68030) {
-					notify_user (NUMSG_KS68030PLUS);
-					uae_restart (-1, NULL);
-				} else if ((rd->cpu & 3) == 3 && changed_prefs.cpu_model != 68030) {
-					notify_user (NUMSG_KS68030);
-					uae_restart (-1, NULL);
-				} else if ((rd->cpu & 3) == 1 && changed_prefs.cpu_model < 68020) {
-					notify_user (NUMSG_KS68EC020);
-					uae_restart (-1, NULL);
-				} else if ((rd->cpu & 3) == 2 && (changed_prefs.cpu_model < 68020 || changed_prefs.address_space_24)) {
-					notify_user (NUMSG_KS68020);
-					uae_restart (-1, NULL);
-				}
-				if (rd->cloanto)
-					cloanto_rom = 1;
-				kickstart_rom = 0;
-				if ((rd->type & (ROMTYPE_SPECIALKICK | ROMTYPE_KICK)) == ROMTYPE_KICK)
-					kickstart_rom = 1;
-				if ((rd->cpu & 4) && currprefs.cs_compatible) {
-					/* A4000 ROM = need ramsey, gary and ide */
-					if (currprefs.cs_ramseyrev < 0)
-						changed_prefs.cs_ramseyrev = currprefs.cs_ramseyrev = 0x0f;
-					changed_prefs.cs_fatgaryrev = currprefs.cs_fatgaryrev = 0;
-					if (currprefs.cs_ide != IDE_A4000)
-						changed_prefs.cs_ide = currprefs.cs_ide = -1;
-				}
-			} else {
-				write_log (_T("Unknown ROM '%s' loaded\n"), currprefs.romfile);
-			}
-		}
-		patch_kick ();
-		write_log (_T("ROM loader end\n"));
-		protect_roms (true);
+		restore_roms();
 	}
 
 	if ((cloanto_rom || extendedkickmem_bank.allocated) && currprefs.maprom && currprefs.maprom < 0x01000000) {
@@ -2650,6 +2678,9 @@ void memory_cleanup (void)
 
 void set_roms_modified(void)
 {
+#ifdef FSUAE
+	write_log("set roms_modified = true;\n");
+#endif
 	roms_modified = true;
 }
 

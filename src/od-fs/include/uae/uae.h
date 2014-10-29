@@ -67,6 +67,7 @@ int amiga_enable_serial_port(const char *serial_name);
 int amiga_enable_parallel_port(const char *parallel_name);
 
 void amiga_set_save_image_dir(const char *path);
+void amiga_set_module_ripper_dir(const char *path);
 
 int amiga_set_min_first_line(int line, int ntsc);
 
