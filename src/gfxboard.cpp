@@ -1328,6 +1328,7 @@ static void REGPARAM2 gfxboard_wput_mem_autoconfig (uaecptr addr, uae_u32 b)
 		gfxboard_bank_memory.bget = gfxboard_bget_mem;
 		gfxboard_bank_memory.bput = gfxboard_bput_mem;
 		gfxboard_bank_memory.wput = gfxboard_wput_mem;
+		init_board ();
 		if (ISP4()) {
 			// main vram
 			map_banks (&gfxboard_bank_memory, (gfxmem_bank.start + PICASSOIV_VRAM1) >> 16, 0x400000 >> 16, currprefs.rtgmem_size);
@@ -1341,7 +1342,6 @@ static void REGPARAM2 gfxboard_wput_mem_autoconfig (uaecptr addr, uae_u32 b)
 			picassoiv_bank = 0;
 			picassoiv_flifi = 1;
 			configured_regs = gfxmem_bank.start >> 16;
-			init_board ();
 		} else {
 			map_banks (&gfxboard_bank_memory, gfxmem_bank.start >> 16, board->banksize >> 16, currprefs.rtgmem_size);
 		}
@@ -1369,6 +1369,8 @@ static void REGPARAM2 gfxboard_bput_mem_autoconfig (uaecptr addr, uae_u32 b)
 			addrbank *ab;
 			if (ISP4()) {
 				ab = &gfxboard_bank_nbsmemory;
+				if (configured_mem == 0)
+					init_board ();
 				map_banks (ab, b, 0x00200000 >> 16, 0x00200000);
 				if (configured_mem == 0) {
 					configured_mem = b;
@@ -1381,6 +1383,7 @@ static void REGPARAM2 gfxboard_bput_mem_autoconfig (uaecptr addr, uae_u32 b)
 				ab = &gfxboard_bank_memory;
 				gfxboard_bank_memory.bget = gfxboard_bget_mem;
 				gfxboard_bank_memory.bput = gfxboard_bput_mem;
+				init_board ();
 				map_banks (ab, b, board->banksize >> 16, currprefs.rtgmem_size);
 				configured_mem = b;
 				gfxboardmem_start = b << 16;
@@ -1587,7 +1590,6 @@ static void REGPARAM2 gfxboard_bput_regs_autoconfig (uaecptr addr, uae_u32 b)
 			map_banks (ab, b, gfxboard_bank_registers.allocated >> 16, gfxboard_bank_registers.allocated);
 		}
 		configured_regs = b;
-		init_board ();
 		expamem_next (ab, NULL);
 		return;
 	}
@@ -1993,26 +1995,26 @@ bool gfxboard_is_z3 (int type)
 
 bool gfxboard_need_byteswap (int type)
 {
-	if (type < 2)
+	if (type < GFXBOARD_HARDWARE)
 		return false;
-	board = &boards[type - 2];
+	board = &boards[type - GFXBOARD_HARDWARE];
 	return board->swap;
 }
 
 int gfxboard_get_vram_min (int type)
 {
-	if (type < 2)
+	if (type < GFXBOARD_HARDWARE)
 		return -1;
-	board = &boards[type - 2];
+	board = &boards[type - GFXBOARD_HARDWARE];
 	//return board->vrammax;
 	return board->vrammin;
 }
 
 int gfxboard_get_vram_max (int type)
 {
-	if (type < 2)
+	if (type < GFXBOARD_HARDWARE)
 		return -1;
-	board = &boards[type - 2];
+	board = &boards[type - GFXBOARD_HARDWARE];
 	return board->vrammax;
 }
 
@@ -2141,6 +2143,8 @@ addrbank *gfxboard_init_memory (void)
 		fetch_rompath (path, sizeof path / sizeof (TCHAR));
 
 #ifdef FSUAE
+		// FIXME: This can possibly be removed now due to
+		// currprefs.picassoivromfile having been added below
 		if (currprefs.fs_graphics_card_rom_file) {
 			p4rom = read_rom_name(currprefs.fs_graphics_card_rom_file);
 			if (p4rom) {
@@ -2148,7 +2152,11 @@ addrbank *gfxboard_init_memory (void)
 			}
 		}
 #endif
-		if (rl) {
+		p4rom = NULL;
+		if (currprefs.picassoivromfile[0])
+			p4rom = read_rom_name(currprefs.picassoivromfile);
+
+		if (!p4rom && rl) {
 			p4rom = read_rom (rl->rd);
 		}
 		if (!p4rom) {

@@ -15,8 +15,8 @@
 #include "uae/limits.h"
 #endif
 
-#define UAEMAJOR 2
-#define UAEMINOR 9
+#define UAEMAJOR 3
+#define UAEMINOR 0
 #define UAESUBREV 0
 
 typedef enum { KBD_LANG_US, KBD_LANG_DK, KBD_LANG_DE, KBD_LANG_SE, KBD_LANG_FR, KBD_LANG_IT, KBD_LANG_ES } KbdLang;
@@ -184,7 +184,7 @@ struct uaedev_config_data
 	int unitnum; // scsi unit number (if tape currently)
 };
 
-enum { CP_GENERIC = 1, CP_CDTV, CP_CD32, CP_A500, CP_A500P, CP_A600, CP_A1000,
+enum { CP_GENERIC = 1, CP_CDTV, CP_CDTVCR, CP_CD32, CP_A500, CP_A500P, CP_A600, CP_A1000,
 	CP_A1200, CP_A2000, CP_A3000, CP_A3000T, CP_A4000, CP_A4000T };
 
 #define IDE_A600A1200 1
@@ -290,6 +290,9 @@ struct boardromconfig
 	struct romconfig roms[MAX_BOARD_ROMS];
 };
 
+#define Z3MAPPING_AUTO 0
+#define Z3MAPPING_UAE 1
+#define Z3MAPPING_REAL 2
 
 struct uae_prefs {
 
@@ -423,6 +426,7 @@ struct uae_prefs {
 	int floppy_random_bits_min;
 	int floppy_random_bits_max;
 	int floppy_auto_ext2;
+	int cd_speed;
 	bool tod_hack;
 	uae_u32 maprom;
 	bool rom_readwrite;
@@ -431,6 +435,7 @@ struct uae_prefs {
 	int filesys_limit;
 	int filesys_max_name;
 	int filesys_max_file_size;
+	int uaescsidevmode;
 	bool reset_delay;
 
 	int cs_compatible;
@@ -445,6 +450,7 @@ struct uae_prefs {
 	bool cs_cd32c2p;
 	bool cs_cd32nvram;
 	bool cs_cd32fmv;
+	int cs_cd32nvram_size;
 	bool cs_cdtvcd;
 	bool cs_cdtvram;
 	int cs_cdtvcard;
@@ -457,6 +463,7 @@ struct uae_prefs {
 	int cs_deniserev;
 	int cs_mbdmac;
 	bool cs_cdtvscsi;
+	bool cs_cdtvcr;
 	bool cs_df0idhw;
 	bool cs_slowmemisfast;
 	bool cs_resetwarning;
@@ -465,6 +472,7 @@ struct uae_prefs {
 	bool cs_agnusbltbusybug;
 	bool cs_ciatodbug;
 	bool cs_z3autoconfig;
+	bool cs_1mchipjumper;
 	int cs_hacks;
 
 	struct boardromconfig a2091rom;
@@ -492,6 +500,7 @@ struct uae_prefs {
 	TCHAR sername[256];
 	TCHAR amaxromfile[MAX_DPATH];
 	TCHAR a2065name[MAX_DPATH];
+	TCHAR picassoivromfile[MAX_DPATH];
 	struct cdslot cdslots[MAX_TOTAL_SCSI_DEVICES];
 	TCHAR quitstatefile[MAX_DPATH];
 	TCHAR statefile[MAX_DPATH];
@@ -549,8 +558,7 @@ struct uae_prefs {
 	bool clipboard_sharing;
 	bool native_code;
 	bool uae_hide_autoconfig;
-	bool jit_direct_compatible_memory;
-	bool force_0x10000000_z3;
+	int z3_mapping_mode;
 
 	int mountitems;
 	struct uaedev_config_data mountconfig[MOUNT_CONFIG_SIZE];

@@ -40,6 +40,7 @@
 #include "akiko.h"
 #include "cd32_fmv.h"
 #include "cdtv.h"
+#include "cdtvcr.h"
 #include "savestate.h"
 #include "filesys.h"
 #include "parallel.h"
@@ -243,8 +244,8 @@ void fixup_cpu (struct uae_prefs *p)
 	if (p->cpu_frequency == 1000000)
 		p->cpu_frequency = 0;
 
-	if (p->cpu_model >= 68030 && p->address_space_24) {
-		error_log (_T("24-bit address space is not supported with 68030/040/060 configurations."));
+	if (p->cpu_model >= 68040 && p->address_space_24) {
+		error_log (_T("24-bit address space is not supported with 68040/060 configurations."));
 		p->address_space_24 = 0;
 	}
 	if (p->cpu_model < 68020 && p->fpu_model && (p->cpu_compatible || p->cpu_cycle_exact)) {
@@ -325,15 +326,8 @@ void fixup_cpu (struct uae_prefs *p)
 	if (p->cpu_cycle_exact)
 		p->cpu_compatible = true;
 
-	if (cpuboard_memorytype(p) == BOARD_MEMORY_BLIZZARD && !p->comptrustbyte) {
+	if (p->cpuboard_type && cpuboard_jitdirectompatible(p) && !p->comptrustbyte) {
 		error_log(_T("JIT direct is not compatible with emulated Blizzard accelerator boards."));
-		p->comptrustbyte = 1;
-		p->comptrustlong = 1;
-		p->comptrustlong = 1;
-		p->comptrustnaddr = 1;
-	}
-	if (!p->jit_direct_compatible_memory && !p->comptrustbyte) {
-		error_log(_T("JIT direct compatible memory option is disabled, disabling JIT direct."));
 		p->comptrustbyte = 1;
 		p->comptrustlong = 1;
 		p->comptrustlong = 1;
@@ -348,10 +342,16 @@ void fixup_prefs (struct uae_prefs *p)
 	built_in_chipset_prefs (p);
 	fixup_cpu (p);
 
-	if (cpuboard_memorytype(p) == BOARD_MEMORY_HIGHMEM)
+
+	if (p->cpuboard_type && p->cpuboardmem1_size > cpuboard_maxmemory(p)) {
+		error_log(_T("Unsupported accelerator board memory size %d (0x%x).\n"), p->cpuboardmem1_size, p->cpuboardmem1_size);
+		p->cpuboardmem1_size = cpuboard_maxmemory(p);
+	}
+	if (cpuboard_memorytype(p) == BOARD_MEMORY_HIGHMEM) {
 		p->mbresmem_high_size = p->cpuboardmem1_size;
-	else if (cpuboard_memorytype(p) == BOARD_MEMORY_Z2)
-		p->fastmem_size = p->cpuboardmem1_size;
+	} else if (cpuboard_memorytype(p) == BOARD_MEMORY_Z2) {
+		p->fastmem2_size = p->cpuboardmem1_size;
+	}
 
 	if (((p->chipmem_size & (p->chipmem_size - 1)) != 0 && p->chipmem_size != 0x180000)
 		|| p->chipmem_size < 0x20000
@@ -369,17 +369,22 @@ void fixup_prefs (struct uae_prefs *p)
 		p->fastmem_size = 0;
 		err = 1;
 	}
-	if ((p->fastmem2_size & (p->fastmem2_size - 1)) != 0 || (p->fastmem_size + p->fastmem2_size) > 0x800000 + 262144
-		|| (p->fastmem2_size != 0 && (p->fastmem2_size < 0x10000 || p->fastmem_size > 0x800000)))
+	if ((p->fastmem2_size & (p->fastmem2_size - 1)) != 0 || (p->fastmem2_size != 0 && (p->fastmem2_size < 0x10000 || p->fastmem2_size > 0x800000)))
 	{
 		error_log (_T("Unsupported fastmem2 size %d (0x%x)."), p->fastmem2_size, p->fastmem2_size);
 		p->fastmem2_size = 0;
 		err = 1;
 	}
-	if (p->fastmem2_size > p->fastmem_size) {
-		error_log (_T("fastmem2 size can't be larger than fastmem1."));
-		p->fastmem2_size = 0;
-		err = 1;
+	if (p->cachesize) {
+		if (p->fastmem_size + p->fastmem2_size > 0x800000) {
+			error_log (_T("Unsupported fastmem2 size %d (0x%x)."), p->fastmem2_size, p->fastmem2_size);
+			err = 1;
+		}
+		if (p->fastmem2_size > p->fastmem_size && p->fastmem_size > 0) {
+			error_log (_T("Fastmem2 size can't be larger than fastmem1 if JIT is enabled."));
+			p->fastmem2_size = 0;
+			err = 1;
+		}
 	}
 
 	if (p->rtgmem_size > max_z3fastmem && p->rtgmem_type == GFXBOARD_UAE_Z3) {
@@ -387,6 +392,7 @@ void fixup_prefs (struct uae_prefs *p)
 		p->rtgmem_size = max_z3fastmem;
 		err = 1;
 	}
+
 	if ((p->rtgmem_size & (p->rtgmem_size - 1)) != 0 || (p->rtgmem_size != 0 && (p->rtgmem_size < 0x100000))) {
 		error_log (_T("Unsupported graphics card memory size %d (0x%x)."), p->rtgmem_size, p->rtgmem_size);
 		if (p->rtgmem_size > max_z3fastmem)
@@ -471,12 +477,20 @@ void fixup_prefs (struct uae_prefs *p)
 	}
 
 	if (p->rtgmem_type >= GFXBOARD_HARDWARE) {
-		if (p->rtgmem_size < gfxboard_get_vram_min (p->rtgmem_type))
+		if (gfxboard_get_vram_min(p->rtgmem_type) > 0 && p->rtgmem_size < gfxboard_get_vram_min (p->rtgmem_type)) {
+			error_log(_T("Graphics card memory size %d (0x%x) smaller than minimum hardware supported %d (0x%x)."),
+				p->rtgmem_size, p->rtgmem_size, gfxboard_get_vram_min(p->rtgmem_type), gfxboard_get_vram_min(p->rtgmem_type));
 			p->rtgmem_size = gfxboard_get_vram_min (p->rtgmem_type);
+		}
 		if (p->address_space_24 && gfxboard_is_z3 (p->rtgmem_type)) {
 			p->rtgmem_type = GFXBOARD_UAE_Z2;
 			p->rtgmem_size = 0;
 			error_log (_T("Z3 RTG and 24-bit address space are not compatible."));
+		}
+		if (gfxboard_get_vram_max(p->rtgmem_type) > 0 && p->rtgmem_size > gfxboard_get_vram_max(p->rtgmem_type)) {
+			error_log(_T("Graphics card memory size %d (0x%x) larger than maximum hardware supported %d (0x%x)."),
+				p->rtgmem_size, p->rtgmem_size, gfxboard_get_vram_max(p->rtgmem_type), gfxboard_get_vram_max(p->rtgmem_type));
+			p->rtgmem_size = gfxboard_get_vram_max(p->rtgmem_type);
 		}
 	}
 	if (p->address_space_24 && p->rtgmem_size && p->rtgmem_type == GFXBOARD_UAE_Z3) {
@@ -588,6 +602,9 @@ void fixup_prefs (struct uae_prefs *p)
 				p->cs_ramseyrev = 0x0f;
 		}
 	}
+	if (p->chipmem_size >= 0x100000)
+		p->cs_1mchipjumper = true;
+
 	/* Can't fit genlock and A2024 or Graffiti at the same time,
 	 * also Graffiti uses genlock audio bit as an enable signal
 	 */
@@ -1032,7 +1049,8 @@ void do_leave_program (void)
 	serial_exit ();
 #endif
 #ifdef CDTV
-	cdtv_free ();
+	cdtv_free();
+	cdtvcr_free();
 #endif
 #ifdef A2091
 	a2091_free ();
@@ -1134,6 +1152,9 @@ void virtualdevice_init (void)
 #endif
 #ifdef NCR9X
 	ncr9x_init();
+#endif
+#ifdef CDTV
+	cdtvcr_reset();
 #endif
 }
 

@@ -742,6 +742,9 @@ static void archive_close_rar (void *ctx)
 
 struct zvolume *archive_directory_rar (struct zfile *z)
 {
+#ifdef WIN64
+	return archive_directory_arcacc (z, ArchiveFormatRAR);
+#else
 	struct zvolume *zv;
 	struct RARContext *rc;
 	struct zfile *zftmp;
@@ -780,10 +783,12 @@ struct zvolume *archive_directory_rar (struct zfile *z)
 	zv->archive = zftmp;
 	zv->method = ArchiveFormatRAR;
 	return zv;
+#endif
 }
 
 static struct zfile *archive_access_rar (struct znode *zn)
 {
+#ifndef WIN64
 	struct RARContext *rc = (struct RARContext*)zn->volume->handle;
 	int i;
 	struct zfile *zf = NULL;
@@ -814,6 +819,9 @@ static struct zfile *archive_access_rar (struct znode *zn)
 end:
 	pRARCloseArchive(rc->hArcData);
 	return zf;
+#else
+	return NULL;
+#endif
 }
 #endif
 
@@ -1249,7 +1257,7 @@ static void recurseadf (struct znode *zn, int root, TCHAR *name)
 				size = 0;
 			zai.size = size;
 			zai.flags = gl (adf, bs - 48 * 4);
-			amiga_to_timeval (&zai.tv, gl (adf, bs - 23 * 4), gl (adf, bs - 22 * 4),gl (adf, bs - 21 * 4));
+			amiga_to_timeval (&zai.tv, gl (adf, bs - 23 * 4), gl (adf, bs - 22 * 4),gl (adf, bs - 21 * 4), 50);
 			if (secondary == -3) {
 				struct znode *znnew = zvolume_addfile_abs (zv, &zai);
 				znnew->offset = block;

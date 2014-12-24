@@ -508,7 +508,8 @@ static void cdrom_command_thread (uae_u8 b)
 		if (cdrom_command_cnt_in == 7) {
 			cdrom_command_accepted (0, s, &cdrom_command_cnt_in);
 			cd_finished = 1;
-			sleep_millis (500);
+			if (currprefs.cd_speed)
+				sleep_millis (500);
 			activate_stch = 1;
 		}
 		break;
@@ -639,6 +640,8 @@ static void dma_do_thread (void)
 		cdrom_offset / cdtv_sectorsize, dmac_acr, cnt, cdrom_length / 2);
 #endif
 	dma_wait += cnt * (uae_u64)312 * 50 / 75 + 1;
+	if (currprefs.cd_speed == 0)
+		dma_wait = 1;
 	while (cnt > 0 && dmac_dma) {
 		uae_u8 buffer[2352];
 		if (!didread || readsector != (cdrom_offset / cdtv_sectorsize)) {
@@ -1093,7 +1096,7 @@ void CDTV_hsync_handler (void)
 {
 	static int subqcnt;
 
-	if (!currprefs.cs_cdtvcd || configured <= 0)
+	if (!currprefs.cs_cdtvcd || configured <= 0 || currprefs.cs_cdtvcr)
 		return;
 
 	cdtv_hsync++;
@@ -1481,7 +1484,7 @@ static void REGPARAM2 dmac_bput (uaecptr addr, uae_u32 b)
 	addr &= 65535;
 	b &= 0xff;
 	if (addr == 0x48) {
-		map_banks (&dmac_bank, b, 0x10000 >> 16, 0x10000);
+		map_banks_z2 (&dmac_bank, b, 0x10000 >> 16);
 		configured = b;
 		expamem_next(&dmac_bank, NULL);
 		return;
@@ -1701,7 +1704,7 @@ addrbank *cdtv_init (void)
 void cdtv_check_banks (void)
 {
 	if (configured > 0)
-		map_banks (&dmac_bank, configured, 0x10000 >> 16, 0x10000);
+		map_banks_z2 (&dmac_bank, configured, 0x10000 >> 16);
 }
 
 #ifdef SAVESTATE
@@ -1710,7 +1713,7 @@ uae_u8 *save_cdtv_dmac (int *len, uae_u8 *dstptr)
 {
 	uae_u8 *dstbak, *dst;
 	
-	if (!currprefs.cs_cdtvcd)
+	if (!currprefs.cs_cdtvcd || currprefs.cs_cdtvcr)
 		return NULL;
 	if (dstptr)
 		dstbak = dst = dstptr;
@@ -1750,7 +1753,7 @@ uae_u8 *save_cdtv (int *len, uae_u8 *dstptr)
 {
 	uae_u8 *dstbak, *dst;
 
-	if (!currprefs.cs_cdtvcd)
+	if (!currprefs.cs_cdtvcd || currprefs.cs_cdtvcr)
 		return NULL;
 
 	if (dstptr) 
@@ -1846,7 +1849,7 @@ uae_u8 *restore_cdtv (uae_u8 *src)
 
 void restore_cdtv_finish (void)
 {
-	if (!currprefs.cs_cdtvcd)
+	if (!currprefs.cs_cdtvcd || currprefs.cs_cdtvcr)
 		return;
 	cdtv_init ();
 	get_toc ();

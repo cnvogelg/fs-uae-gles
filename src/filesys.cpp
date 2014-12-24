@@ -820,7 +820,30 @@ static bool add_cpuboard_scsi_unit(int unit, struct uaedev_config_info *uci)
 static bool add_scsi_unit(int type, int unit, struct uaedev_config_info *uci)
 {
 	bool added = false;
-	if (type == HD_CONTROLLER_TYPE_SCSI_A2091) {
+	if (type == HD_CONTROLLER_TYPE_SCSI_A3000) {
+#ifdef A2091
+		if (currprefs.cs_mbdmac == 1) {
+			a3000_add_scsi_unit (unit, uci);
+			added = true;
+		}
+#endif
+	} else if (type == HD_CONTROLLER_TYPE_SCSI_A4000T) {
+#ifdef NCR
+		if (currprefs.cs_mbdmac == 2) {
+			a4000t_add_scsi_unit (unit, uci);
+			added = true;
+		}
+#endif
+	} else if (type == HD_CONTROLLER_TYPE_SCSI_CPUBOARD) {
+		added = add_cpuboard_scsi_unit(unit, uci);
+	} else if (type == HD_CONTROLLER_TYPE_SCSI_CDTV) {
+#ifdef CDTV
+		if (currprefs.cs_cdtvscsi) {
+			cdtv_add_scsi_hd_unit (unit, uci);
+			added = true;
+		}
+#endif
+	} else if (type == HD_CONTROLLER_TYPE_SCSI_A2091) {
 #ifdef A2091
 		if (cfgfile_board_enabled(&currprefs.a2091rom)) {
 			a2091_add_scsi_unit (unit, uci, 0);
@@ -831,13 +854,6 @@ static bool add_scsi_unit(int type, int unit, struct uaedev_config_info *uci)
 #ifdef A2091
 		if (cfgfile_board_enabled(&currprefs.a2091rom)) {
 			a2091_add_scsi_unit (unit, uci, 1);
-			added = true;
-		}
-#endif
-	} else if (type == HD_CONTROLLER_TYPE_SCSI_A3000) {
-#ifdef A2091
-		if (currprefs.cs_mbdmac == 1) {
-			a3000_add_scsi_unit (unit, uci);
 			added = true;
 		}
 #endif
@@ -880,22 +896,6 @@ static bool add_scsi_unit(int type, int unit, struct uaedev_config_info *uci)
 #ifdef NCR
 		if (cfgfile_board_enabled(&currprefs.oktagonrom)) {
 			oktagon_add_scsi_unit (unit, uci, 1);
-			added = true;
-		}
-#endif
-	} else if (type == HD_CONTROLLER_TYPE_SCSI_CPUBOARD) {
-		added = add_cpuboard_scsi_unit(unit, uci);
-	} else if (type == HD_CONTROLLER_TYPE_SCSI_A4000T) {
-#ifdef NCR
-		if (currprefs.cs_mbdmac == 2) {
-			a4000t_add_scsi_unit (unit, uci);
-			added = true;
-		}
-#endif
-	} else if (type == HD_CONTROLLER_TYPE_SCSI_CDTV) {
-#ifdef CDTV
-		if (currprefs.cs_cdtvscsi) {
-			cdtv_add_scsi_hd_unit (unit, uci);
 			added = true;
 		}
 #endif
@@ -978,10 +978,10 @@ static void initialize_mountinfo (void)
 					break;
 			}
 		} else if (type == HD_CONTROLLER_TYPE_PCMCIA_SRAM) {
-			gayle_add_pcmcia_sram_unit (uci->rootdir, uci->readonly);
+			gayle_add_pcmcia_sram_unit (uci);
 			added = true;
 		} else if (type == HD_CONTROLLER_TYPE_PCMCIA_IDE) {
-			gayle_add_pcmcia_ide_unit (uci->rootdir, uci->readonly);
+			gayle_add_pcmcia_ide_unit (uci);
 			added = true;
 		}
 		if (added)
@@ -1057,7 +1057,15 @@ struct hardfiledata *get_hardfile_data (int nr)
 #define ST_SOFTLINK 3
 #define ST_LINKDIR 4
 
+#if 1
+#define MAXFILESIZE32 (0xffffffff)
+#else
+/* technically correct but most native
+ * filesystems don't enforce it
+ */
 #define MAXFILESIZE32 (0x7fffffff)
+#endif
+#define MAXFILESIZE32_2G (0x7fffffff)
 
 /* Passed as type to Lock() */
 #define SHARED_LOCK		-2  /* File is readable by others */
@@ -1382,7 +1390,7 @@ static TCHAR *bstr_cut (Unit *unit, uaecptr addr)
 static const uae_s64 msecs_per_day = 24 * 60 * 60 * 1000;
 static const uae_s64 diff = ((8 * 365 + 2) * (24 * 60 * 60)) * (uae_u64)1000;
 
-void timeval_to_amiga (struct mytimeval *tv, int *days, int *mins, int *ticks)
+void timeval_to_amiga (struct mytimeval *tv, int *days, int *mins, int *ticks, int tickcount)
 {
 	/* tv.tv_sec is secs since 1-1-1970 */
 	/* days since 1-1-1978 */
@@ -1397,10 +1405,10 @@ void timeval_to_amiga (struct mytimeval *tv, int *days, int *mins, int *ticks)
 	t -= *days * msecs_per_day;
 	*mins = t / (60 * 1000);
 	t -= *mins * (60 * 1000);
-	*ticks = t / (1000 / 50);
+	*ticks = t / (1000 / tickcount);
 }
 
-void amiga_to_timeval (struct mytimeval *tv, int days, int mins, int ticks)
+void amiga_to_timeval (struct mytimeval *tv, int days, int mins, int ticks, int tickcount)
 {
 	uae_s64 t;
 
@@ -1410,7 +1418,7 @@ void amiga_to_timeval (struct mytimeval *tv, int days, int mins, int ticks)
 		days = 9900 * 365; // in future far enough?
 	if (mins < 0 || mins >= 24 * 60)
 		mins = 0;
-	if (ticks < 0 || ticks >= 60 * 50)
+	if (ticks < 0 || ticks >= 60 * tickcount)
 		ticks = 0;
 
 	t = ticks * 20;
@@ -1571,7 +1579,7 @@ static void set_volume_name (Unit *unit, struct mytimeval *tv)
 	put_byte (unit->volume + 45 + namelen, 0);
 	if (tv && (tv->tv_sec || tv->tv_usec)) {
 		int days, mins, ticks;
-		timeval_to_amiga (tv, &days, &mins, &ticks);
+		timeval_to_amiga (tv, &days, &mins, &ticks, 50);
 		put_long (unit->volume + 16, days);
 		put_long (unit->volume + 20, mins);
 		put_long (unit->volume + 24, ticks);
@@ -1960,6 +1968,16 @@ int filesys_media_change (const TCHAR *rootdir, int inserted, struct uaedev_conf
 		if (uci)
 			uci->configoffset = nr;
 		return 100 + nr;
+	}
+	return 0;
+}
+
+int hardfile_added (struct uaedev_config_info *ci)
+{
+	if (ci->controller_type == HD_CONTROLLER_TYPE_PCMCIA_IDE) {
+		return gayle_add_pcmcia_ide_unit(ci);
+	} else if (ci->controller_type == HD_CONTROLLER_TYPE_PCMCIA_SRAM) {
+		return gayle_add_pcmcia_sram_unit(ci);
 	}
 	return 0;
 }
@@ -3829,7 +3847,7 @@ static void
 
 	if (longfilesize) {
 		/* MorphOS 64-bit file length support */
-		put_long (info + 124, statbuf.size > MAXFILESIZE32 ? 0 : (uae_u32)statbuf.size);
+		put_long (info + 124, statbuf.size > MAXFILESIZE32_2G ? 0 : (uae_u32)statbuf.size);
 		put_long (info + 228, statbuf.size >> 32);
 		put_long (info + 232, (uae_u32)statbuf.size);
 		put_long (info + 236, numblocks >> 32);
@@ -3842,7 +3860,7 @@ static void
 #ifdef FSUAE
 	fsdb_get_file_time(aino, &days, &mins, &ticks);
 #else
-	timeval_to_amiga (&statbuf.mtime, &days, &mins, &ticks);
+	timeval_to_amiga (&statbuf.mtime, &days, &mins, &ticks, 50);
 #endif
 	put_long (info + 132, days);
 	put_long (info + 136, mins);
@@ -4146,7 +4164,7 @@ static int exalldo (uaecptr exalldata, uae_u32 exalldatasize, uae_u32 type, uaec
 #ifdef FSUAE
 		fsdb_get_file_time(aino, &days, &mins, &ticks);
 #else
-		timeval_to_amiga (&statbuf.mtime, &days, &mins, &ticks);
+		timeval_to_amiga (&statbuf.mtime, &days, &mins, &ticks, 50);
 #endif
 		size2 += 12;
 	}
@@ -5464,7 +5482,7 @@ static void
 	}
 
 	/* Fail if file is >=2G, it is not safe operation. */
-	if (fs_fsize64 (k->fd) > MAXFILESIZE32) {
+	if (fs_fsize64 (k->fd) > MAXFILESIZE32_2G) {
 		PUT_PCK_RES1 (packet, DOS_TRUE);
 		PUT_PCK_RES2 (packet, ERROR_BAD_NUMBER); /* ? */
 		return;
@@ -5643,7 +5661,7 @@ static void
 		handle_softlink (unit, packet, a);
 		return;
 	}
-	amiga_to_timeval (&tv, get_long (date), get_long (date + 4), get_long (date + 8));
+	amiga_to_timeval (&tv, get_long (date), get_long (date + 4), get_long (date + 8), 50);
 	//write_log (_T("%llu.%u (%d,%d,%d) %s\n"), tv.tv_sec, tv.tv_usec, get_long (date), get_long (date + 4), get_long (date + 8), a->nname);
 	if (!my_utime (a->nname, &tv))
 		err = dos_errno ();
@@ -6720,7 +6738,7 @@ static uae_u32 REGPARAM2 filesys_diagentry (TrapContext *context)
 		put_word (resaddr + 0x0, 0x4AFC);
 		put_long (resaddr + 0x2, resaddr);
 		put_long (resaddr + 0x6, resaddr + 0x1A); /* Continue scan here */
-		put_word (resaddr + 0xA, 0x8101); /* RTF_AUTOINIT|RTF_COLDSTART; Version 1 */
+		put_word (resaddr + 0xA, 0x8132); /* RTF_AUTOINIT|RTF_COLDSTART; Version 50 */
 		put_word (resaddr + 0xC, 0x0305); /* NT_DEVICE; pri 05 */
 		put_long (resaddr + 0xE, ROM_hardfile_resname);
 		put_long (resaddr + 0x12, ROM_hardfile_resid);
@@ -8061,7 +8079,6 @@ static a_inode *restore_filesys_get_base (Unit *u, TCHAR *npath)
 	cnt = 1;
 	for (;;) {
 		_tcscpy (path, npath);
-		_tcscat (path, _T("/"));
 		p = path;
 		for (i = 0; i < cnt ;i++) {
 			if (i > 0)
@@ -8181,9 +8198,10 @@ static uae_u8 *restore_aino (UnitInfo *ui, Unit *u, uae_u8 *src)
 	pn = makenativepath (ui, p);
 	a->nname = pn;
 	a->aname = my_strdup (p2);
-	/* find parent of a->aname (Already restored previously. I hope..) */
+	/* create path to parent dir */
 	if (p2 != p)
-		p2[-1] = 0;
+		p2[0] = 0;
+	/* find parent of a->aname (Already restored previously. I hope..) */
 	base = restore_filesys_get_base (u, p);
 	xfree(p);
 	if (flags & 2) {
@@ -8380,11 +8398,11 @@ static TCHAR *getfullaname (a_inode *a)
 	TCHAR *p;
 	int first = 1;
 
-	p = xcalloc (TCHAR, 2000);
+	p = xcalloc (TCHAR, MAX_DPATH);
 	while (a) {
 		int len = _tcslen (a->aname);
 		memmove (p + len + 1, p, (_tcslen (p) + 1) * sizeof (TCHAR));
-		memcpy (p, a->aname, _tcslen (a->aname) * sizeof (TCHAR));
+		memcpy (p, a->aname, len * sizeof (TCHAR));
 		if (!first)
 			p[len] = '/';
 		first = 0;

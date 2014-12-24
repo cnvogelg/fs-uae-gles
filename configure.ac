@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.67])
-AC_INIT([FS-UAE], [2.5.19dev],
+AC_INIT([FS-UAE], [2.5.22dev],
         [frode@fs-uae.net], [fs-uae], [http://fs-uae.net])
 AC_CONFIG_AUX_DIR([.])
 AC_CANONICAL_SYSTEM
@@ -13,7 +13,7 @@ AM_INIT_AUTOMAKE([tar-ustar subdir-objects])
 
 AC_SUBST([PACKAGE_SERIES], [devel])
 
-AC_DEFINE_UNQUOTED([UAE_BASE_VERSION], ["WinUAE 2900b19"],
+AC_DEFINE_UNQUOTED([UAE_BASE_VERSION], ["WinUAE 3000b28"],
 [Which UAE core this version is based on.])
 
 PACKAGE_MAJOR=`echo ${PACKAGE_VERSION} | sed -e 's,\(\.*\)\..*\..*,\1,g'`
@@ -211,6 +211,7 @@ AS_CASE([$target_os],
 [mingw*], [
 	OS_NAME="windows"
 	OS_CPPFLAGS="-DWINDOWS"
+	OS_LDFLAGS="-mwindows"
 	LOADABLE_MODULE_EXT=".dll"
 ],
 [linux*], [
@@ -238,6 +239,8 @@ AS_CASE([$target_os],
 	OS_NAME="unknown"
 	LOADABLE_MODULE_EXT=".unknown"
 ])
+
+AM_CONDITIONAL([WINDOWS], [test x$OS_NAME = xwindows])
 
 # Not using libtool right now, but use name LT_MODULE_EXT anyway in case
 # transitioning to libtool later.
@@ -376,6 +379,7 @@ AC_CHECK_FUNCS([gethostname])
 AC_CHECK_FUNCS([getpagesize])
 AC_CHECK_FUNCS([gmtime_r])
 AC_CHECK_FUNCS([index])
+AC_CHECK_FUNCS([inet_aton])
 AC_CHECK_FUNCS([inet_ntoa])
 AC_CHECK_FUNCS([localeconv])
 AC_CHECK_FUNCS([localtime_r])
@@ -604,12 +608,13 @@ AC_CONFIG_SUBDIRS([libmpeg2])
 # Write Makefile
 
 AC_CONFIG_FILES([
-    build/linux-dist/Makefile
-    build/steamos-dist/Makefile
-    macosx/Info.plist
-    macosx/Makefile
+    dist/linux/Makefile
+    dist/macosx/Info.plist
+    dist/macosx/Makefile
+    dist/steamos/Makefile
+    dist/windows/fs-uae.iss
+    dist/windows/Makefile
+    src/fs-uae/fs-uae.rc
     Makefile
-    windows/fs-uae.iss
-    windows/Makefile
 ])
 AC_OUTPUT

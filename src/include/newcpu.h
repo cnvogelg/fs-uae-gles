@@ -209,9 +209,6 @@ struct regstruct
 	uae_u32 pcr;
 	uae_u32 address_space_mask;
 
-	uae_u8 panic;
-	uae_u32 panic_pc, panic_addr;
-
 	uae_u32 prefetch020[CPU_PIPELINE_MAX];
 	uae_u32 prefetch020addr;
 	uae_u32 cacheholdingdata020;
@@ -569,7 +566,7 @@ extern bool is_hardreset(void);
 extern bool is_keyboardreset(void);
 
 extern void mmu_op (uae_u32, uae_u32);
-extern void mmu_op30 (uaecptr, uae_u32, uae_u16, uaecptr);
+extern bool mmu_op30 (uaecptr, uae_u32, uae_u16, uaecptr);
 
 extern void fpuop_arithmetic(uae_u32, uae_u16);
 extern void fpuop_dbcc(uae_u32, uae_u16);
@@ -604,17 +601,18 @@ extern void fill_prefetch_030 (void);
 /* 68060 */
 extern const struct cputbl op_smalltbl_0_ff[];
 extern const struct cputbl op_smalltbl_40_ff[];
-extern const struct cputbl op_smalltbl_23_ff[]; // CE
+extern const struct cputbl op_smalltbl_24_ff[]; // CE
 extern const struct cputbl op_smalltbl_33_ff[]; // MMU
 /* 68040 */
 extern const struct cputbl op_smalltbl_1_ff[];
 extern const struct cputbl op_smalltbl_41_ff[];
-extern const struct cputbl op_smalltbl_24_ff[]; // CE
+extern const struct cputbl op_smalltbl_25_ff[]; // CE
 extern const struct cputbl op_smalltbl_31_ff[]; // MMU
 /* 68030 */
 extern const struct cputbl op_smalltbl_2_ff[];
 extern const struct cputbl op_smalltbl_42_ff[];
-extern const struct cputbl op_smalltbl_22_ff[]; // CE
+extern const struct cputbl op_smalltbl_22_ff[]; // prefetch
+extern const struct cputbl op_smalltbl_23_ff[]; // CE
 extern const struct cputbl op_smalltbl_32_ff[]; // MMU
 /* 68020 */
 extern const struct cputbl op_smalltbl_3_ff[];

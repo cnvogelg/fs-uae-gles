@@ -216,7 +216,7 @@ uae_u32 get_byte_debug (uaecptr addr)
 				v = mmu_get_user_byte (addr, regs.s != 0, (debug_mmu_mode & 1) ? true : false, false, sz_byte);
 			}
 		} CATCH(p) {
-		}
+		} ENDTRY
 		regs.s = olds;
 	} else {
 		v = get_byte (addr);
@@ -236,7 +236,7 @@ uae_u32 get_word_debug (uaecptr addr)
 				v = mmu_get_user_word (addr, regs.s != 0, (debug_mmu_mode & 1) ? true : false, false, sz_word);
 			}
 		} CATCH(p) {
-		}
+		} ENDTRY
 		regs.s = olds;
 	} else {
 		v = get_word (addr);
@@ -256,7 +256,7 @@ uae_u32 get_long_debug (uaecptr addr)
 				v = mmu_get_user_long (addr, regs.s != 0, (debug_mmu_mode & 1) ? true : false, false, sz_long);
 			}
 		} CATCH(p) {
-		}
+		} ENDTRY
 		regs.s = olds;
 	} else {
 		v = get_long (addr);
@@ -296,7 +296,7 @@ static int safe_addr (uaecptr addr, int size)
 				addr = mmu030_translate (addr, regs.s != 0, (debug_mmu_mode & 1), false);
 		} CATCH(p) {
 			return 0;
-		}
+		} ENDTRY
 		regs.s = olds;
 	}
 	addrbank *ab = &get_mem_bank (addr);
@@ -1306,9 +1306,18 @@ void log_dma_record (void)
 	decode_dma_record (0, 0, 0, true);
 }
 
+static void init_record_copper(void)
+{
+	if (!cop_record[0]) {
+		cop_record[0] = xmalloc(struct cop_rec, NR_COPPER_RECORDS);
+		cop_record[1] = xmalloc(struct cop_rec, NR_COPPER_RECORDS);
+	}
+}
+
 void record_copper_blitwait (uaecptr addr, int hpos, int vpos)
 {
-	int t = nr_cop_records[curr_cop_set] - 1;
+	int t = nr_cop_records[curr_cop_set];
+	init_record_copper();
 	cop_record[curr_cop_set][t].bhpos = hpos;
 	cop_record[curr_cop_set][t].bvpos = vpos;
 }
@@ -1316,10 +1325,7 @@ void record_copper_blitwait (uaecptr addr, int hpos, int vpos)
 void record_copper (uaecptr addr, uae_u16 word1, uae_u16 word2, int hpos, int vpos)
 {
 	int t = nr_cop_records[curr_cop_set];
-	if (!cop_record[0]) {
-		cop_record[0] = xmalloc (struct cop_rec, NR_COPPER_RECORDS);
-		cop_record[1] = xmalloc (struct cop_rec, NR_COPPER_RECORDS);
-	}
+	init_record_copper();
 	if (t < NR_COPPER_RECORDS) {
 		cop_record[curr_cop_set][t].addr = addr;
 		cop_record[curr_cop_set][t].w1 = word1;
@@ -3029,7 +3035,9 @@ static void memory_map_dump_3(UaeMemoryMap *map, int log)
 				tmp[0] = 0;
 				if ((a1->flags & ABFLAG_ROM) && mirrored) {
 					TCHAR *p = txt + _tcslen (txt);
-					uae_u32 crc = get_crc32 (a1->xlateaddr((j << 16) | bankoffset), (size * 1024) / mirrored);
+					uae_u32 crc = 0xffffffff;
+					if (a1->check(((j << 16) | bankoffset), (size * 1024) / mirrored))
+						crc = get_crc32 (a1->xlateaddr((j << 16) | bankoffset), (size * 1024) / mirrored);
 					struct romdata *rd = getromdatabycrc (crc);
 					_stprintf (p, _T(" (%08X)"), crc);
 					if (rd) {
@@ -4723,10 +4731,10 @@ static bool debug_line (TCHAR *input)
 							console_out_f (_T(" RW"));
 						} CATCH(prb2) {
 							console_out_f (_T(" RO"));
-						}
+						} ENDTRY
 					} CATCH(prb) {
 						console_out_f (_T("***********"));
-					}
+					} ENDTRY
 					console_out_f (_T(" "));
 				}
 				console_out_f (_T("\n"));
@@ -4786,6 +4794,12 @@ static void addhistory (void)
 		if (++firsthist == MAX_HIST) firsthist = 0;
 	}
 }
+
+static void debug_continue(void)
+{
+	set_special (SPCFLAG_BRK);
+}
+
 
 void debug (void)
 {
@@ -4892,7 +4906,7 @@ void debug (void)
 				}
 			}
 			if (!bp) {
-				set_special (SPCFLAG_BRK);
+				debug_continue();
 				return;
 			}
 		}
@@ -4910,7 +4924,7 @@ void debug (void)
 	if (skipaddr_doskip > 0) {
 		skipaddr_doskip--;
 		if (skipaddr_doskip > 0) {
-			set_special (SPCFLAG_BRK);
+			debug_continue();
 			return;
 		}
 	}
@@ -4953,8 +4967,7 @@ void debug (void)
 		do_skip = 1;
 	if (do_skip) {
 		set_special (SPCFLAG_BRK);
-		m68k_resumestopped ();
-		debugging = 1;
+		debugging = -1;
 	}
 	resume_sound ();
 	inputdevice_acquire (TRUE);

@@ -348,6 +348,10 @@ static PPCLockStatus get_ppc_lock(PPCLockMethod method)
 			}
 			trylock_called = true;
 		}
+	} else {
+		//uae_abort("invalid ppc loc method");
+		write_log("invalid ppc loc method");
+		abort();
 	}
 }
 
@@ -405,11 +409,11 @@ static void map_banks(void)
 		regions[i].memory = r->memory;
 	}
 
-	if (impl.in_cpu_thread() == false) {
+	if (impl.in_cpu_thread && impl.in_cpu_thread() == false) {
 		uae_ppc_spinlock_release();
 	}
 	impl.map_memory(regions, map.num_regions);
-	if (impl.in_cpu_thread() == false) {
+	if (impl.in_cpu_thread && impl.in_cpu_thread() == false) {
 		uae_ppc_spinlock_get();
 	}
 
@@ -440,6 +444,13 @@ static void set_and_wait_for_state(int state, int unlock)
 			uae_ppc_spinlock_get();
 		}
 	}
+}
+
+bool uae_self_is_ppc(void)
+{
+	if (ppc_state == PPC_STATE_INACTIVE)
+		return false;
+	return impl.in_cpu_thread();
 }
 
 void ppc_map_banks(uae_u32 start, uae_u32 size, const TCHAR *name, void *addr, bool remove)

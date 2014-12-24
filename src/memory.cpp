@@ -70,7 +70,7 @@ static bool canjit (void)
 }
 static bool needmman (void)
 {
-	if (!currprefs.jit_direct_compatible_memory)
+	if (!jit_direct_compatible_memory)
 		return false;
 #ifdef _WIN32
 #ifdef FSUAE
@@ -1137,8 +1137,9 @@ int REGPARAM2 default_check (uaecptr a, uae_u32 b)
 
 static int be_cnt;
 
-uae_u8 *REGPARAM2 default_xlate (uaecptr a)
+uae_u8 *REGPARAM2 default_xlate (uaecptr addr)
 {
+	int size = currprefs.cpu_model >= 68020 ? 4 : 2;
 	if (quit_program == 0) {
 		/* do this only in 68010+ mode, there are some tricky A500 programs.. */
 		if ((currprefs.cpu_model > 68000 || !currprefs.cpu_compatible) && !currprefs.mmu_model) {
@@ -1147,9 +1148,9 @@ uae_u8 *REGPARAM2 default_xlate (uaecptr a)
 #endif
 			if (be_cnt < 3) {
 				int i, j;
-				uaecptr a2 = a - 32;
+				uaecptr a2 = addr - 32;
 				uaecptr a3 = m68k_getpc () - 32;
-				write_log (_T("Your Amiga program just did something terribly stupid %08X PC=%08X\n"), a, M68K_GETPC);
+				write_log (_T("Your Amiga program just did something terribly stupid %08X PC=%08X\n"), addr, M68K_GETPC);
 				if (debugging || DEBUG_STUPID) {
 					activate_debugger ();
 					m68k_dumpstate (0);
@@ -1164,15 +1165,10 @@ uae_u8 *REGPARAM2 default_xlate (uaecptr a)
 				}
 				memory_map_dump ();
 			}
-			be_cnt++;
-			if (regs.s || be_cnt > 1000) {
-				cpu_halt (3);
-				be_cnt = 0;
+			if (0 || (gary_toenb && (gary_nonrange(addr) || (size > 1 && gary_nonrange(addr + size - 1))))) {
+				exception2 (addr, false, size, regs.s ? 4 : 0);
 			} else {
-				regs.panic = 4;
-				regs.panic_pc = m68k_getpc ();
-				regs.panic_addr = a;
-				set_special (SPCFLAG_BRK);
+				cpu_halt(3);
 			}
 		}
 	}
@@ -1736,14 +1732,17 @@ err:
 
 #ifndef NATMEM_OFFSET
 
-uae_u8 *mapped_malloc (size_t s, const TCHAR *file)
+bool mapped_malloc (addrbank *ab)
 {
-	return xmalloc (uae_u8, s);
+	ab->startmask = ab->start;
+	ab->baseaddr = xcalloc (uae_u8, ab->allocated + 4);
+	return ab->baseaddr != NULL;
 }
 
-void mapped_free (uae_u8 *p)
+void mapped_free (addrbank *ab)
 {
-	xfree (p);
+	xfree(ab->baseaddr);
+	ab->baseaddr = NULL;
 }
 
 #else
@@ -1855,7 +1854,7 @@ static void add_shmmaps (uae_u32 start, addrbank *what)
 	shm_start = y;
 }
 
-#define MAPPED_MALLOC_DEBUG 1
+#define MAPPED_MALLOC_DEBUG 0
 
 bool mapped_malloc (addrbank *ab)
 {
@@ -2202,9 +2201,11 @@ void map_overlay (int chip)
 			if ((currprefs.chipset_mask & CSMASK_ECS_AGNUS) && bogomem_bank.allocated == 0) {
 				int start = chipmem_bank.allocated >> 16;
 				if (chipmem_bank.allocated < 0x100000) {
-					int dummy = (0x100000 - chipmem_bank.allocated) >> 16;
-					map_banks (&chipmem_dummy_bank, start, dummy, 0);
-					map_banks (&chipmem_dummy_bank, start + 16, dummy, 0);
+					if (currprefs.cs_1mchipjumper) {
+						int dummy = (0x100000 - chipmem_bank.allocated) >> 16;
+						map_banks (&chipmem_dummy_bank, start, dummy, 0);
+						map_banks (&chipmem_dummy_bank, start + 16, dummy, 0);
+					}
 				} else if (chipmem_bank.allocated < 0x200000 && chipmem_bank.allocated > 0x100000) {
 					int dummy = (0x200000 - chipmem_bank.allocated) >> 16;
 					map_banks (&chipmem_dummy_bank, start, dummy, 0);
@@ -2460,8 +2461,11 @@ void memory_reset (void)
 	}
 #endif
 #ifdef CDTV
-	if (currprefs.cs_cdtvcd)
+	if (currprefs.cs_cdtvcr) {
+		map_banks(&cdtvcr_bank, 0xB8, 1, 0);
+	} else if (currprefs.cs_cdtvcd) {
 		cdtv_check_banks ();
+	}
 #endif
 #ifdef A2091
 	if (currprefs.cs_mbdmac == 1)
@@ -2805,6 +2809,30 @@ void map_banks (addrbank *bank, int start, int size, int realsize)
 	ppc_generate_map_banks(bank, start, size);
 #endif
 }
+
+void map_banks_z2 (addrbank *bank, int start, int size)
+{
+	if (start < 0x20 || (start >= 0xa0 && start < 0xe9) || start >= 0xf0) {
+		write_log(_T("Z2 map_banks with invalid start address %08X\n"), start << 16);
+		return;
+	}
+	if (start >= 0xe9) {
+		if (start + size > 0xf0) {
+			write_log(_T("Z2 map_banks with invalid region %08x - %08X\n"), start << 16, (start + size) << 16);
+			size = 0xf0 - start;
+		}
+	} else {
+		if (start + size > 0xa0) {
+			write_log(_T("Z2 map_banks with invalid region %08x - %08X\n"), start << 16, (start + size) << 16);
+			size = 0xa0 - start;
+		}
+	}
+	if (size <= 0)
+		return;
+	map_banks (bank, start, size, 0);
+}
+
+
 void map_banks_quick (addrbank *bank, int start, int size, int realsize)
 {
 	map_banks2 (bank, start, size, realsize, 1);

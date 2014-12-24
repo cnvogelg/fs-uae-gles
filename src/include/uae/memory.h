@@ -33,6 +33,10 @@ bool init_shm (void);
 void free_shm (void);
 bool preinit_shm (void);
 extern bool canbang;
+extern bool jit_direct_compatible_memory;
+
+#define Z3BASE_UAE 0x10000000
+#define Z3BASE_REAL 0x40000000
 
 #ifdef ADDRESS_SPACE_24BIT
 #define MEMORY_BANKS 256
@@ -337,7 +341,7 @@ extern addrbank cia_bank;
 extern addrbank rtarea_bank;
 extern addrbank filesys_bank;
 extern addrbank expamem_bank;
-extern addrbank expamem_null;
+extern addrbank expamem_null, expamem_none;
 extern addrbank fastmem_bank;
 extern addrbank fastmem_nojit_bank;
 extern addrbank fastmem2_bank;
@@ -347,6 +351,7 @@ extern addrbank gayle_bank;
 extern addrbank gayle2_bank;
 extern addrbank mbres_bank;
 extern addrbank akiko_bank;
+extern addrbank cdtvcr_bank;
 extern addrbank cardmem_bank;
 extern addrbank bogomem_bank;
 extern addrbank z3fastmem_bank;
@@ -423,6 +428,7 @@ extern uae_u8 *baseaddr[MEMORY_BANKS];
 extern void memory_init (void);
 extern void memory_cleanup (void);
 extern void map_banks (addrbank *bank, int first, int count, int realsize);
+extern void map_banks_z2 (addrbank *bank, int first, int count);
 extern void map_banks_quick (addrbank *bank, int first, int count, int realsize);
 extern void map_banks_nojitdirect (addrbank *bank, int first, int count, int realsize);
 extern void map_banks_cond (addrbank *bank, int first, int count, int realsize);

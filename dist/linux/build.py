@@ -4,16 +4,17 @@ import sys
 import platform
 import subprocess
 
-p = subprocess.Popen(["file", "../../fs-uae"], stdout=subprocess.PIPE)
+p = subprocess.Popen(["file", "-L", "/bin/sh"], stdout=subprocess.PIPE)
 exe_info = p.stdout.read().decode("UTF-8")
 if "386" in exe_info:
     arch = "i386"
 elif "x86-64" in exe_info:
     arch = "amd64"
 else:
-    raise Exception("unrecognized arch")
+    raise Exception("unrecognized arch " + repr(exe_info))
 
-if os.environ.get("STEAM_RUNTIME", ""):
+#if os.environ.get("STEAM_RUNTIME", ""):
+if os.environ.get("STEAMOS", ""):
     os_name = "steamos"
     if arch == "i386":
         # steam runtime sdk compiles with -mtune=generic -march=i686
@@ -32,8 +33,9 @@ else:
 #    arch = "i386"
 
 version = sys.argv[1]
-package_dir = "fs-uae-{0}-{1}-{2}".format(version, os_name, arch)
-dbg_package_dir = "fs-uae-dbg-{0}-{1}-{2}".format(version, os_name, arch)
+package_name = "fs-uae_{0}_{1}_{2}".format(version, os_name, arch)
+package_dir = "../{1}/fs-uae_{0}_{1}_{2}".format(version, os_name, arch)
+#dbg_package_dir = "fs-uae-dbg-{0}-{1}-{2}".format(version, os_name, arch)
 
 
 def s(command):
@@ -76,24 +78,28 @@ def wrap(name, target, args=None):
 
 s("rm -Rf {package_dir}")
 s("mkdir {package_dir}")
-#s("make -C ../..")
+if os.environ.get("BUILD") == "0":
+    pass
+else:
+    s("cd ../.. && ./configure")
+    s("make -C ../..")
 s("cp -a ../../fs-uae {package_dir}/fs-uae.bin")
 s("cp -a ../../fs-uae.dat {package_dir}/fs-uae.dat")
 s("cp -a ../../fs-uae-device-helper {package_dir}/fs-uae-device-helper.bin")
 s("cp -a ../../share {package_dir}/share")
 s("cp -a ../../licenses {package_dir}/licenses")
 s("cp -a ../../README {package_dir}/fs-uae.txt")
-s("python3 standalone.py {package_dir}")
+s("./standalone.py {package_dir}")
 s("strip {package_dir}/*.bin")
 s("strip {package_dir}/*.so.* || true")
 
 wrap("fs-uae", "fs-uae.bin")
 wrap("fs-uae-device-helper", "fs-uae-device-helper.bin")
 
-s("cd {package_dir} && tar Jcfv ../../../{package_dir}.tar.xz *")
+s("cd {package_dir} && tar Jcfv ../../../{package_name}.tar.xz *")
 
-s("rm -Rf {dbg_package_dir}")
-s("mkdir {dbg_package_dir}")
-s("cp -a ../../fs-uae.dbg {dbg_package_dir}/")
-s("cp -a ../../fs-uae-device-helper.dbg {dbg_package_dir}/")
-s("cd {dbg_package_dir} && tar Jcfv ../../../{dbg_package_dir}.tar.xz *")
+#s("rm -Rf {dbg_package_dir}")
+#s("mkdir {dbg_package_dir}")
+#s("cp -a ../../fs-uae.dbg {dbg_package_dir}/")
+#s("cp -a ../../fs-uae-device-helper.dbg {dbg_package_dir}/")
+#s("cd {dbg_package_dir} && tar Jcfv ../../../{dbg_package_dir}.tar.xz *")

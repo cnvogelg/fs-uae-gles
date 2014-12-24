@@ -87,6 +87,8 @@ noinst_LIBRARIES =
 BUILT_SOURCES = \
 	gen/linetoscr.cpp
 
+nodist_fs_uae_SOURCES =
+
 fs_uae_SOURCES = \
 	src/fs-uae/config.c \
 	src/fs-uae/config-accelerator.c \
@@ -117,6 +119,15 @@ fs_uae_SOURCES = \
 	src/fs-uae/recording.h \
 	src/fs-uae/uae_config.c \
 	src/fs-uae/video.c
+
+
+if WINDOWS
+nodist_fs_uae_SOURCES += src/fs-uae/fs-uae.rc
+.rc.o:
+	windres $< -o $@
+%.o : %.rc
+	windres $< -o $@
+endif
 
 fs_uae_LDADD =
 
@@ -198,6 +209,7 @@ libuae_a_SOURCES = \
 	src/cd32_fmv_genlock.cpp \
 	src/cdrom.cpp \
 	src/cdtv.cpp \
+	src/cdtvcr.cpp \
 	src/cfgfile.cpp \
 	src/cia.cpp \
 	src/clockport.cpp \
@@ -246,6 +258,7 @@ libuae_a_SOURCES = \
 	src/include/catweasel.h \
 	src/include/cd32_fmv.h \
 	src/include/cdtv.h \
+	src/include/cdtvcr.h \
 	src/include/cia.h \
 	src/include/clipboard.h \
 	src/include/commpipe.h \
@@ -517,6 +530,7 @@ nodist_libcpuemu_a_SOURCES = \
 	gen/cpuemu_21.cpp \
 	gen/cpuemu_22.cpp \
 	gen/cpuemu_23.cpp \
+	gen/cpuemu_24.cpp \
 	gen/cpuemu_31.cpp \
 	gen/cpuemu_32.cpp \
 	gen/cpuemu_33.cpp \
@@ -703,12 +717,6 @@ libpearpc_a_SOURCES = \
 	src/ppc/pearpc/tools/snprintf.h \
 	src/ppc/pearpc/tracers.h \
 	src/ppc/pearpc/uaeglue.cpp
-endif
-
-if WITH_QEMU_CPU
-# fs_uae_LDADD += qemu/uae/libqemu.a
-# LIBS += -lutil
-# AM_CPPFLAGS += -I$(s)/qemu/uae
 endif
 
 if WITH_PPC
@@ -1078,6 +1086,15 @@ EXTRA_DIST = $(TESTS) $(EXTRA_TESTS) \
 	debian/rules \
 	debian/source \
 	debian/source/format \
+	dist/linux/build.py \
+	dist/linux/standalone.py \
+	dist/macosx/fs-uae-config.icns \
+	dist/macosx/fs-uae.icns \
+	dist/macosx/PkgInfo \
+	dist/macosx/standalone.py \
+	dist/windows/clib.py \
+	dist/windows/iscc.py \
+	dist/windows/sign.py \
 	flac/include/FLAC/all.h \
 	flac/include/FLAC/assert.h \
 	flac/include/FLAC/callback.h \
@@ -1088,6 +1105,7 @@ EXTRA_DIST = $(TESTS) $(EXTRA_TESTS) \
 	flac/include/FLAC/stream_decoder.h \
 	flac/include/FLAC/stream_encoder.h \
 	fs-uae.spec \
+	icon/fs-uae.ico \
 	libudis86/README \
 	licenses/fs-uae.txt \
 	licenses/glib.txt \
@@ -1098,12 +1116,9 @@ EXTRA_DIST = $(TESTS) $(EXTRA_TESTS) \
 	licenses/libstdc++.txt \
 	licenses/lua.txt \
 	licenses/zlib.txt \
-	macosx/fs-uae-config.icns \
-	macosx/fs-uae.icns \
-	macosx/PkgInfo \
-	macosx/standalone.py \
 	po \
 	src/filesys_bootrom.cpp \
+	src/fs-uae/fs-uae.rc.in \
 	src/inputevents.def \
 	src/jit/compemu_optimizer_x86.cpp \
 	src/jit/compemu_raw_x86.cpp \
@@ -1154,6 +1169,8 @@ gen/cpuemu_21.cpp: gen/cpuemu_0.cpp
 gen/cpuemu_22.cpp: gen/cpuemu_0.cpp
 
 gen/cpuemu_23.cpp: gen/cpuemu_0.cpp
+
+gen/cpuemu_24.cpp: gen/cpuemu_0.cpp
 
 gen/cpuemu_31.cpp: gen/cpuemu_0.cpp
 
