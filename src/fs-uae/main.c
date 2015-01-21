@@ -43,6 +43,17 @@ static int g_warn_about_missing_config_file = 0;
 #define LOG_LINE "---------------------------------------------------------" \
         "-------------------\n"
 
+#ifdef WITH_LUA
+static fs_emu_lua_binding g_uae_lua_binding = {
+    .run_handler = amiga_lua_run_handler,
+    .run_script = amiga_lua_run_script,
+    .create_state = amiga_lua_create_state,
+    .destroy_state = amiga_lua_destroy_state,
+    .lock_state = amiga_lua_lock_state,
+    .unlock_state = amiga_lua_unlock_state
+};
+#endif
+
 static void change_port_device_mode(int data) {
     int modes = INPUTEVENT_AMIGA_JOYPORT_MODE_0_LAST -
             INPUTEVENT_AMIGA_JOYPORT_MODE_0_NONE + 1;
@@ -1110,9 +1121,9 @@ int main(int argc, char* argv[])
     amiga_set_init_function(on_init);
 
 #ifdef WITH_LUA
-    amiga_init_lua(fs_emu_acquire_lua, fs_emu_release_lua);
-    amiga_init_lua_state(fs_emu_get_lua_state());
-    fs_uae_init_lua_state(fs_emu_get_lua_state());
+    fs_emu_lua_set_binding(&g_uae_lua_binding);
+    amiga_lua_init(fs_emu_lua_bind, fs_emu_lua_unbind);
+    amiga_lua_set_extra_state_init(fs_emu_lua_setup_state);
 #endif
 
     if (fs_emu_get_video_format() == FS_EMU_VIDEO_FORMAT_RGBA) {
