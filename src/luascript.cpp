@@ -9,7 +9,13 @@
 #include "sysconfig.h"
 #include "sysdeps.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 #include <lualib.h>
+#ifdef __cplusplus
+}
+#endif
 
 #include "options.h"
 #include "savestate.h"

@@ -8,7 +8,14 @@
 #include "emu_lua.h"
 #include <fs/log.h>
 #include <fs/thread.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 #include <lualib.h>
+#ifdef __cplusplus
+}
+#endif
 
 static fs_mutex *g_mutex;
 lua_State *fs_emu_lua_state = NULL;

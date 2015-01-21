@@ -793,6 +793,7 @@ if WITH_LUA
 noinst_LIBRARIES += liblua.a
 AM_CPPFLAGS += -I$(s)/lua/src
 fs_uae_LDADD += liblua.a
+fs_uae_device_helper_LDADD += liblua.a
 liblua_a_SOURCES = \
 	lua/src/lapi.c \
 	lua/src/lapi.h \
