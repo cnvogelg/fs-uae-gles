@@ -34,13 +34,6 @@ static lua_func g_func_table[MAX_LUA_FUNCS];
 static fs_emu_lua_binding *g_binding = NULL;
 static int g_is_bound = 0;
 
-static void log_error(const char *msg) {
-#if 0
-    fs_log("%s: %s\n", msg, lua_tostring(fs_emu_lua_state, -1));
-    printf("%s: %s\n", msg, lua_tostring(fs_emu_lua_state, -1));
-#endif
-}
-
 static int l_fs_emu_log(lua_State *L) {
     int n = lua_gettop(L);
     if (n != 1) {
