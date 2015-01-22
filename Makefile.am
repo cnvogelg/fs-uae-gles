@@ -563,6 +563,7 @@ libfsemu_a_SOURCES = \
 	libfsemu/include/fs/ml.h \
 	libfsemu/include/fs/ml/opengl.h \
 	libfsemu/include/fs/ml/options.h \
+	libfsemu/include/fs/net.h \
 	libfsemu/include/fs/ref.h \
 	libfsemu/include/fs/thread.h \
 	libfsemu/include/fs/time.h \
@@ -591,6 +592,8 @@ libfsemu_a_SOURCES = \
 	libfsemu/src/emu/input.h \
 	libfsemu/src/emu/keynames.c \
 	libfsemu/src/emu/libfsemu.h \
+	libfsemu/src/emu/lua_shell.c \
+	libfsemu/src/emu/lua_shell.h \
 	libfsemu/src/emu/menu.c \
 	libfsemu/src/emu/menu.h \
 	libfsemu/src/emu/netplay.c \
