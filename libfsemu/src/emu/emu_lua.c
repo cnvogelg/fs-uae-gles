@@ -4,6 +4,8 @@
 
 #ifdef WITH_LUA
 
+#include <string.h>
+
 #include <fs/emu.h>
 #include <fs/emu_lua.h>
 #include <fs/log.h>
@@ -22,6 +24,10 @@ typedef struct lua_func {
     const char *name;
     fs_emu_lua_func func;
 } lua_func;
+
+#define MAX_POSTPONED_HANDLERS     16
+static const char *g_postponed_handlers[MAX_POSTPONED_HANDLERS];
+static int g_num_postponed_handlers;
 
 static int g_num_func = 0;
 static lua_func g_func_table[MAX_LUA_FUNCS];
@@ -62,6 +68,15 @@ void fs_emu_lua_bind(void)
     if((g_binding != NULL) && !g_is_bound) {
         g_is_bound = 1;
         fs_log("lua-fs: bound to emu\n");
+
+        // recall postponed handlers?
+        for(int i=0;i<g_num_postponed_handlers;i++) {
+            const char *name = g_postponed_handlers[i];
+            fs_log("lua-fs: calling postponed handler '%s'\n", name);
+            g_binding->run_handler(name);
+        }
+        g_num_postponed_handlers = 0;
+
     } else {
         fs_log("lua-fs: ERROR binding to emu!\n");
     }
@@ -139,8 +154,22 @@ int fs_emu_lua_run_handler(const char *name) {
     if(g_is_bound) {
         return g_binding->run_handler(name);
     } else {
-        fs_log("lua-fs: not bound: ignoring handler '%s'\n", name);
-        return -1;
+        // try to postpone handler
+        for(int i=0;i<g_num_postponed_handlers;i++) {
+            // already postponed?
+            if(strcmp(g_postponed_handlers[i], name)==0) {
+                return 0;
+            }
+        }
+        // no more slots free?
+        if(g_num_postponed_handlers == MAX_POSTPONED_HANDLERS) {
+            fs_log("lua-fs: ignoring handler '%s'. no slots free!\n", name);
+            return -1;
+        }
+        // store in slot
+        g_postponed_handlers[g_num_postponed_handlers++] = name;
+        fs_log("lua-fs: not bound: postpone handler '%s'\n", name);
+        return 0;
     }
 }
 
