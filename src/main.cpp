@@ -1003,7 +1003,7 @@ void do_start_program (void)
 	if (quit_program >= 0)
 		quit_program = UAE_RESET;
 #ifdef WITH_LUA
-	uae_lua_loadall ();
+	uae_lua_run_init_scripts ();
 #endif
 #ifdef FSUAE
 
