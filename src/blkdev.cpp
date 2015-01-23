@@ -21,6 +21,7 @@
 #include "zfile.h"
 #include "scsi.h"
 #include "statusline.h"
+#include "fsdb.h"
 #ifdef RETROPLATFORM
 #include "rp.h"
 #endif
@@ -48,6 +49,7 @@ struct blkdevstate
 	int wasopen;
 	bool mediawaschanged;
 	struct scsi_data_tape *tape;
+	bool showstatusline;
 };
 
 struct blkdevstate state[MAX_TOTAL_SCSI_DEVICES];
@@ -422,6 +424,19 @@ fallback:
 	return unitnum;
 }
 
+static void cd_statusline_label(int unitnum)
+{
+	TCHAR *p = currprefs.cdslots[unitnum].name;
+	if (p[0]) {
+		struct device_info di;
+		const TCHAR *fname = my_getfilepart(p);
+		if (sys_command_info(unitnum, &di, 0) && di.volume_id[0])
+			statusline_add_message(_T("CD%d: [%s] %s"), unitnum, di.volume_id, fname);
+		else
+			statusline_add_message(_T("CD%d: %s"), unitnum, fname);
+	}
+}
+
 int get_standard_cd_unit (cd_standard_unit csu)
 {
 	int unitnum = get_standard_cd_unit2 (&currprefs, csu);
@@ -435,6 +450,7 @@ int get_standard_cd_unit (cd_standard_unit csu)
 	if (currprefs.cdslots[unitnum].delayed) {
 		st->delayed = PRE_INSERT_DELAY;
 	}
+	st->showstatusline = true;
 	return unitnum;
 }
 
@@ -599,6 +615,11 @@ static void check_changes (int unitnum)
 		return;
 	}
 
+	if (st->showstatusline) {
+		cd_statusline_label(unitnum);
+		st->showstatusline = 0;
+	}
+
 	if (st->delayed) {
 		st->delayed--;
 		if (st->delayed == 0)
@@ -662,8 +683,6 @@ static void check_changes (int unitnum)
 	currprefs.cdslots[unitnum].inuse = changed_prefs.cdslots[unitnum].inuse = st->cdimagefileinuse;
 	st->newimagefile[0] = 0;
 	write_log (_T("CD: delayed insert '%s' (open=%d,unit=%d)\n"), currprefs.cdslots[unitnum].name[0] ? currprefs.cdslots[unitnum].name : _T("<EMPTY>"), st->wasopen ? 1 : 0, unitnum);
-	if (currprefs.cdslots[unitnum].name[0])
-		statusline_add_message(_T("CD%d: %s"), unitnum, currprefs.cdslots[unitnum].name);
 	device_func_init (0);
 	if (st->wasopen) {
 		if (!st->device_func->opendev (unitnum, currprefs.cdslots[unitnum].name, 0)) {
@@ -686,13 +705,14 @@ static void check_changes (int unitnum)
 		filesys_do_disk_change (unitnum, 1);
 	}
 	st->mediawaschanged = true;
-#ifdef RETROPLATFORM
-	rp_cd_image_change (unitnum, currprefs.cdslots[unitnum].name);
-#endif
+	st->showstatusline = true;
 	if (gotsem) {
 		freesem (unitnum);
 		gotsem = false;
 	}
+#ifdef RETROPLATFORM
+	rp_cd_image_change (unitnum, currprefs.cdslots[unitnum].name);
+#endif
 
 	set_config_changed ();
 
@@ -1013,7 +1033,27 @@ struct device_info *sys_command_info_session (int unitnum, struct device_info *d
 }
 struct device_info *sys_command_info (int unitnum, struct device_info *di, int quick)
 {
-	return sys_command_info_session (unitnum, di, quick, -1);
+	struct device_info *dix;
+
+	dix = sys_command_info_session (unitnum, di, quick, -1);
+	if (dix && dix->media_inserted && !quick) {
+		TCHAR *name = NULL;
+		uae_u8 buf[2048];
+		if (sys_command_cd_read(unitnum, buf, 16, 1)) {
+			if ((buf[0] == 1 || buf[0] == 2) && !memcmp(buf + 1, "CD001", 5)) {
+				TCHAR *p;
+				au_copy(dix->volume_id, 32, (uae_char*)buf + 40);
+				au_copy(dix->system_id, 32, (uae_char*)buf + 8);
+				p = dix->volume_id + _tcslen(dix->volume_id) - 1;
+				while (p > dix->volume_id && *p == ' ')
+					*p-- = 0;
+				p = dix->system_id + _tcslen(dix->system_id) - 1;
+				while (p > dix->system_id && *p == ' ')
+					*p-- = 0;
+			}
+		}
+	}
+	return dix; 
 }
 
 #define MODE_SELECT_6 0x15
