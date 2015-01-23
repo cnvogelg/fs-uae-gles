@@ -6,20 +6,147 @@
 
 #include "lua_shell.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+#include <lualib.h>
+#ifdef __cplusplus
+}
+#endif
+
 #include <string.h>
 #include <errno.h>
 #include <stdio.h>
+#include <stdarg.h>
 
 #include <fs/net.h>
 #include <fs/log.h>
 #include <fs/thread.h>
 #include <fs/conf.h>
+#include <fs/emu_lua.h>
 
+static const char *hello_msg = "FS-UAE " PACKAGE_VERSION " " LUA_VERSION "\n";
+static const char *bye_msg = "bye.\n";
+static const char *fail_msg = "FAILED!\n";
 static const char *default_addr = "127.0.0.1";
 static const char *default_port = "6800";
 static fs_thread *g_listen_thread = NULL;
 static int g_listen_fd;
 static int g_keep_listening;
+static int g_client_fd;
+
+#define MAX_CMD_LEN     256
+static char buf[MAX_CMD_LEN];
+
+static int myprintf(int fd, const char *fmt, ...)
+{
+    va_list ap;
+
+    va_start(ap, fmt);
+    int n = vsnprintf(buf, MAX_CMD_LEN, fmt, ap);
+    va_end(ap);
+    if(n>0) {
+        return write(fd, buf, n);
+    } else {
+        return 0;
+    }
+}
+
+static int handle_command(int fd, lua_State *L, const char *cmd_line)
+{
+    // parse and execute command
+    if(luaL_loadbuffer(L, cmd_line, strlen(cmd_line), "=shell")
+        || lua_pcall(L, 0, 0, 0)) {
+        // error
+        const char *err_msg = lua_tostring(L, -1);
+        myprintf(fd, "ERROR: %s\n", err_msg);
+        lua_pop(L,1);
+    }
+    return 0;
+}
+
+static int read_line(int fd, const char *prompt)
+{
+    int result;
+
+    // send prompt
+    result = write(fd, prompt, strlen(prompt));
+    if(result < 0) {
+        return result;
+    }
+
+    // read line
+    result = read(fd, buf, MAX_CMD_LEN-1);
+    if(result <= 0) {
+        return result;
+    }
+    if(buf[result-1] == '\n') {
+        buf[result-1] = '\0';
+        result--;
+    }
+    if(result>0) {
+        if(buf[result-1] == '\r') {
+            buf[result-1] = '\0';
+            result--;
+        }
+    }
+    return result;
+}
+
+static void main_loop(int fd, lua_State *L)
+{
+    int result = 0;
+    while(1) {
+        // read a command
+        result = read_line(fd, "> ");
+        if(result < 0) {
+            break;
+        }
+        // exit shell? -> CTRL+D
+        if(buf[0] == '\x04') {
+            break;
+        }
+        if(!strcmp(buf,"endshell")) {
+            break;
+        }
+        // execute command
+        result = handle_command(fd, L, buf);
+        if(result < 0) {
+            break;
+        }
+    }
+    // show final result
+    if(result < 0) {
+        write(fd, fail_msg, strlen(fail_msg));
+    } else {
+        write(fd, bye_msg, strlen(bye_msg));
+    }
+}
+
+static void handle_client(int fd)
+{
+    fs_log("lua-shell: client connect\n");
+
+    // welcome
+    write(fd, hello_msg, strlen(hello_msg));
+
+    // create lua context
+    lua_State *L = fs_emu_lua_create_state();
+    if(L == NULL) {
+        // error
+    }
+    else {
+        // enter main loop
+        main_loop(fd, L);
+
+        // free context
+        fs_emu_lua_destroy_state(L);
+    }
+
+    // close connection
+    close(fd);
+    fs_log("lua-shell: client disconnect\n");
+}
 
 static void *lua_shell_listener(void *data)
 {
@@ -34,10 +161,9 @@ static void *lua_shell_listener(void *data)
             fs_log("lua-shell: failed accept: %s\n", strerror(errno));
             break;
         }
-
-        fs_log("lua-shell: client connect\n");
-        close(client_fd);
-
+        g_client_fd = client_fd;
+        handle_client(client_fd);
+        g_client_fd = -1;
     }
     fs_log("lua-shell: -listener\n");
     return NULL;
@@ -114,8 +240,13 @@ void fs_emu_lua_shell_init(void)
 void fs_emu_lua_shell_free(void)
 {
     fs_log("lua-shell: stopping...\n");
-    
-    // close socket
+
+    // close client socket
+    if(g_client_fd >= 0) {
+        close(g_client_fd);
+    }
+
+    // close listener socket
     if(g_listen_fd >= 0) {
         close(g_listen_fd);
     }

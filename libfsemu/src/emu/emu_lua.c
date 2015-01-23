@@ -10,6 +10,7 @@
 #include <fs/emu_lua.h>
 #include <fs/log.h>
 #include <fs/thread.h>
+#include "lua_shell.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -70,6 +71,8 @@ void fs_emu_lua_bind(void)
         }
         g_num_postponed_handlers = 0;
 
+        // setup lua shell if configured
+        fs_emu_lua_shell_init();
     } else {
         fs_log("lua-fs: ERROR binding to emu!\n");
     }
@@ -78,6 +81,9 @@ void fs_emu_lua_bind(void)
 void fs_emu_lua_unbind(void)
 {
     if(g_is_bound) {
+        // shutdown lua shell if configured
+        fs_emu_lua_shell_free();
+
         g_is_bound = 0;
         fs_log("lua-fs: unbound from emu\n");
     } else {

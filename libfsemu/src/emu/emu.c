@@ -32,7 +32,6 @@
 #include "netplay.h"
 #include "theme.h"
 #include "video.h"
-#include "lua_shell.h"
 
 char *g_fs_emu_title = NULL;
 char *g_fs_emu_sub_title = NULL;
@@ -298,7 +297,6 @@ void fs_emu_init() {
 
 #ifdef WITH_LUA
     fs_emu_lua_init();
-    fs_emu_lua_shell_init();
 #endif
 
     g_gui_mutex = fs_mutex_create();
@@ -475,11 +473,6 @@ int fs_emu_run(fs_emu_main_function function) {
 #endif
 
     fs_emu_audio_shutdown();
-
-#ifdef WITH_LUA
-    fs_emu_lua_shell_free();
-#endif
-
     fs_emu_log("fs_emu_run: returning\n");
     return result;
 }
