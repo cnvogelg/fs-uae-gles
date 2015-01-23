@@ -226,13 +226,7 @@ void uae_lua_unlock_state(lua_State *L)
 
 lua_State *uae_lua_create_state(int flags)
 {
-    // find empty state slot
-    uae_lua_state_t *state = g_free;
-    if(state == NULL) {
-        write_log(_T("WARNING: too many lua states (ignored this one)\n"));
-        return NULL;
-    }
-
+    // create a new state
 	lua_State *L = luaL_newstate();
     if(L == NULL) {
         write_log(_T("WARNING: can't create new lua state\n"));
@@ -246,10 +240,20 @@ lua_State *uae_lua_create_state(int flags)
         g_extra_state_setup(L);
     }
 
-    // insert new state
+    // find empty state slot
     uae_sem_wait (&lua_sem);
+    uae_lua_state_t *state = g_free;
+    if(state == NULL) {
+        uae_sem_post (&lua_sem);
+        write_log(_T("WARNING: too many lua states (ignored this one)\n"));
+        return NULL;
+    }
+
+    // insert new state
     g_free = state->next;
     state->next = g_first;
+    state->state = L;
+    state->flags = flags;
     g_first = state;
     g_num_states ++;
     uae_sem_post (&lua_sem);
