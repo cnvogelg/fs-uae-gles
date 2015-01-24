@@ -47,6 +47,22 @@ static int l_fs_uae_get_rand_checksum(lua_State *L) {
     return 1;
 }
 
+static int l_floppy_set_file(lua_State *L)
+{
+    int index = luaL_checkint(L, -2);
+    const char *name = luaL_checkstring(L, -1);
+    amiga_floppy_set_file(index, name);
+    return 0;
+}
+
+static int l_cdrom_set_file(lua_State *L)
+{
+    int index = luaL_checkint(L, -2);
+    const char *name = luaL_checkstring(L, -1);
+    amiga_cdrom_set_file(index, name);
+    return 0;
+}
+
 static const struct luaL_Reg fsuaelib[] = {
     {"get_input_event", l_fs_uae_get_input_event},
     {"set_input_event", l_fs_uae_set_input_event},
@@ -54,6 +70,8 @@ static const struct luaL_Reg fsuaelib[] = {
     {"get_save_state_number", l_fs_uae_get_save_state_number},
     {"get_state_checksum", l_fs_uae_get_state_checksum},
     {"get_rand_checksum", l_fs_uae_get_rand_checksum},
+    {"floppy_set_file", l_floppy_set_file},
+    {"cdrom_set_file", l_cdrom_set_file},
     {NULL, NULL}
 };
 
