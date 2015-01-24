@@ -11,13 +11,11 @@
 
 #ifdef WITH_LUA
 
-#ifdef FSUAE // NL
+#ifdef __cplusplus
 extern "C" {
-#endif // NL
-
+#endif
 #include <lauxlib.h>
-
-#ifdef FSUAE // NL
+#ifdef __cplusplus
 }
 #endif
 

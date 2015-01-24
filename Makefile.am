@@ -304,6 +304,7 @@ libuae_a_SOURCES = \
 	src/include/isofs_api.h \
 	src/include/keyboard.h \
 	src/include/keybuf.h \
+	src/include/lualibuae.h \
 	src/include/luascript.h \
 	src/include/mackbd.h \
 	src/include/mmu_common.h \
@@ -865,7 +866,8 @@ liblua_a_SOURCES = \
 	lua/src/lzio.h
 fs_uae_SOURCES += \
 	src/fs-uae/luascript.c \
-	src/luascript.cpp
+	src/luascript.cpp \
+	src/lualibuae.cpp
 libfsemu_a_SOURCES += \
 	libfsemu/src/emu/emu_lua.c
 endif

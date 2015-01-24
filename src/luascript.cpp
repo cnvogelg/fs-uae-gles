@@ -18,14 +18,10 @@ extern "C" {
 #endif
 
 #include "options.h"
-#include "savestate.h"
-#include "memory.h"
-#include "debug.h"
-#include "identify.h"
-#include "luascript.h"
-#include "uae.h"
 #include "zfile.h"
-#include "threaddep/thread.h"
+#include "uae.h"
+#include "luascript.h"
+#include "lualibuae.h"
 
 #ifdef WITH_LUA
 
@@ -44,107 +40,11 @@ static uae_lua_state_cb g_extra_state_setup;
 static uae_lua_cb g_init_cb;
 static uae_lua_cb g_exit_cb;
 
-static int l_uae_read_u8(lua_State *L)
-{
-    int addr = luaL_checkint(L, 1);
-    int value = debug_read_memory_8(addr);
-    lua_pushinteger(L, value);
-    return value >= 0 ? 1 : 0;
-}
-
-static int l_uae_write_u8(lua_State *L)
-{
-    int addr = luaL_checkint(L, 1);
-    uint8_t value = luaL_checkint(L, 2);
-    debug_write_memory_8(addr, value);
-    return 0;
-}
-static int l_uae_write_u16(lua_State *L)
-{
-    int addr = luaL_checkint(L, 1);
-    uint16_t value = luaL_checkint(L, 2);
-    debug_write_memory_16(addr, value);
-    return 0;
-}
-
-static int l_uae_read_u16(lua_State *L)
-{
-    int addr = luaL_checkint(L, 1);
-    int value = debug_read_memory_16(addr);
-    lua_pushinteger(L, value);
-	return value >= 0 ? 1 : 0;
-}
-
-/* peek = read without any side-effects */
-static int l_uae_peek_u16(lua_State *L)
-{
-    int result = 0;
-	uint16_t value;
-    int addr = luaL_checkint(L, 1);
-
-	value = debug_peek_memory_16 (addr);
-	if (value >= 0) {
-        lua_pushinteger(L, value);
-        result = 1;
-    }
-    return result;
-}
-
-static int l_uae_read_config(lua_State *L)
-{
-	int result = 0;
-    const char *s = luaL_checkstring(L, 1);
-	TCHAR *ts = au(s);
-	TCHAR out[MAX_DPATH];
-	if (cfgfile_searchconfig(ts, -1, out, sizeof out / sizeof(TCHAR)) == -1) {
-		char *c = ua(out);
-		lua_pushstring(L, c);
-		xfree(c);
-		result = 1;
-	}
-	xfree(ts);
-	return result;
-}
-
-static int l_uae_write_config(lua_State *L)
-{
-    const char *s = luaL_checkstring(L, 1);
-	TCHAR *ts = au(s);
-	TCHAR out[MAX_DPATH];
-	cfgfile_modify(-1, ts, _tcslen(ts), out, sizeof out / sizeof(TCHAR));
-	char *c = ua(out);
-	lua_pushstring(L, c);
-	xfree(c);
-	return 1;
-}
-
-static int l_uae_log(lua_State *L)
-{
-    const char *s = luaL_checkstring(L, 1);
-    write_log("%s", s);
-    //printf("%s", s);
-    return 0;
-}
-
 static void setup_state(lua_State *L)
 {
-    lua_register(L, "uae_log", l_uae_log);
-
-    lua_register(L, "uae_read_u8", l_uae_read_u8);
-    lua_register(L, "uae_read_u16", l_uae_read_u16);
-    lua_register(L, "uae_peek_u16", l_uae_peek_u16);
-    lua_register(L, "uae_write_u8", l_uae_write_u8);
-    lua_register(L, "uae_write_u16", l_uae_write_u16);
-
-    lua_register(L, "uae_read_config", l_uae_read_config);
-    lua_register(L, "uae_write_config", l_uae_write_config);
-
-    for (int i = 0; custd[i].name; i++) {
-        char *s = ua(custd[i].name);
-        lua_pushinteger(L, custd[i].adr);
-        lua_setglobal(L, s);
-        xfree(s);
-    }
+    luaopen_uaelib(L); // get lib table
+    lua_setglobal(L, "uae"); // assign "uae"
+    lua_pop(L,1); // remove lib table
 }
 
 void uae_lua_log_error(lua_State *L, const char *msg)
