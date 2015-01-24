@@ -18,6 +18,7 @@ extern "C" {
 #include <errno.h>
 #include <stdio.h>
 #include <stdarg.h>
+#include <stdlib.h>
 
 #include <fs/net.h>
 #include <fs/log.h>
@@ -36,14 +37,14 @@ static int g_keep_listening;
 static int g_client_fd;
 
 #define MAX_CMD_LEN     256
-static char buf[MAX_CMD_LEN];
 
 static int myprintf(int fd, const char *fmt, ...)
 {
     va_list ap;
+    char buf[128];
 
     va_start(ap, fmt);
-    int n = vsnprintf(buf, MAX_CMD_LEN, fmt, ap);
+    int n = vsnprintf(buf, 128, fmt, ap);
     va_end(ap);
     if(n>0) {
         return write(fd, buf, n);
@@ -61,7 +62,8 @@ static void print_lua_error(int fd, lua_State *L)
 }
 
 // print replacement that writes to socket
-static int l_my_print(lua_State* L) {
+static int l_my_print(lua_State* L)
+{
     // retrieve fd via closure
     int fd = lua_tointeger(L, lua_upvalueindex(1));
 
@@ -87,12 +89,24 @@ static int l_my_print(lua_State* L) {
     return 0;
 }
 
-static void setup_shell_state(int fd, lua_State *L)
+static int l_my_quit(lua_State *L)
+{
+    int *quit_flag = (int *)lua_touserdata(L, lua_upvalueindex(1));
+    *quit_flag = 1;
+    return 0;
+}
+
+static void setup_shell_state(int fd, lua_State *L, int *quit_flag)
 {
     // replace print function
     lua_pushinteger(L, fd);
     lua_pushcclosure(L, &l_my_print, 1);
     lua_setglobal(L, "print");
+
+    // add a quit function
+    lua_pushlightuserdata(L, quit_flag);
+    lua_pushcclosure(L, &l_my_quit, 1);
+    lua_setglobal(L, "quit");
 }
 
 static int handle_command(int fd, lua_State *L, const char *cmd_line)
@@ -116,56 +130,79 @@ static int handle_command(int fd, lua_State *L, const char *cmd_line)
     return 0;
 }
 
-static int read_line(int fd, const char *prompt)
+static char* read_line(int fd, const char *prompt, char *cmd_line, int len)
 {
     int result;
 
     // send prompt
     result = write(fd, prompt, strlen(prompt));
     if(result < 0) {
-        return result;
+        return NULL;
     }
 
+    // leave room for prepending "return"
+    char *buf = cmd_line + 6;
+    len -= 7;
+
     // read line
-    result = read(fd, buf, MAX_CMD_LEN-1);
-    if(result <= 0) {
-        return result;
-    }
-    if(buf[result-1] == '\n') {
-        buf[result-1] = '\0';
-        result--;
+    result = read(fd, buf, len);
+    if(result < 0) {
+        return NULL;
     }
     if(result>0) {
-        if(buf[result-1] == '\r') {
+        if(buf[result-1] == '\n') {
             buf[result-1] = '\0';
             result--;
         }
     }
-    return result;
+    if(result>0) {
+        if(buf[result-1] == '\r') {
+            buf[result-1] = '\0';
+        }
+    }
+
+    // prepend 'return' ?
+    if(buf[0]=='=') {
+        strcpy(cmd_line,"return");
+        buf[0] = ' ';
+        return cmd_line;
+    } else {
+        return buf;
+    }
 }
 
-static void main_loop(int fd, lua_State *L)
+static void main_loop(int fd, lua_State *L, int *quit_flag)
 {
+    char *cmd_line = (char *)malloc(MAX_CMD_LEN);
+    if(cmd_line == NULL) {
+        myprintf(fd, "ERROR: out of memory\n");
+        return;
+    }
+
     int result = 0;
-    while(1) {
+    while(!*quit_flag) {
         // read a command
-        result = read_line(fd, "> ");
-        if(result < 0) {
+        char *line = read_line(fd, "> ", cmd_line, MAX_CMD_LEN);
+        if(line == NULL) {
+            myprintf(fd, "ERROR: error reading line\n");
             break;
         }
         // exit shell? -> CTRL+D
-        if(buf[0] == '\x04') {
-            break;
-        }
-        if(!strcmp(buf,"endshell")) {
+        if(line[0] == '\x04') {
+            myprintf(fd, "aborted.\n");
             break;
         }
         // execute command
-        result = handle_command(fd, L, buf);
+        result = handle_command(fd, L, line);
         if(result < 0) {
+            myprintf(fd, "ERROR: command handling failed\n");
             break;
         }
     }
+
+    // free command line
+    free(cmd_line);
+
     // show final result
     if(result < 0) {
         write(fd, fail_msg, strlen(fail_msg));
@@ -187,11 +224,14 @@ static void handle_client(int fd)
         // error
     }
     else {
+        // flag to tell shell end
+        int quit_flag = 0;
+
         // setup state for shell
-        setup_shell_state(fd, L);
+        setup_shell_state(fd, L, &quit_flag);
 
         // enter main loop
-        main_loop(fd, L);
+        main_loop(fd, L, &quit_flag);
 
         // free context
         fs_emu_lua_destroy_state(L);
