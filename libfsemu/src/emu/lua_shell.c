@@ -52,15 +52,66 @@ static int myprintf(int fd, const char *fmt, ...)
     }
 }
 
+static void print_lua_error(int fd, lua_State *L)
+{
+    // pop error and print
+    const char *err_msg = lua_tostring(L, -1);
+    myprintf(fd, "ERROR: %s\n", err_msg);
+    lua_pop(L,1);
+}
+
+// print replacement that writes to socket
+static int l_my_print(lua_State* L) {
+    // retrieve fd via closure
+    int fd = lua_tointeger(L, lua_upvalueindex(1));
+
+    int n = lua_gettop(L);
+    lua_getglobal(L, "tostring");
+    for(int i=1; i<=n; i++) {
+      lua_pushvalue(L, -1);  /* function to be called */
+      lua_pushvalue(L, i);   /* value to print */
+      lua_call(L, 1, 1);
+      size_t l;
+      const char *s = lua_tolstring(L, -1, &l);  /* get result */
+      if (s == NULL) {
+        return luaL_error(L,
+           LUA_QL("tostring") " must return a string to " LUA_QL("print"));
+      }
+      if (i>1) {
+          write(fd, "\t", 1);
+      }
+      write(fd, s, l);
+      lua_pop(L, 1);  /* pop result */
+    }
+    write(fd, "\n", 1);
+    return 0;
+}
+
+static void setup_shell_state(int fd, lua_State *L)
+{
+    // replace print function
+    lua_pushinteger(L, fd);
+    lua_pushcclosure(L, &l_my_print, 1);
+    lua_setglobal(L, "print");
+}
+
 static int handle_command(int fd, lua_State *L, const char *cmd_line)
 {
     // parse and execute command
     if(luaL_loadbuffer(L, cmd_line, strlen(cmd_line), "=shell")
-        || lua_pcall(L, 0, 0, 0)) {
-        // error
-        const char *err_msg = lua_tostring(L, -1);
-        myprintf(fd, "ERROR: %s\n", err_msg);
-        lua_pop(L,1);
+        || lua_pcall(L, 0, LUA_MULTRET, 0)) {
+        print_lua_error(fd, L);
+        return 0;
+    }
+
+    // is there a result? -> call print!
+    if (lua_gettop(L) > 0) {
+      luaL_checkstack(L, LUA_MINSTACK, "too many results to print");
+      lua_getglobal(L, "print");
+      lua_insert(L, 1);
+      if (lua_pcall(L, lua_gettop(L)-1, 0, 0) != LUA_OK) {
+          print_lua_error(fd, L);
+      }
     }
     return 0;
 }
@@ -136,6 +187,9 @@ static void handle_client(int fd)
         // error
     }
     else {
+        // setup state for shell
+        setup_shell_state(fd, L);
+
         // enter main loop
         main_loop(fd, L);
 
