@@ -24,7 +24,7 @@ extern void fs_emu_lua_unbind(void);
 // register functions
 extern void fs_emu_lua_init(void);
 extern void fs_emu_lua_register_func(const char *name, fs_emu_lua_func f);
-extern void fs_emu_lua_setup_state(lua_State *);
+extern int luaopen_fsemulib(lua_State *state);
 
 extern lua_State *fs_emu_lua_create_state(void);
 extern void fs_emu_lua_destroy_state(lua_State *);

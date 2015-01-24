@@ -56,11 +56,13 @@ static fs_emu_lua_binding g_uae_lua_binding = {
 static void lua_setup_state(lua_State *L)
 {
     // open "fsemu" lib
-    fs_emu_lua_setup_state(L);
+    luaopen_fsemulib(L); // get lib table
+    lua_setglobal(L, "fsemu"); // assign global name "fsemu"
+    lua_pop(L,1); // remove lib table
 
     // open "fsuae" lib
     luaopen_fsuaelib(L); // get lib table
-    lua_setglobal(L, "fsuae"); // assign "fsuae"
+    lua_setglobal(L, "fsuae"); // assign global name "fsuae"
     lua_pop(L,1); // remove lib table
 }
 #endif

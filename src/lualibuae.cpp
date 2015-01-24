@@ -130,7 +130,6 @@ int luaopen_uaelib(lua_State *L)
     // add names of custom chip registers
     for (int i = 0; custd[i].name; i++) {
         char *s = ua(custd[i].name);
-        puts(s);
         lua_pushstring(L, s); // key
         lua_pushinteger(L, custd[i].adr); // value
         lua_settable(L, -3);

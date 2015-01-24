@@ -49,7 +49,7 @@ static int l_fs_emu_log(lua_State *L) {
 
 void fs_emu_lua_init(void) {
     fs_log("lua-fs: init\n");
-    fs_emu_lua_register_func("fs_emu_log", l_fs_emu_log);
+    fs_emu_lua_register_func("log", l_fs_emu_log);
 }
 
 void fs_emu_lua_set_binding(fs_emu_lua_binding *b)
@@ -103,13 +103,19 @@ void fs_emu_lua_register_func(const char *name, fs_emu_lua_func func)
     }
 }
 
-void fs_emu_lua_setup_state(lua_State *state)
+int luaopen_fsemulib(lua_State *L)
 {
-    fs_log("lua-fs: setup state %p with %d functions\n", state, g_num_func);
+    fs_log("lua-fs: setup state %p with %d 'fsemu' functions\n", L, g_num_func);
+
+    // create "fsemu" table
+    lua_newtable(L);
     for(int i=0;i<g_num_func;i++) {
         lua_func *f = &g_func_table[i];
-        lua_register(state, f->name, f->func);
+        lua_pushstring(L, f->name);
+        lua_pushcfunction(L, f->func);
+        lua_settable(L, -3);
     }
+    return 1;
 }
 
 lua_State *fs_emu_lua_create_state(void)

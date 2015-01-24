@@ -1193,8 +1193,8 @@ void fs_emu_xml_shader_init(void) {
     fs_emu_load_default_shader();
 
 #ifdef WITH_LUA
-    fs_emu_lua_register_func("fs_emu_load_shader", l_fs_emu_load_shader);
-    fs_emu_lua_register_func("fs_emu_set_shader", l_fs_emu_set_shader);
+    fs_emu_lua_register_func("load_shader", l_fs_emu_load_shader);
+    fs_emu_lua_register_func("set_shader", l_fs_emu_set_shader);
 #endif
 }
 
