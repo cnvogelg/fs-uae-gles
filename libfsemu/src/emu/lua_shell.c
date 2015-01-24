@@ -149,6 +149,9 @@ static char* read_line(int fd, const char *prompt, char *cmd_line, int len)
     if(result < 0) {
         return NULL;
     }
+
+    // strip return/newline
+    buf[result] = '\0';
     if(result>0) {
         if(buf[result-1] == '\n') {
             buf[result-1] = '\0';
