@@ -865,7 +865,7 @@ liblua_a_SOURCES = \
 	lua/src/lzio.c \
 	lua/src/lzio.h
 fs_uae_SOURCES += \
-	src/fs-uae/luascript.c \
+	src/fs-uae/lualibfsuae.c \
 	src/luascript.cpp \
 	src/lualibuae.cpp
 libfsemu_a_SOURCES += \

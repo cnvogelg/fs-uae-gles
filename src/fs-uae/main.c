@@ -52,6 +52,17 @@ static fs_emu_lua_binding g_uae_lua_binding = {
     .lock_state = amiga_lua_lock_state,
     .unlock_state = amiga_lua_unlock_state
 };
+
+static void lua_setup_state(lua_State *L)
+{
+    // open "fsemu" lib
+    fs_emu_lua_setup_state(L);
+
+    // open "fsuae" lib
+    luaopen_fsuaelib(L); // get lib table
+    lua_setglobal(L, "fsuae"); // assign "fsuae"
+    lua_pop(L,1); // remove lib table
+}
 #endif
 
 static void change_port_device_mode(int data) {
@@ -1123,7 +1134,7 @@ int main(int argc, char* argv[])
 #ifdef WITH_LUA
     fs_emu_lua_set_binding(&g_uae_lua_binding);
     amiga_lua_init(fs_emu_lua_bind, fs_emu_lua_unbind);
-    amiga_lua_set_extra_state_init(fs_emu_lua_setup_state);
+    amiga_lua_set_extra_state_init(lua_setup_state);
 #endif
 
     if (fs_emu_get_video_format() == FS_EMU_VIDEO_FORMAT_RGBA) {

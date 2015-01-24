@@ -47,15 +47,23 @@ static int l_fs_uae_get_rand_checksum(lua_State *L) {
     return 1;
 }
 
-void fs_uae_init_lua_state(lua_State *L) {
-    fs_log("fs_uae_lua_init_state %p\n", L);
-    lua_register(L, "fs_uae_get_input_event", l_fs_uae_get_input_event);
-    lua_register(L, "fs_uae_set_input_event", l_fs_uae_set_input_event);
-    lua_register(L, "fs_uae_send_input_event", l_fs_uae_send_input_event);
-    lua_register(L, "fs_uae_get_save_state_number",
-            l_fs_uae_get_save_state_number);
-    lua_register(L, "fs_uae_get_state_checksum", l_fs_uae_get_state_checksum);
-    lua_register(L, "fs_uae_get_rand_checksum", l_fs_uae_get_rand_checksum);
+static const struct luaL_Reg fsuaelib[] = {
+    {"get_input_event", l_fs_uae_get_input_event},
+    {"set_input_event", l_fs_uae_set_input_event},
+    {"send_input_event", l_fs_uae_send_input_event},
+    {"get_save_state_number", l_fs_uae_get_save_state_number},
+    {"get_state_checksum", l_fs_uae_get_state_checksum},
+    {"get_rand_checksum", l_fs_uae_get_rand_checksum},
+    {NULL, NULL}
+};
+
+int luaopen_fsuaelib(lua_State *L)
+{
+    fs_log("lua: open fsuaelib for state %p\n", L);
+    lua_newtable(L);
+    luaL_setfuncs(L, fsuaelib, 0);
+    // top is now uaelib table
+    return 1;
 }
 
 #endif
