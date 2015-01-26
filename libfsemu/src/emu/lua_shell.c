@@ -195,8 +195,11 @@ static void main_loop(int fd, lua_State *L, int *quit_flag)
             myprintf(fd, "aborted.\n");
             break;
         }
+
         // execute command
+        fs_emu_lua_lock_state(L);
         result = handle_command(fd, L, line);
+        fs_emu_lua_unlock_state(L);
         if(result < 0) {
             myprintf(fd, "ERROR: command handling failed\n");
             break;
