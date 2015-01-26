@@ -65,6 +65,7 @@
 #include "disk.h"
 #include "threaddep/thread.h"
 #include "a2091.h"
+#include "devices.h"
 
 #ifdef FSUAE // NL
 #include "uae/fs.h"
@@ -526,14 +527,7 @@ void restore_state (const TCHAR *filename)
 	savestate_file = f;
 	restore_header (chunk);
 	xfree (chunk);
-	restore_cia_start ();
-	changed_prefs.bogomem_size = 0;
-	changed_prefs.chipmem_size = 0;
-	changed_prefs.fastmem_size = 0;
-	changed_prefs.z3fastmem_size = 0;
-	changed_prefs.z3fastmem2_size = 0;
-	changed_prefs.mbresmem_low_size = 0;
-	changed_prefs.mbresmem_high_size = 0;
+	devices_restore_start();
 	z3num = 0;
 	for (;;) {
 		name[0] = 0;
@@ -707,7 +701,7 @@ void restore_state (const TCHAR *filename)
 		else if (!_tcscmp (name, _T("GAYL")))
 			end = restore_gayle (chunk);
 		else if (!_tcscmp (name, _T("IDE ")))
-			end = restore_ide (chunk);
+			end = restore_gayle_ide (chunk);
 		else if (!_tcsncmp (name, _T("CDU"), 3))
 			end = restore_cd (name[3] - '0', chunk);
 #ifdef A2065
@@ -1044,7 +1038,7 @@ static int save_state_internal (struct zfile *f, const TCHAR *description, int c
 		xfree(dst);
 	}
 	for (i = 0; i < 4; i++) {
-		dst = save_ide (i, &len, NULL);
+		dst = save_gayle_ide (i, &len, NULL);
 		if (dst) {
 			save_chunk (f, dst, len, _T("IDE "), 0);
 			xfree (dst);
@@ -1360,7 +1354,7 @@ void savestate_rewind (void)
 		p = restore_gayle (p);
 	for (i = 0; i < 4; i++) {
 		if (restore_u32_func (&p))
-			p = restore_ide (p);
+			p = restore_gayle_ide (p);
 	}
 	p += 4;
 	if (p != p2) {
@@ -1734,7 +1728,7 @@ retry2:
 		p3 = p;
 		save_u32_func (&p, 0);
 		tlen += 4;
-		if (save_ide (i, &len, p)) {
+		if (save_gayle_ide (i, &len, p)) {
 			save_u32_func (&p3, 1);
 			tlen += len;
 			p += len;

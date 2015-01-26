@@ -113,6 +113,7 @@ struct cdslot
 	TCHAR name[MAX_DPATH];
 	bool inuse;
 	bool delayed;
+	bool temporary;
 	int type;
 };
 struct floppyslot
@@ -209,6 +210,8 @@ enum { CP_GENERIC = 1, CP_CDTV, CP_CDTVCR, CP_CD32, CP_A500, CP_A500P, CP_A600, 
 #define MONITOREMU_AUTO 1
 #define MONITOREMU_A2024 2
 #define MONITOREMU_GRAFFITI 3
+#define MONITOREMU_HAM_E 4
+#define MONITOREMU_DCTV 5
 
 #define MAX_FILTERSHADERS 4
 
@@ -334,8 +337,10 @@ struct uae_prefs {
 	int sound_interpol;
 	int sound_filter;
 	int sound_filter_type;
-	int sound_volume;
+	int sound_volume_master;
+	int sound_volume_paula;
 	int sound_volume_cd;
+	int sound_volume_board;
 	bool sound_stereo_swap_paula;
 	bool sound_stereo_swap_ahi;
 	bool sound_auto;
@@ -566,6 +571,7 @@ struct uae_prefs {
 	bool uae_hide_autoconfig;
 	int z3_mapping_mode;
 	bool sound_toccata;
+	bool sound_toccata_mixer;
 
 	int mountitems;
 	struct uaedev_config_data mountconfig[MOUNT_CONFIG_SIZE];

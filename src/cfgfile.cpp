@@ -218,7 +218,7 @@ static const TCHAR *dongles[] =
 };
 static const TCHAR *cdmodes[] = { _T("disabled"), _T(""), _T("image"), _T("ioctl"), _T("spti"), _T("aspi"), 0 };
 static const TCHAR *cdconmodes[] = { _T(""), _T("uae"), _T("ide"), _T("scsi"), _T("cdtv"), _T("cd32"), 0 };
-static const TCHAR *specialmonitors[] = { _T("none"), _T("autodetect"), _T("a2024"), _T("graffiti"), 0 };
+static const TCHAR *specialmonitors[] = { _T("none"), _T("autodetect"), _T("a2024"), _T("graffiti"), _T("ham_e"), _T("dctv"), 0 };
 static const TCHAR *rtgtype[] = {
 	_T("ZorroII"), _T("ZorroIII"),
 	_T("PicassoII"),
@@ -245,6 +245,8 @@ static const TCHAR *cpuboards[] = {
 	_T("A2630"),
 	_T("DKB12x0"),
 	_T("FusionForty"),
+	_T("A3001SI"),
+	_T("A3001SII"),
 	NULL
 };
 static const TCHAR *ppc_implementations[] = {
@@ -284,7 +286,7 @@ static int leds_order[] = { 3, 6, 7, 8, 9, 4, 5, 2, 1, 0, 9 };
 static const TCHAR *lacer[] = { _T("off"), _T("i"), _T("p"), 0 };
 static const TCHAR *hdcontrollers[] = {
 	_T("uae"),
-	_T("ide%d"),
+	_T("ide%d"), _T("ide%d_mainboard"), _T("ide%d_a3001"),
 	_T("scsi%d"), _T("scsi%d_a2091"),  _T("scsi%d_a2091-2"), _T("scsi%d_gvp"), _T("scsi%d_gvp-2"), _T("scsi%d_a4091"),  _T("scsi%d_a4091-2"),
 	_T("scsi%d_fastlane"), _T("scsi%d_fastlane-2"),
 	_T("scsi%d_oktagon2008"), _T("scsi%d_oktagon2008-2"),
@@ -1165,9 +1167,12 @@ void cfgfile_save_options (struct zfile *f, struct uae_prefs *p, int type)
 	cfgfile_write_str (f, _T("sound_interpol"), interpolmode[p->sound_interpol]);
 	cfgfile_write_str (f, _T("sound_filter"), soundfiltermode1[p->sound_filter]);
 	cfgfile_write_str (f, _T("sound_filter_type"), soundfiltermode2[p->sound_filter_type]);
-	cfgfile_write (f, _T("sound_volume"), _T("%d"), p->sound_volume);
+	cfgfile_write (f, _T("sound_volume"), _T("%d"), p->sound_volume_master);
+	cfgfile_write (f, _T("sound_volume_paula"), _T("%d"), p->sound_volume_paula);
 	if (p->sound_volume_cd >= 0)
 		cfgfile_write (f, _T("sound_volume_cd"), _T("%d"), p->sound_volume_cd);
+	if (p->sound_volume_board >= 0)
+		cfgfile_write (f, _T("sound_volume_ahi"), _T("%d"), p->sound_volume_board);
 	cfgfile_write_bool (f, _T("sound_auto"), p->sound_auto);
 	cfgfile_write_bool (f, _T("sound_cdaudio"), p->sound_cdaudio);
 	cfgfile_write_bool (f, _T("sound_stereo_swap_paula"), p->sound_stereo_swap_paula);
@@ -1618,7 +1623,8 @@ void cfgfile_save_options (struct zfile *f, struct uae_prefs *p, int type)
 	else
 		cfgfile_dwrite (f, _T("catweasel"), _T("%d"), p->catweasel);
 	cfgfile_write_bool(f, _T("toccata"), p->sound_toccata);
-
+	if (p->sound_toccata_mixer)
+		cfgfile_write_bool(f, _T("toccata_mixer"), p->sound_toccata_mixer);
 
 	cfgfile_write_str (f, _T("kbd_lang"), (p->keyboard_lang == KBD_LANG_DE ? _T("de")
 		: p->keyboard_lang == KBD_LANG_DK ? _T("dk")
@@ -2152,8 +2158,10 @@ static int cfgfile_parse_host (struct uae_prefs *p, TCHAR *option, TCHAR *value)
 		|| cfgfile_intval (option, value, _T("state_replay_buffers"), &p->statecapturebuffersize, 1)
 		|| cfgfile_yesno (option, value, _T("state_replay_autoplay"), &p->inprec_autoplay)
 		|| cfgfile_intval (option, value, _T("sound_frequency"), &p->sound_freq, 1)
-		|| cfgfile_intval (option, value, _T("sound_volume"), &p->sound_volume, 1)
+		|| cfgfile_intval (option, value, _T("sound_volume"), &p->sound_volume_master, 1)
+		|| cfgfile_intval (option, value, _T("sound_volume_paula"), &p->sound_volume_paula, 1)
 		|| cfgfile_intval (option, value, _T("sound_volume_cd"), &p->sound_volume_cd, 1)
+		|| cfgfile_intval (option, value, _T("sound_volume_ahi"), &p->sound_volume_board, 1)
 		|| cfgfile_intval (option, value, _T("sound_stereo_separation"), &p->sound_stereo_separation, 1)
 		|| cfgfile_intval (option, value, _T("sound_stereo_mixing_delay"), &p->sound_mixed_stereo_delay, 1)
 		|| cfgfile_intval (option, value, _T("sampler_frequency"), &p->sampler_freq, 1)
@@ -3168,12 +3176,13 @@ static void get_filesys_controller (const TCHAR *hdc, int *type, int *num)
 		if (hdunit < 0 || hdunit > 3)
 			hdunit = 0;
 	} else if(_tcslen (hdc) >= 5 && !_tcsncmp (hdc, _T("scsi"), 4)) {
-		const TCHAR *ext;
 		hdcv = HD_CONTROLLER_TYPE_SCSI_AUTO;
 		hdunit = hdc[4] - '0';
 		if (hdunit < 0 || hdunit > 7)
 			hdunit = 0;
-		ext = _tcsrchr (hdc, '_');
+	}
+	if (hdcv > HD_CONTROLLER_TYPE_UAE) {
+		const TCHAR *ext = _tcsrchr (hdc, '_');
 		if (ext) {
 			ext++;
 			for (int i = 0; hdcontrollers[i]; i++) {
@@ -3762,6 +3771,7 @@ static int cfgfile_parse_hardware (struct uae_prefs *p, const TCHAR *option, TCH
 		|| cfgfile_yesno (option, value, _T("floppy_write_protect"), &p->floppy_read_only)
 		|| cfgfile_yesno (option, value, _T("uae_hide_autoconfig"), &p->uae_hide_autoconfig)
 		|| cfgfile_yesno (option, value, _T("toccata"), &p->sound_toccata)
+		|| cfgfile_yesno (option, value, _T("toccata_mixer"), &p->sound_toccata_mixer)
 		|| cfgfile_yesno (option, value, _T("uaeserial"), &p->uaeserial))
 		return 1;
 
@@ -5786,7 +5796,8 @@ static void buildin_default_prefs (struct uae_prefs *p)
 	p->maprom = 0;
 	p->cachesize = 0;
 	p->socket_emu = 0;
-	p->sound_volume = 0;
+	p->sound_volume_master = 0;
+	p->sound_volume_paula = 0;
 	p->sound_volume_cd = 0;
 	p->clipboard_sharing = false;
 	p->ppc_mode = 0;

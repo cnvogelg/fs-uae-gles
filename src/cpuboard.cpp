@@ -1746,22 +1746,39 @@ static struct zfile *flashfile_open(const TCHAR *name)
 {
 	struct zfile *f;
 	TCHAR path[MAX_DPATH];
+	bool rw = true;
 
 	if (!name[0])
 		return NULL;
-	f = zfile_fopen(name, _T("rb+"), ZFD_NONE);
+	f = zfile_fopen(name, _T("rb"), ZFD_NORMAL);
+	if (f) {
+		if (zfile_iscompressed(f)) {
+			rw = false;
+		} else {
+			zfile_fclose(f);
+			f = NULL;
+		}
+	}
 	if (!f) {
-		f = zfile_fopen(name, _T("rb"), ZFD_NORMAL);
+		rw = true;
+		f = zfile_fopen(name, _T("rb+"), ZFD_NONE);
 		if (!f) {
-			fetch_rompath(path, sizeof path / sizeof(TCHAR));
-			_tcscat(path, name);
-			f = zfile_fopen(path, _T("rb+"), ZFD_NONE);
-			if (!f)
-				f = zfile_fopen(path, _T("rb"), ZFD_NORMAL);
+			rw = false;
+			f = zfile_fopen(name, _T("rb"), ZFD_NORMAL);
+			if (!f) {
+				fetch_rompath(path, sizeof path / sizeof(TCHAR));
+				_tcscat(path, name);
+				rw = true;
+				f = zfile_fopen(path, _T("rb+"), ZFD_NONE);
+				if (!f) {
+					rw = false;
+					f = zfile_fopen(path, _T("rb"), ZFD_NORMAL);
+				}
+			}
 		}
 	}
 	if (f)
-		write_log(_T("Accelerator board flash file '%s' loaded.\n"), name);
+		write_log(_T("Accelerator board flash file '%s' loaded, %s.\n"), name, rw ? _T("RW") : _T("RO"));
 	return f;
 }
 
@@ -1815,6 +1832,9 @@ addrbank *cpuboard_autoconfig_init(void)
 		roms[0] = 105;
 		roms[1] = 106;
 		break;
+	case BOARD_A3001_I:
+	case BOARD_A3001_II:
+		return &expamem_null;
 	case BOARD_BLIZZARD_1230_IV_SCSI:
 		roms2[0] = 94;
 	case BOARD_BLIZZARD_1230_IV:
