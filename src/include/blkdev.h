@@ -88,6 +88,8 @@ struct device_info {
 	TCHAR revision[6];
 	const TCHAR *backend;
 	struct cd_toc_head toc;
+	TCHAR system_id[33];
+	TCHAR volume_id[33];
 };
 
 struct amigascsi
@@ -194,6 +196,7 @@ extern int scsi_cd_emulate (int unitnum, uae_u8 *cmdbuf, int scsi_cmd_len,
 	uae_u8 *scsi_data, int *data_len, uae_u8 *r, int *reply_len, uae_u8 *s, int *sense_len, bool atapi);
 
 extern void blkdev_vsync (void);
+extern void restore_blkdev_start(void);
 
 extern int msf2lsn (int msf);
 extern int lsn2msf (int lsn);

@@ -1194,6 +1194,27 @@ static int nodisk (struct hardfiledata *hfd)
 	return 0;
 }
 
+static void setdrivestring(const TCHAR *s, uae_u8 *d, int start, int length)
+{
+	int i = 0;
+	uae_char *ss = ua(s);
+	while (i < length && ss[i]) {
+		d[start + i] = ss[i];
+		i++;
+	}
+	while (i > 0) {
+		uae_char c = d[start + i - 1];
+		if (c != '_')
+			break;
+		i--;
+	}
+	while (i < length) {
+		d[start + i] = 32;
+		i++;
+	}
+	xfree (ss);
+}
+
 int scsi_hd_emulate (struct hardfiledata *hfd, struct hd_hardfiledata *hdhfd, uae_u8 *cmdbuf, int scsi_cmd_len,
 	uae_u8 *scsi_data, int *data_len, uae_u8 *r, int *reply_len, uae_u8 *s, int *sense_len)
 {
@@ -1201,14 +1222,17 @@ int scsi_hd_emulate (struct hardfiledata *hfd, struct hd_hardfiledata *hdhfd, ua
 	int lr = 0, ls = 0;
 	int scsi_len = -1;
 	int status = 0;
-	int i, lun;
-	char *ss;
+	int lun;
 
 	if (log_scsiemu) {
 		write_log (_T("SCSIEMU HD %d: %02X.%02X.%02X.%02X.%02X.%02X.%02X.%02X.%02X.%02X.%02X.%02X CMDLEN=%d DATA=%p\n"), hfd->unitnum,
 			cmdbuf[0], cmdbuf[1], cmdbuf[2], cmdbuf[3], cmdbuf[4], cmdbuf[5], cmdbuf[6], 
 			cmdbuf[7], cmdbuf[8], cmdbuf[9], cmdbuf[10], cmdbuf[11],
 			scsi_cmd_len, scsi_data);
+	}
+
+	if (cmdbuf[0] == 0x03) { /* REQUEST SENSE */
+		return 0;
 	}
 
 	*reply_len = *sense_len = 0;
@@ -1219,7 +1243,8 @@ int scsi_hd_emulate (struct hardfiledata *hfd, struct hd_hardfiledata *hdhfd, ua
 		s[2] = 5; /* ILLEGAL REQUEST */
 		s[12] = 0x25; /* INVALID LUN */
 		ls = 0x12;
-		goto err;
+		write_log (_T("UAEHF: CMD=%02X LUN=%d ignored\n"), cmdbuf[0], lun);
+		goto err_exit;
 	}
 	switch (cmdbuf[0])
 	{
@@ -1278,45 +1303,15 @@ int scsi_hd_emulate (struct hardfiledata *hfd, struct hd_hardfiledata *hdhfd, ua
 			r[2] = 2; /* supports SCSI-2 */
 			r[3] = 2; /* response data format */
 			r[4] = 32; /* additional length */
-			r[7] = 0x20; /* 16 bit bus */
+			r[7] = 0;
 			scsi_len = lr = alen < 36 ? alen : 36;
 			if (hdhfd) {
 				r[2] = hdhfd->ansi_version;
 				r[3] = hdhfd->ansi_version >= 2 ? 2 : 0;
 			}
-			ss = ua (hfd->vendor_id);
-			i = 0; /* vendor id */
-			while (i < 8 && ss[i]) {
-				r[8 + i] = ss[i];
-				i++;
-			}
-			while (i < 8) {
-				r[8 + i] = 32;
-				i++;
-			}
-			xfree (ss);
-			ss = ua (hfd->product_id);
-			i = 0; /* product id */
-			while (i < 16 && ss[i]) {
-				r[16 + i] = ss[i];
-				i++;
-			}
-			while (i < 16) {
-				r[16 + i] = 32;
-				i++;
-			}
-			xfree (ss);
-			ss = ua (hfd->product_rev);
-			i = 0; /* product revision */
-			while (i < 4 && ss[i]) {
-				r[32 + i] = ss[i];
-				i++;
-			}
-			while (i < 4) {
-				r[32 + i] = 32;
-				i++;
-			}
-			xfree (ss);
+			setdrivestring(hfd->vendor_id, r, 8, 8);
+			setdrivestring(hfd->product_id, r, 16, 16);
+			setdrivestring(hfd->product_rev, r, 32, 4);
 		}
 		break;
 	case 0x1a: /* MODE SENSE(6) */
@@ -1348,7 +1343,7 @@ int scsi_hd_emulate (struct hardfiledata *hfd, struct hd_hardfiledata *hdhfd, ua
 				if (alen >= r[0] + 1 + 8) {
 					uae_u32 blocks = (uae_u32)(hfd->virtsize / hfd->ci.blocksize);
 					p[-1] = 8;
-					wl(p + 0, blocks);
+					wl(p + 0, blocks < 0x01000000 ? blocks : 0);
 					wl(p + 4, hfd->ci.blocksize);
 					p += 8;
 				}
@@ -1542,7 +1537,6 @@ nodisk:
 err:
 		write_log (_T("UAEHF: unsupported scsi command 0x%02X LUN=%d\n"), cmdbuf[0], lun);
 errreq:
-		lr = -1;
 		status = 2; /* CHECK CONDITION */
 		s[0] = 0x70;
 		s[2] = 5; /* ILLEGAL REQUEST */
@@ -1550,7 +1544,6 @@ errreq:
 		ls = 0x12;
 		break;
 outofbounds:
-		lr = -1;
 		status = 2; /* CHECK CONDITION */
 		s[0] = 0x70;
 		s[2] = 5; /* ILLEGAL REQUEST */
@@ -1558,7 +1551,6 @@ outofbounds:
 		ls = 0x12;
 		break;
 miscompare:
-		lr = -1;
 		status = 2; /* CHECK CONDITION */
 		s[0] = 0x70;
 		s[2] = 5; /* ILLEGAL REQUEST */
@@ -1566,9 +1558,13 @@ miscompare:
 		ls = 0x12;
 		break;
 	}
+err_exit:
 
 	if (log_scsiemu && ls) {
 		write_log (_T("-> SENSE STATUS: KEY=%d ASC=%02X ASCQ=%02X\n"), s[2], s[12], s[13]);
+		for (int i = 0; i < ls; i++)
+			write_log (_T("%02X."), s[i]);
+		write_log (_T("\n"));	
 	}
 
 	if (cmdbuf[0] && log_scsiemu)
@@ -1576,6 +1572,14 @@ miscompare:
 
 	*data_len = scsi_len;
 	*reply_len = lr;
+	if (lr > 0 && lr < 512) {
+		if (log_scsiemu) {
+			write_log (_T("REPLY: "));
+			for (int i = 0; i < lr && i < 40; i++)
+				write_log (_T("%02X."), r[i]);
+			write_log (_T("\n"));	
+		}
+	}
 	*sense_len = ls;
 	if (ls > 0) {
 		memset (hfd->scsi_sense, 0, MAX_SCSI_SENSE);

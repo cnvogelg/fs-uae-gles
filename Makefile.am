@@ -103,6 +103,8 @@ fs_uae_SOURCES = \
 	src/fs-uae/config-hardware.h \
 	src/fs-uae/config-model.c \
 	src/fs-uae/config-model.h \
+	src/fs-uae/config-sound.c \
+	src/fs-uae/config-sound.h \
 	src/fs-uae/fs-uae.h \
 	src/fs-uae/input.c \
 	src/fs-uae/joystick.c \
@@ -221,6 +223,8 @@ libuae_a_SOURCES = \
 	src/custom.cpp \
 	src/debug.cpp \
 	src/debuginfo.cpp \
+	src/def_icons.cpp \
+	src/devices.cpp \
 	src/disk.cpp \
 	src/diskutil.cpp \
 	src/dlopen.cpp \
@@ -242,6 +246,8 @@ libuae_a_SOURCES = \
 	src/gfxutil.cpp \
 	src/hardfile.cpp \
 	src/hrtmon.rom.cpp \
+	src/ide.cpp \
+	src/idecontrollers.cpp \
 	src/identify.cpp \
 	src/include/a2065.h \
 	src/include/a2091.h \
@@ -270,6 +276,7 @@ libuae_a_SOURCES = \
 	src/include/crc32.h \
 	src/include/custom.h \
 	src/include/debug.h \
+	src/include/devices.h \
 	src/include/disk.h \
 	src/include/diskutil.h \
 	src/include/dongle.h \
@@ -296,6 +303,8 @@ libuae_a_SOURCES = \
 	src/include/gfxboard.h \
 	src/include/gfxfilter.h \
 	src/include/gui.h \
+	src/include/ide.h \
+	src/include/idecontrollers.h \
 	src/include/identify.h \
 	src/include/inputdevice.h \
 	src/include/inputrecord.h \
@@ -327,6 +336,7 @@ libuae_a_SOURCES = \
 	src/include/scsi.h \
 	src/include/scsidev.h \
 	src/include/serial.h \
+	src/include/sndboard.h \
 	src/include/statusline.h \
 	src/include/sysdeps.h \
 	src/include/tabletlibrary.h \
@@ -547,10 +557,12 @@ libfsemu_a_SOURCES = \
 	libfsemu/include/fs/data.h \
 	libfsemu/include/fs/defines.h \
 	libfsemu/include/fs/emu.h \
-	libfsemu/include/fs/emu/dialog.h \
+        libfsemu/include/fs/emu/audio.h \
+        libfsemu/include/fs/emu/dialog.h \
 	libfsemu/include/fs/emu/hacks.h \
 	libfsemu/include/fs/emu/options.h \
-	libfsemu/include/fs/emu/video.h \
+        libfsemu/include/fs/emu/path.h \
+        libfsemu/include/fs/emu/video.h \
 	libfsemu/include/fs/endian.h \
 	libfsemu/include/fs/eventlog.h \
 	libfsemu/include/fs/filesys.h \
@@ -571,7 +583,11 @@ libfsemu_a_SOURCES = \
 	libfsemu/include/fs/thread.h \
 	libfsemu/include/fs/time.h \
 	libfsemu/include/fs/util.h \
-	libfsemu/src/base.c \
+        libfsemu/src/audio/common.c \
+        libfsemu/src/audio/init.c \
+        libfsemu/src/audio/openal.c \
+        libfsemu/src/audio/sdl2.c \
+        libfsemu/src/base.c \
 	libfsemu/src/conf.c \
 	libfsemu/src/data.c \
 	libfsemu/src/emu/actions.c \
@@ -644,7 +660,8 @@ libfsemu_a_SOURCES = \
 	libfsemu/src/ml/windows.c \
 	libfsemu/src/ml/x11.c \
 	libfsemu/src/opengl.c \
-	libfsemu/src/ref.c \
+        libfsemu/src/path.c \
+        libfsemu/src/ref.c \
 	libfsemu/src/thread.c \
 	libfsemu/src/time.c
 
@@ -771,6 +788,11 @@ libslirp_a_SOURCES = \
 	src/slirp/udp.cpp \
 	src/slirp/udp.h
 endif
+endif
+
+if WITH_TOCCATA
+fs_uae_SOURCES += \
+	src/sndboard.cpp
 endif
 
 if WITH_UDIS86

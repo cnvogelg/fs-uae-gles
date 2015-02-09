@@ -605,11 +605,13 @@ static int doinit_shm (void)
 	p96mem_offset = NULL;
 	p96mem_size = z3rtgmem_size;
 	p96base_offset = 0;
+	uae_u32 z3rtgallocsize = 0;
 	if (changed_prefs.rtgmem_size && gfxboard_is_z3 (changed_prefs.rtgmem_type)) {
+		z3rtgallocsize = gfxboard_get_autoconfig_size(changed_prefs.rtgmem_type) < 0 ? changed_prefs.rtgmem_size : gfxboard_get_autoconfig_size(changed_prefs.rtgmem_type);
 		if (changed_prefs.z3autoconfig_start == Z3BASE_UAE)
 			p96base_offset = natmemsize + startbarrier + z3offset;
 		else
-			p96base_offset = expansion_startaddress(natmemsize + startbarrier + z3offset, changed_prefs.rtgmem_size);
+			p96base_offset = expansion_startaddress(natmemsize + startbarrier + z3offset, z3rtgallocsize);
 	} else if (changed_prefs.rtgmem_size && !gfxboard_is_z3 (changed_prefs.rtgmem_type)) {
 		p96base_offset = getz2rtgaddr (changed_prefs.rtgmem_size);
 	}
@@ -625,7 +627,9 @@ static int doinit_shm (void)
 			}
 			addr = expansion_startaddress(addr, changed_prefs.z3fastmem_size);
 			addr += changed_prefs.z3fastmem_size;
-			addr = expansion_startaddress(addr, changed_prefs.rtgmem_size);
+			addr = expansion_startaddress(addr, changed_prefs.z3fastmem2_size);
+			addr += changed_prefs.z3fastmem2_size;
+			addr = expansion_startaddress(addr, z3rtgallocsize);
 			if (gfxboard_is_z3(changed_prefs.rtgmem_type)) {
 				p96base_offset = addr;
 				// adjust p96mem_offset to beginning of natmem
@@ -658,14 +662,14 @@ static int doinit_shm (void)
 	return canbang;
 }
 
+static uae_u32 oz3fastmem_size, oz3fastmem2_size;
+static uae_u32 oz3chipmem_size;
+static uae_u32 ortgmem_size;
+static int ortgmem_type = -1;
+
 bool init_shm (void)
 {
 	write_log("init_shm\n");
-	static uae_u32 oz3fastmem_size, oz3fastmem2_size;
-	static uae_u32 oz3chipmem_size;
-	static uae_u32 ortgmem_size;
-	static int ortgmem_type;
-
 	if (
 		oz3fastmem_size == changed_prefs.z3fastmem_size &&
 		oz3fastmem2_size == changed_prefs.z3fastmem2_size &&
@@ -693,6 +697,7 @@ void free_shm (void)
 {
 	resetmem (true);
 	clear_shm ();
+	ortgmem_type = -1;
 }
 
 void mapped_free (addrbank *ab)
@@ -702,9 +707,6 @@ void mapped_free (addrbank *ab)
 
 	if (ab->baseaddr == NULL)
 		return;
-
-	if (rtgmem)
-		write_log(_T("x"));
 
 	if (ab->flags & ABFLAG_INDIRECT) {
 		while(x) {
@@ -732,8 +734,8 @@ void mapped_free (addrbank *ab)
 	if (!(ab->flags & ABFLAG_DIRECTMAP)) {
 		if (!(ab->flags & ABFLAG_NOALLOC)) {
 			xfree(ab->baseaddr);
-			ab->baseaddr = NULL;
 		}
+		ab->baseaddr = NULL;
 		write_log(_T("mapped_free nondirect %s\n"), ab->name);
 		return;
 	}
@@ -886,6 +888,9 @@ void *uae_shmat (addrbank *ab, int shmid, void *shmaddr, int shmflg)
 			got = TRUE;
 		} else if (!_tcscmp(shmids[shmid].name, _T("ramsey_high"))) {
 			shmaddr = natmem_offset + 0x08000000;
+			got = TRUE;
+		} else if (!_tcscmp(shmids[shmid].name, _T("fusionforty"))) {
+			shmaddr = natmem_offset + 0x11000000;
 			got = TRUE;
 		} else if (!_tcscmp(shmids[shmid].name, _T("blizzard_40"))) {
 			shmaddr = natmem_offset + 0x40000000;

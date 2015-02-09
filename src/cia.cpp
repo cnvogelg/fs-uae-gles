@@ -546,6 +546,9 @@ STATIC_INLINE void ciaa_checkalarm (bool inc)
 #ifdef TOD_HACK
 static uae_u64 tod_hack_tv, tod_hack_tod, tod_hack_tod_last;
 static int tod_hack_enabled;
+static int tod_hack_delay;
+static int tod_diff_cnt;
+#define TOD_HACK_DELAY 50
 #define TOD_HACK_TIME 312 * 50 * 10
 static void tod_hack_reset (void)
 {
@@ -554,6 +557,7 @@ static void tod_hack_reset (void)
 	tod_hack_tv = (uae_u64)tv.tv_sec * 1000000 + tv.tv_usec;
 	tod_hack_tod = ciaatod;
 	tod_hack_tod_last = tod_hack_tod;
+	tod_diff_cnt = 0;
 }
 #endif
 
@@ -591,27 +595,43 @@ static void do_tod_hack (int dotod)
 		return;
 	}
 
-	if (currprefs.cs_ciaatod == 0)
+	if (currprefs.cs_ciaatod == 0) {
 		rate = (int)(vblank_hz + 0.5);
-	else if (currprefs.cs_ciaatod == 1)
+		if (rate >= 59 && rate <= 61)
+			rate = 60;
+		if (rate >= 49 && rate <= 51)
+			rate = 50;
+	} else if (currprefs.cs_ciaatod == 1) {
 		rate = 50;
-	else
+	} else {
 		rate = 60;
+	}
 	if (rate <= 0)
 		return;
 	if (rate != oldrate || ciaatod != tod_hack_tod_last) {
-		//if (ciaatod != 0)
-		//	write_log (_T("TOD HACK reset %d,%d %d,%d\n"), rate, oldrate, ciaatod, tod_hack_tod_last);
+		write_log (_T("TOD HACK reset %d,%d %d,%d\n"), rate, oldrate, ciaatod, tod_hack_tod_last);
 		tod_hack_reset ();
 		oldrate = rate;
 		docount = 1;
 	}
+
 	if (!dotod && currprefs.cs_ciaatod == 0)
 		return;
+
+	if (tod_hack_delay > 0) {
+		tod_hack_delay--;
+		if (tod_hack_delay > 0)
+			return;
+		tod_hack_delay = TOD_HACK_DELAY;
+	}
+
 	gettimeofday (&tv, NULL);
 	t = (uae_u64)tv.tv_sec * 1000000 + tv.tv_usec;
 	if (t - tod_hack_tv >= 1000000 / rate) {
 		tod_hack_tv += 1000000 / rate;
+		tod_diff_cnt += 1000000 - (1000000 / rate) * rate;
+		tod_hack_tv += tod_diff_cnt / rate;
+		tod_diff_cnt %= rate;
 		docount = 1;
 	}
 	if (docount) {
@@ -641,7 +661,7 @@ static void sendrw (void)
 
 int resetwarning_do (int canreset)
 {
-	if (resetwarning_phase) {
+	if (resetwarning_phase || regs.halted > 0) {
 		/* just force reset if second reset happens during resetwarning */
 		if (canreset) {
 			resetwarning_phase = 0;

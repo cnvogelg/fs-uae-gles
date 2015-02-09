@@ -15,7 +15,6 @@
 #include "uae.h"
 #include "gensound.h"
 #include "audio.h"
-#include "sounddep/sound.h"
 #include "events.h"
 #include "uae/memory.h"
 #include "custom.h"
@@ -29,42 +28,20 @@
 #include "gui.h"
 #include "zfile.h"
 #include "autoconf.h"
-#include "traps.h"
-#include "osemu.h"
 #include "picasso96.h"
-#include "bsdsocket.h"
-#include "uaeexe.h"
 #include "native2amiga.h"
-#include "scsidev.h"
-#include "uaeserial.h"
-#include "akiko.h"
-#include "cd32_fmv.h"
-#include "cdtv.h"
-#include "cdtvcr.h"
 #include "savestate.h"
 #include "filesys.h"
-#include "parallel.h"
-#include "a2091.h"
-#include "a2065.h"
-#include "ncr_scsi.h"
-#include "ncr9x_scsi.h"
-#include "scsi.h"
-#include "sana2.h"
 #include "blkdev.h"
-#include "gfxfilter.h"
-#include "uaeresource.h"
-#include "debuginfo.h"
 #include "segtracker.h"
-#include "dongle.h"
-#include "sampler.h"
 #include "consolehook.h"
-#include "gayle.h"
 #include "gfxboard.h"
 #include "luascript.h"
 #include "uaenative.h"
 #include "tabletlibrary.h"
 #include "cpuboard.h"
 #include "uae/ppc.h"
+#include "devices.h"
 #ifdef RETROPLATFORM
 #include "rp.h"
 #endif
@@ -502,6 +479,11 @@ void fixup_prefs (struct uae_prefs *p)
 		error_log (_T("Too large Z2 RTG memory size."));
 	}
 
+	if (p->cs_z3autoconfig && p->address_space_24) {
+		p->cs_z3autoconfig = false;
+		error_log (_T("Z3 autoconfig and 24bit address space are not compatible."));
+	}
+
 #if 0
 	if (p->m68k_speed < -1 || p->m68k_speed > 20) {
 		write_log (_T("Bad value for -w parameter: must be -1, 0, or within 1..20.\n"));
@@ -930,53 +912,6 @@ static void parse_cmdline_and_init_file (int argc, TCHAR **argv)
 	parse_cmdline (argc, argv);
 }
 
-void reset_all_systems (void)
-{
-	init_eventtab ();
-
-#ifdef WITH_PPC
-	uae_ppc_reset(is_hardreset());
-#endif
-#ifdef PICASSO96
-	picasso_reset ();
-#endif
-#ifdef SCSIEMU
-	scsi_reset ();
-	scsidev_reset ();
-	scsidev_start_threads ();
-#endif
-#ifdef A2065
-	a2065_reset ();
-#endif
-#ifdef SANA2
-	netdev_reset ();
-	netdev_start_threads ();
-#endif
-#ifdef FILESYS
-	filesys_prepare_reset ();
-	filesys_reset ();
-#endif
-	init_shm ();
-	memory_reset ();
-#if defined (BSDSOCKET)
-	bsdlib_reset ();
-#endif
-#ifdef FILESYS
-	filesys_start_threads ();
-	hardfile_reset ();
-#endif
-#ifdef UAESERIAL
-	uaeserialdev_reset ();
-	uaeserialdev_start_threads ();
-#endif
-#if defined (PARALLEL_PORT)
-	initparallel ();
-#endif
-	native2amiga_reset ();
-	dongle_reset ();
-	sampler_init ();
-}
-
 /* Okay, this stuff looks strange, but it is here to encourage people who
 * port UAE to re-use as much of this code as possible. Functions that you
 * should be using are do_start_program () and do_leave_program (), as well
@@ -1107,7 +1042,6 @@ void leave_program (void)
 	do_leave_program ();
 }
 
-
 void virtualdevice_init (void)
 {
 #ifdef AUTOCONFIG
@@ -1115,7 +1049,7 @@ void virtualdevice_init (void)
 #endif
 #ifdef FILESYS
 	rtarea_init ();
-    segtracker_install ();
+	segtracker_install ();
 	uaeres_install ();
 	hardfile_install ();
 #endif

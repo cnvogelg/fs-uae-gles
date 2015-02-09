@@ -5718,27 +5718,36 @@ void inputdevice_devicechange (struct uae_prefs *prefs)
 {
 	int acc = input_acquired;
 	int i, idx;
-	TCHAR *jports[MAX_JPORTS];
+	TCHAR *jports_name[MAX_JPORTS];
+	TCHAR *jports_configname[MAX_JPORTS];
 	int jportskb[MAX_JPORTS], jportsmode[MAX_JPORTS];
 	int jportid[MAX_JPORTS], jportaf[MAX_JPORTS];
 
 	for (i = 0; i < MAX_JPORTS; i++) {
-		jports[i] = NULL;
 		jportskb[i] = -1;
 		jportid[i] = prefs->jports[i].id;
 		jportaf[i] = prefs->jports[i].autofire;
+		jports_name[i] = NULL;
+		jports_configname[i] = NULL;
 		idx = inputdevice_getjoyportdevice (i, prefs->jports[i].id);
 		if (idx >= JSEM_LASTKBD) {
-			struct inputdevice_functions *idf;
-			int devidx;
-			idx -= JSEM_LASTKBD;
-			idf = getidf (idx);
-			devidx = inputdevice_get_device_index (idx);
-			jports[i] = my_strdup (idf->get_uniquename (devidx));
+			if (prefs->jports[i].name[0] == 0 && prefs->jports[i].configname[0] == 0) {
+				struct inputdevice_functions *idf;
+				int devidx;
+				idx -= JSEM_LASTKBD;
+				idf = getidf (idx);
+				devidx = inputdevice_get_device_index (idx);
+				jports_name[i] = my_strdup (idf->get_friendlyname (devidx));
+				jports_configname[i] = my_strdup (idf->get_uniquename (devidx));
+			}
 		} else {
 			jportskb[i] = idx;
 		}
 		jportsmode[i] = prefs->jports[i].mode;
+		if (jports_name[i] == NULL)
+			jports_name[i] = my_strdup(prefs->jports[i].name);
+		if (jports_configname[i] == NULL)
+			jports_configname[i] = my_strdup(prefs->jports[i].configname);
 	}
 
 	inputdevice_unacquire ();
@@ -5756,15 +5765,18 @@ void inputdevice_devicechange (struct uae_prefs *prefs)
 		freejport (prefs, i);
 		if (jportid[i] == JPORT_CUSTOM) {
 			inputdevice_joyport_config (prefs, _T("custom"), i, jportsmode[i], 0, true);
-		} else if (jports[i]) {
-			inputdevice_joyport_config (prefs, jports[i], i, jportsmode[i], 2, true);
+		} else if (jports_name[i][0] || jports_configname[i][0]) {
+			if (!inputdevice_joyport_config (prefs, jports_configname[i], i, jportsmode[i], 1, true)) {
+				inputdevice_joyport_config (prefs, jports_name[i], i, jportsmode[i], 2, true);
+			}
 		} else if (jportskb[i] >= 0) {
 			TCHAR tmp[10];
 			_stprintf (tmp, _T("kbd%d"), jportskb[i]);
 			inputdevice_joyport_config (prefs, tmp, i, jportsmode[i], 0, true);
 		}
 		prefs->jports[i].autofire = jportaf[i];
-		xfree (jports[i]);
+		xfree (jports_name[i]);
+		xfree (jports_configname[i]);
 	}
 
 	if (prefs == &changed_prefs)
@@ -7286,7 +7298,7 @@ int jsem_iskbdjoy (int port, const struct uae_prefs *p)
 
 static struct jport stored_ports[MAX_JPORTS];
 
-static void fixjport (struct jport *port, int add)
+static void fixjport (struct jport *port, int add, bool always)
 {
 	int vv = port->id;
 	if (vv == JPORT_CUSTOM || vv == JPORT_NONE)
@@ -7310,10 +7322,21 @@ static void fixjport (struct jport *port, int add)
 			vv = 0;
 		vv += JSEM_KBDLAYOUT;
 	}
+	if (port->id != vv || always) {
+		if (vv >= JSEM_JOYS && vv < JSEM_MICE) {
+			_tcscpy(port->name, inputdevice_get_device_name (IDTYPE_JOYSTICK, vv - JSEM_JOYS));
+			_tcscpy(port->configname, inputdevice_get_device_unique_name (IDTYPE_JOYSTICK, vv - JSEM_JOYS));
+		} else if (vv >= JSEM_MICE && vv < JSEM_END) {
+			_tcscpy(port->name, inputdevice_get_device_name (IDTYPE_MOUSE, vv - JSEM_MICE));
+			_tcscpy(port->configname, inputdevice_get_device_unique_name (IDTYPE_MOUSE, vv - JSEM_MICE));
+		} else {
+			port->name[0] = 0;
+			port->configname[0] = 0;
+		}
 #if 0
-	if (port->id != vv)
-		write_log(_T("fixjport %d %d %d\n"), port->id, vv, add);
+		write_log(_T("fixjport %d %d %d (%s)\n"), port->id, vv, add, port->name);
 #endif
+	}
 	port->id = vv;
 }
 
@@ -7321,7 +7344,7 @@ void inputdevice_validate_jports (struct uae_prefs *p, int changedport)
 {
 	int i, j;
 	for (i = 0; i < MAX_JPORTS; i++)
-		fixjport (&p->jports[i], 0);
+		fixjport (&p->jports[i], 0, changedport == i);
 	for (i = 0; i < MAX_JPORTS; i++) {
 		if (p->jports[i].id < 0)
 			continue;
@@ -7346,10 +7369,12 @@ void inputdevice_validate_jports (struct uae_prefs *p, int changedport)
 					} else {
 						k = i;
 					}
-					fixjport (&p->jports[k], 1);
+					fixjport (&p->jports[k], 1, true);
 					cnt++;
-					if (cnt > 10)
+					if (cnt > 10) {
 						p->jports[k].id = JSEM_KBDLAYOUT;
+						fixjport (&p->jports[k], 1, true);
+					}
 					if (cnt > 20)
 						break;
 				}
@@ -7395,6 +7420,10 @@ int inputdevice_joyport_config (struct uae_prefs *p, const TCHAR *value, int por
 	case 2:
 		{
 			int i, j;
+			if (type == 2)
+				_tcscpy(p->jports[portnum].name, value);
+			else if (type == 1)
+				_tcscpy(p->jports[portnum].configname, value);
 			for (j = 0; j < MAX_JPORTS; j++) {
 				struct inputdevice_functions *idf;
 				int type = IDTYPE_MOUSE;
@@ -7612,12 +7641,15 @@ void uae_mousehack_helper(int x, int y)
 
 #include <fs/i18n.h>
 
+static bool g_amiga_allow_auto_mouse_mode = false;
 static int g_requested_port_modes[4];
 
 static void amiga_set_joystick_port_mode_2 (int port, int mode)
 {
     int *ip = NULL;
-    //parport_joystick_enabled = 0;
+#if 0
+    parport_joystick_enabled = 0;
+#endif
     if (port == 0 || port == 1) {
         mouse_port[port] = 0;
         cd32_pad_enabled[port] = 0;
@@ -7674,12 +7706,19 @@ static void amiga_set_joystick_port_mode_2 (int port, int mode)
             ip++;
         }
     }
-    //changed_prefs.jports[port].mode = mode;
-    //config_changed = 1;
-    //inputdevice_updateconfig(&currprefs);
+#if 0
+    changed_prefs.jports[port].mode = mode;
+    config_changed = 1;
+    inputdevice_updateconfig(&currprefs);
+#endif
 }
 
 extern "C" {
+
+void amiga_enable_auto_mouse_mode(bool enable)
+{
+    g_amiga_allow_auto_mouse_mode = enable;
+}
 
 void amiga_set_joystick_port_mode(int port, int mode)
 {
@@ -7696,14 +7735,12 @@ int amiga_handle_input_event (int nr, int state, int max,
     switch (nr) {
     case INPUTEVENT_MOUSE1_HORIZ:
     case INPUTEVENT_MOUSE1_VERT:
-        if (mouse_port[0] == 0) {
+        if (mouse_port[0] == 0 && g_amiga_allow_auto_mouse_mode) {
             if (g_requested_port_modes[0] == AMIGA_JOYPORT_DJOY) {
                 // require a bit  than the minimum registered motion activity
                 // more to switch mode
                 if (state < -2 || state > 2) {
                     gui_message ("%s", _("[ Port 0 ] Switched to mouse mode"));
-                    printf ("state %d\n", state);
-                    printf ("[auto] joyport 0 -> mouse mode\n");
                     amiga_set_joystick_port_mode_2 (0, AMIGA_JOYPORT_MOUSE);
                 }
             }
@@ -7713,13 +7750,9 @@ int amiga_handle_input_event (int nr, int state, int max,
     case INPUTEVENT_JOY1_DOWN:
     case INPUTEVENT_JOY1_LEFT:
     case INPUTEVENT_JOY1_RIGHT:
-        printf ("..1\n");
-        if (mouse_port[0] == 1) {
-            printf ("..2\n");
+        if (mouse_port[0] == 1 && g_amiga_allow_auto_mouse_mode) {
             if (g_requested_port_modes[0] == AMIGA_JOYPORT_DJOY) {
-                printf ("..3\n");
                 gui_message ("%s", _("[ Port 0 ] Switched to joystick mode"));
-                printf ("[auto] joyport 0 -> joystick mode\n");
                 amiga_set_joystick_port_mode_2 (0, AMIGA_JOYPORT_DJOY);
             }
         }

@@ -425,6 +425,7 @@ static uae_u32 REGPARAM2 ncr_bget (struct ncr_state *ncr, uaecptr addr)
 #endif
 	addr &= ncr->board_mask;
 	if (!ncr->configured) {
+		addr &= 65535;
 		if (addr >= sizeof ncr->acmemory)
 			return 0;
 		return ncr->acmemory[addr];
@@ -486,6 +487,7 @@ static void REGPARAM2 ncr_wput (struct ncr_state *ncr, uaecptr addr, uae_u32 w)
 	w &= 0xffff;
 	addr &= ncr->board_mask;
 	if (!ncr->configured) {
+		addr &= 65535;
 		switch (addr)
 		{
 			case 0x44:
@@ -509,6 +511,7 @@ static void REGPARAM2 ncr_bput (struct ncr_state *ncr, uaecptr addr, uae_u32 b)
 	b &= 0xff;
 	addr &= ncr->board_mask;
 	if (!ncr->configured) {
+		addr &= 65535;
 		switch (addr)
 		{
 			case 0x4c:
@@ -1008,7 +1011,7 @@ static int ncr_add_scsi_unit(struct ncr_state *ncr, int ch, struct uaedev_config
 	else if (ci->type == UAEDEV_TAPE)
 		return add_ncr_scsi_tape (ncr, ch, ci->rootdir, ci->readonly);
 	else
-		return add_ncr_scsi_hd (ncr, ch, NULL, ci, 1);
+		return add_ncr_scsi_hd (ncr, ch, NULL, ci, 2);
 }
 
 int a4000t_add_scsi_unit (int ch, struct uaedev_config_info *ci)

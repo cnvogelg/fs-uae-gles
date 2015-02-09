@@ -21,6 +21,7 @@
 #include "zfile.h"
 #include "scsi.h"
 #include "statusline.h"
+#include "fsdb.h"
 #ifdef RETROPLATFORM
 #include "rp.h"
 #endif
@@ -48,6 +49,7 @@ struct blkdevstate
 	int wasopen;
 	bool mediawaschanged;
 	struct scsi_data_tape *tape;
+	bool showstatusline;
 };
 
 struct blkdevstate state[MAX_TOTAL_SCSI_DEVICES];
@@ -221,6 +223,7 @@ void blkdev_default_prefs (struct uae_prefs *p)
 		p->cdslots[i].name[0] = 0;
 		p->cdslots[i].inuse = false;
 		p->cdslots[i].type = SCSI_UNIT_DEFAULT;
+		p->cdslots[i].temporary = false;
 		cdscsidevicetype[i] = SCSI_UNIT_DEFAULT;
 	}
 }
@@ -422,6 +425,19 @@ fallback:
 	return unitnum;
 }
 
+static void cd_statusline_label(int unitnum)
+{
+	TCHAR *p = currprefs.cdslots[unitnum].name;
+	if (p[0]) {
+		struct device_info di;
+		const TCHAR *fname = my_getfilepart(p);
+		if (sys_command_info(unitnum, &di, 0) && di.volume_id[0])
+			statusline_add_message(_T("CD%d: [%s] %s"), unitnum, di.volume_id, fname);
+		else
+			statusline_add_message(_T("CD%d: %s"), unitnum, fname);
+	}
+}
+
 int get_standard_cd_unit (cd_standard_unit csu)
 {
 	int unitnum = get_standard_cd_unit2 (&currprefs, csu);
@@ -435,6 +451,7 @@ int get_standard_cd_unit (cd_standard_unit csu)
 	if (currprefs.cdslots[unitnum].delayed) {
 		st->delayed = PRE_INSERT_DELAY;
 	}
+	st->showstatusline = true;
 	return unitnum;
 }
 
@@ -579,7 +596,6 @@ void check_prefs_changed_cd (void)
 {
 	if (!config_changed)
 		return;
-	currprefs.sound_volume_cd = changed_prefs.sound_volume_cd;
 }
 
 static void check_changes (int unitnum)
@@ -597,6 +613,11 @@ static void check_changes (int unitnum)
 #endif
 #endif
 		return;
+	}
+
+	if (st->showstatusline) {
+		cd_statusline_label(unitnum);
+		st->showstatusline = 0;
 	}
 
 	if (st->delayed) {
@@ -662,8 +683,6 @@ static void check_changes (int unitnum)
 	currprefs.cdslots[unitnum].inuse = changed_prefs.cdslots[unitnum].inuse = st->cdimagefileinuse;
 	st->newimagefile[0] = 0;
 	write_log (_T("CD: delayed insert '%s' (open=%d,unit=%d)\n"), currprefs.cdslots[unitnum].name[0] ? currprefs.cdslots[unitnum].name : _T("<EMPTY>"), st->wasopen ? 1 : 0, unitnum);
-	if (currprefs.cdslots[unitnum].name[0])
-		statusline_add_message(_T("CD%d: %s"), unitnum, currprefs.cdslots[unitnum].name);
 	device_func_init (0);
 	if (st->wasopen) {
 		if (!st->device_func->opendev (unitnum, currprefs.cdslots[unitnum].name, 0)) {
@@ -686,13 +705,14 @@ static void check_changes (int unitnum)
 		filesys_do_disk_change (unitnum, 1);
 	}
 	st->mediawaschanged = true;
-#ifdef RETROPLATFORM
-	rp_cd_image_change (unitnum, currprefs.cdslots[unitnum].name);
-#endif
+	st->showstatusline = true;
 	if (gotsem) {
 		freesem (unitnum);
 		gotsem = false;
 	}
+#ifdef RETROPLATFORM
+	rp_cd_image_change (unitnum, currprefs.cdslots[unitnum].name);
+#endif
 
 	set_config_changed ();
 
@@ -1013,7 +1033,27 @@ struct device_info *sys_command_info_session (int unitnum, struct device_info *d
 }
 struct device_info *sys_command_info (int unitnum, struct device_info *di, int quick)
 {
-	return sys_command_info_session (unitnum, di, quick, -1);
+	struct device_info *dix;
+
+	dix = sys_command_info_session (unitnum, di, quick, -1);
+	if (dix && dix->media_inserted && !quick) {
+		TCHAR *name = NULL;
+		uae_u8 buf[2048];
+		if (sys_command_cd_read(unitnum, buf, 16, 1)) {
+			if ((buf[0] == 1 || buf[0] == 2) && !memcmp(buf + 1, "CD001", 5)) {
+				TCHAR *p;
+				au_copy(dix->volume_id, 32, (uae_char*)buf + 40);
+				au_copy(dix->system_id, 32, (uae_char*)buf + 8);
+				p = dix->volume_id + _tcslen(dix->volume_id) - 1;
+				while (p > dix->volume_id && *p == ' ')
+					*p-- = 0;
+				p = dix->system_id + _tcslen(dix->system_id) - 1;
+				while (p > dix->system_id && *p == ' ')
+					*p-- = 0;
+			}
+		}
+	}
+	return dix; 
 }
 
 #define MODE_SELECT_6 0x15
@@ -1280,7 +1320,7 @@ int scsi_cd_emulate (int unitnum, uae_u8 *cmdbuf, int scsi_cmd_len,
 	int status = 0;
 	struct device_info di;
 	uae_u8 cmd = cmdbuf[0];
-	int dlen;
+	int dlen, lun;
 	
 	if (cmd == 0x03) { /* REQUEST SENSE */
 		st->mediawaschanged = false;
@@ -1290,19 +1330,28 @@ int scsi_cd_emulate (int unitnum, uae_u8 *cmdbuf, int scsi_cmd_len,
 	dlen = *data_len;
 	*reply_len = *sense_len = 0;
 
-	sys_command_info (unitnum, &di, 1);
-
 	if (log_scsiemu) {
-		write_log (_T("SCSIEMU CD %d: %02X.%02X.%02X.%02X.%02X.%02X.%02X.%02X.%02X.%02X.%02X.%02X CMDLEN=%d DATA=%p LEN=%d\n"), unitnum,
+		write_log (_T("CD SCSIEMU %d: %02X.%02X.%02X.%02X.%02X.%02X.%02X.%02X.%02X.%02X.%02X.%02X CMDLEN=%d DATA=%p LEN=%d\n"), unitnum,
 			cmdbuf[0], cmdbuf[1], cmdbuf[2], cmdbuf[3], cmdbuf[4], cmdbuf[5], cmdbuf[6], 
 			cmdbuf[7], cmdbuf[8], cmdbuf[9], cmdbuf[10], cmdbuf[11],
 			scsi_cmd_len, scsi_data, dlen);
 	}
 
+	lun = cmdbuf[1] >> 5;
+	if (cmdbuf[0] != 0x03 && cmdbuf[0] != 0x12 && lun) {
+		status = 2; /* CHECK CONDITION */
+		s[0] = 0x70;
+		s[2] = 5; /* ILLEGAL REQUEST */
+		s[12] = 0x25; /* INVALID LUN */
+		ls = 0x12;
+		write_log (_T("CD SCSIEMU %d: CMD=%02X LUN=%d ignored\n"), unitnum, cmdbuf[0], lun);
+		goto end;
+	}
+
 	// media changed and not inquiry
 	if (st->mediawaschanged && cmd != 0x12) {
 		if (log_scsiemu) {
-			write_log (_T("SCSIEMU %d: MEDIUM MAY HAVE CHANGED STATE\n"), unitnum);
+			write_log (_T("CD SCSIEMU %d: MEDIUM MAY HAVE CHANGED STATE\n"), unitnum);
 		}
 		lr = -1;
 		status = 2; /* CHECK CONDITION */
@@ -1314,6 +1363,8 @@ int scsi_cd_emulate (int unitnum, uae_u8 *cmdbuf, int scsi_cmd_len,
 			st->mediawaschanged = false;
 		goto end;
 	}
+
+	sys_command_info (unitnum, &di, 1);
 
 	switch (cmdbuf[0])
 	{
@@ -1395,7 +1446,7 @@ int scsi_cd_emulate (int unitnum, uae_u8 *cmdbuf, int scsi_cmd_len,
 			scsi_len = 0;
 		} else {
 			if (log_scsiemu)
-				write_log (_T("MODE SELECT PC=%d not supported\n"), pcode);
+				write_log (_T("CD SCSIEMU MODE SELECT PC=%d not supported\n"), pcode);
 			goto errreq;
 		}
 	}
@@ -1418,7 +1469,7 @@ int scsi_cd_emulate (int unitnum, uae_u8 *cmdbuf, int scsi_cmd_len,
 			dbd = 1;
 		}
 		if (log_scsiemu)
-			write_log (_T("MODE SENSE PC=%d CODE=%d DBD=%d\n"), pc, pcode, dbd);
+			write_log (_T("CD SCSIEMU MODE SENSE PC=%d CODE=%d DBD=%d\n"), pc, pcode, dbd);
 		p = r;
 		if (sense10) {
 			totalsize = 8 - 2;
@@ -1978,7 +2029,7 @@ int scsi_cd_emulate (int unitnum, uae_u8 *cmdbuf, int scsi_cmd_len,
 
 	default:
 err:
-		write_log (_T("CDEMU: unsupported scsi command 0x%02X\n"), cmdbuf[0]);
+		write_log (_T("CD SCSIEMU: unsupported scsi command 0x%02X\n"), cmdbuf[0]);
 readprot:
 		status = 2; /* CHECK CONDITION */
 		s[0] = 0x70;
@@ -2027,6 +2078,14 @@ end:
 	*data_len = scsi_len;
 	*reply_len = lr;
 	*sense_len = ls;
+	if (lr > 0) {
+		if (log_scsiemu) {
+			write_log (_T("CD SCSIEMU REPLY: "));
+			for (int i = 0; i < lr && i < 40; i++)
+				write_log (_T("%02X."), r[i]);
+			write_log (_T("\n"));
+		}
+	}
 	if (ls) {
 		//s[0] |= 0x80;
 		s[7] = ls - 7; // additional sense length
@@ -2156,6 +2215,17 @@ int sys_command_scsi_direct (int unitnum, int type, uaecptr acmd)
 
 #ifdef SAVESTATE
 
+void restore_blkdev_start(void)
+{
+	for (int i = 0; i < MAX_TOTAL_SCSI_DEVICES; i++) {
+		struct cdslot *cd = &currprefs.cdslots[i];
+		if (cd->temporary) {
+			memset(cd, 0, sizeof(struct cdslot));
+			memset(&changed_prefs.cdslots[i], 0, sizeof(struct cdslot));
+		}
+	}
+}
+
 uae_u8 *save_cd (int num, int *len)
 {
 	struct blkdevstate *st = &state[num];
@@ -2198,6 +2268,7 @@ uae_u8 *restore_cd (int num, uae_u8 *src)
 			_tcscpy (currprefs.cdslots[num].name, s);
 		}
 		changed_prefs.cdslots[num].type = currprefs.cdslots[num].type = type;
+		changed_prefs.cdslots[num].temporary = currprefs.cdslots[num].temporary = true;
 	}
 	if (flags & 8) {
 		restore_u32 ();

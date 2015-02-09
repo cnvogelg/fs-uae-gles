@@ -2,6 +2,8 @@
 #include "config.h"
 #endif
 
+#ifndef FS_EMU_DRIVERS
+
 #ifdef USE_OPENAL
 
 #include <fs/emu.h>
@@ -778,3 +780,5 @@ fs_emu_audio_driver g_fs_emu_audio_openal_driver = {
 };
 
 #endif // USE_OPENAL
+
+#endif

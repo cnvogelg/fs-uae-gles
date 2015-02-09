@@ -1015,6 +1015,8 @@ static void set_x_funcs (void)
 	}
 
 	set_x_cp_funcs();
+	mmu_set_funcs();
+	mmu030_set_funcs();
 
 }
 
@@ -2099,11 +2101,28 @@ Interrupt:
 
 */
 
+static int iack_cycle(int nr)
+{
+	int vector;
+
+	if (1) {
+		// non-autovectored
+		vector = x_get_byte(0x00fffff1 | ((nr - 24) << 1));
+		if (currprefs.cpu_cycle_exact)
+			x_do_cycles(4 * cpucycleunit);
+	} else {
+		// autovectored
+
+	}
+	return vector;
+}
+
 static void Exception_ce000 (int nr)
 {
 	uae_u32 currpc = m68k_getpc (), newpc;
 	int sv = regs.s;
 	int start, interrupt;
+	int vector_nr = nr;
 
 	start = 6;
 	interrupt = nr >= 24 && nr < 24 + 8;
@@ -2131,6 +2150,8 @@ static void Exception_ce000 (int nr)
 	if (nr == 2 || nr == 3) { /* 2=bus error, 3=address error */
 		uae_u16 mode = (sv ? 4 : 0) | (last_instructionaccess_for_exception_3 ? 2 : 1);
 		mode |= last_writeaccess_for_exception_3 ? 0 : 16;
+		// undocumented bits seem to contain opcode
+		mode |= last_op_for_exception_3 & ~31;
 		m68k_areg (regs, 7) -= 14;
 		/* fixme: bit3=I/N */
 		x_put_word (m68k_areg (regs, 7) + 12, last_addr_for_exception_3);
@@ -2141,35 +2162,29 @@ static void Exception_ce000 (int nr)
 		x_put_word (m68k_areg (regs, 7) + 0, mode);
 		x_put_word (m68k_areg (regs, 7) + 2, last_fault_for_exception_3 >> 16);
 		x_do_cycles (2 * cpucycleunit);
-		write_log (_T("Exception %d (%x) at %x -> %x!\n"), nr, last_addr_for_exception_3, currpc, get_long (4 * nr));
+		write_log (_T("Exception %d (%x) at %x -> %x!\n"), nr, last_addr_for_exception_3, currpc, get_long_debug (4 * nr));
 		goto kludge_me_do;
 	}
 	if (currprefs.cpu_model == 68010) {
 		// 68010 creates only format 0 and 8 stack frames
 		m68k_areg (regs, 7) -= 8;
 		x_put_word (m68k_areg (regs, 7) + 4, currpc); // write low address
-		if (interrupt) {
-			// fetch interrupt vector number
-			nr = x_get_byte (0x00fffff1 | ((nr - 24) << 1));
-			x_do_cycles (4 * cpucycleunit);
-		}
+		if (interrupt)
+			vector_nr = iack_cycle(nr);
 		x_put_word (m68k_areg (regs, 7) + 0, regs.sr); // write SR
 		x_put_word (m68k_areg (regs, 7) + 2, currpc >> 16); // write high address
-		x_put_word (m68k_areg (regs, 7) + 6, nr * 4);
+		x_put_word (m68k_areg (regs, 7) + 6, vector_nr * 4);
 	} else {
 		m68k_areg (regs, 7) -= 6;
 		x_put_word (m68k_areg (regs, 7) + 4, currpc); // write low address
-		if (interrupt) {
-			// fetch interrupt vector number
-			nr = x_get_byte (0x00fffff1 | ((nr - 24) << 1));
-			x_do_cycles (4 * cpucycleunit);
-		}
+		if (interrupt)
+			vector_nr = iack_cycle(nr);
 		x_put_word (m68k_areg (regs, 7) + 0, regs.sr); // write SR
 		x_put_word (m68k_areg (regs, 7) + 2, currpc >> 16); // write high address
 	}
 kludge_me_do:
-	newpc = x_get_word (regs.vbr + 4 * nr) << 16; // read high address
-	newpc |= x_get_word (regs.vbr + 4 * nr + 2); // read low address
+	newpc = x_get_word (regs.vbr + 4 * vector_nr) << 16; // read high address
+	newpc |= x_get_word (regs.vbr + 4 * vector_nr + 2); // read low address
 	if (newpc & 1) {
 		if (nr == 2 || nr == 3)
 			cpu_halt (2);
@@ -2457,7 +2472,7 @@ static void Exception_mmu (int nr, uaecptr oldpc)
 			Exception_build_stack_frame(oldpc, currpc, regs.mmu_fslw, nr, 0x4);
 	} else if (nr == 3) { // address error
         Exception_build_stack_frame(last_fault_for_exception_3, currpc, 0, nr, 0x2);
-		write_log (_T("Exception %d (%x) at %x -> %x!\n"), nr, last_fault_for_exception_3, currpc, get_long (regs.vbr + 4 * nr));
+		write_log (_T("Exception %d (%x) at %x -> %x!\n"), nr, last_fault_for_exception_3, currpc, get_long_debug (regs.vbr + 4 * nr));
 	} else if (nr == 5 || nr == 6 || nr == 7 || nr == 9) {
         Exception_build_stack_frame(oldpc, currpc, regs.mmu_ssw, nr, 0x2);
 	} else if (regs.m && interrupt) { /* M + Interrupt */
@@ -2519,11 +2534,12 @@ static void Exception_normal (int nr)
 	uae_u32 currpc, newpc;
 	int sv = regs.s;
 	int interrupt;
+	int vector_nr = nr;
 
 	interrupt = nr >= 24 && nr < 24 + 8;
 
 	if (interrupt && currprefs.cpu_model <= 68010)
-		nr = x_get_byte (0x00fffff1 | (nr << 1));
+		vector_nr = iack_cycle(nr);
 
 	exception_debug (nr);
 	MakeSR ();
@@ -2574,12 +2590,12 @@ static void Exception_normal (int nr)
 						x_put_long (m68k_areg (regs, 7), regs.mmu_fault_addr);
 
 						m68k_areg (regs, 7) -= 2;
-						x_put_word (m68k_areg (regs, 7), 0x7000 + nr * 4);
+						x_put_word (m68k_areg (regs, 7), 0x7000 + vector_nr * 4);
 						m68k_areg (regs, 7) -= 4;
 						x_put_long (m68k_areg (regs, 7), regs.instruction_pc);
 						m68k_areg (regs, 7) -= 2;
 						x_put_word (m68k_areg (regs, 7), regs.sr);
-						newpc = x_get_long (regs.vbr + 4 * nr);
+						newpc = x_get_long (regs.vbr + 4 * vector_nr);
 						if (newpc & 1) {
 							if (nr == 2 || nr == 3)
 								cpu_halt (2);
@@ -2614,7 +2630,7 @@ static void Exception_normal (int nr)
 						m68k_areg (regs, 7) -= 4;
 						x_put_long (m68k_areg (regs, 7), last_addr_for_exception_3);
 						m68k_areg (regs, 7) -= 2;
-						x_put_word (m68k_areg (regs, 7), 0x7000 + nr * 4);
+						x_put_word (m68k_areg (regs, 7), 0x7000 + vector_nr * 4);
 						m68k_areg (regs, 7) -= 4;
 						x_put_long (m68k_areg (regs, 7), regs.instruction_pc);
 						m68k_areg (regs, 7) -= 2;
@@ -2627,7 +2643,7 @@ static void Exception_normal (int nr)
 					m68k_areg (regs, 7) -= 4;
 					x_put_long (m68k_areg (regs, 7), last_fault_for_exception_3);
 					m68k_areg (regs, 7) -= 2;
-					x_put_word (m68k_areg (regs, 7), 0x2000 + nr * 4);
+					x_put_word (m68k_areg (regs, 7), 0x2000 + vector_nr * 4);
 				}
 			} else {
 				// 68020 address error
@@ -2649,17 +2665,17 @@ static void Exception_normal (int nr)
 				m68k_areg (regs, 7) -= 2;
 				x_put_word (m68k_areg (regs, 7), ssw);
 				m68k_areg (regs, 7) -= 2;
-				x_put_word (m68k_areg (regs, 7), 0xb000 + nr * 4);
+				x_put_word (m68k_areg (regs, 7), 0xb000 + vector_nr * 4);
 			}
-			write_log (_T("Exception %d (%x) at %x -> %x!\n"), nr, regs.instruction_pc, currpc, x_get_long (regs.vbr + 4*nr));
+			write_log (_T("Exception %d (%x) at %x -> %x!\n"), nr, regs.instruction_pc, currpc, get_long_debug (regs.vbr + 4 * vector_nr));
 		} else if (nr ==5 || nr == 6 || nr == 7 || nr == 9) {
 			m68k_areg (regs, 7) -= 4;
 			x_put_long (m68k_areg (regs, 7), regs.instruction_pc);
 			m68k_areg (regs, 7) -= 2;
-			x_put_word (m68k_areg (regs, 7), 0x2000 + nr * 4);
+			x_put_word (m68k_areg (regs, 7), 0x2000 + vector_nr * 4);
 		} else if (regs.m && interrupt) { /* M + Interrupt */
 			m68k_areg (regs, 7) -= 2;
-			x_put_word (m68k_areg (regs, 7), nr * 4);
+			x_put_word (m68k_areg (regs, 7), vector_nr * 4);
 			m68k_areg (regs, 7) -= 4;
 			x_put_long (m68k_areg (regs, 7), currpc);
 			m68k_areg (regs, 7) -= 2;
@@ -2669,10 +2685,10 @@ static void Exception_normal (int nr)
 			regs.m = 0;
 			m68k_areg (regs, 7) = regs.isp;
 			m68k_areg (regs, 7) -= 2;
-			x_put_word (m68k_areg (regs, 7), 0x1000 + nr * 4);
+			x_put_word (m68k_areg (regs, 7), 0x1000 + vector_nr * 4);
 		} else {
 			m68k_areg (regs, 7) -= 2;
-			x_put_word (m68k_areg (regs, 7), nr * 4);
+			x_put_word (m68k_areg (regs, 7), vector_nr * 4);
 		}
 	} else {
 		add_approximate_exception_cycles(nr);
@@ -2688,7 +2704,7 @@ static void Exception_normal (int nr)
 			x_put_word (m68k_areg (regs, 7) + 6, last_op_for_exception_3);
 			x_put_word (m68k_areg (regs, 7) + 8, regs.sr);
 			x_put_long (m68k_areg (regs, 7) + 10, last_addr_for_exception_3);
-			write_log (_T("Exception %d (%x) at %x -> %x!\n"), nr, last_fault_for_exception_3, currpc, x_get_long (regs.vbr + 4*nr));
+			write_log (_T("Exception %d (%x) at %x -> %x!\n"), nr, last_fault_for_exception_3, currpc, get_long_debug (regs.vbr + 4 * vector_nr));
 			goto kludge_me_do;
 		}
 	}
@@ -2697,7 +2713,7 @@ static void Exception_normal (int nr)
 	m68k_areg (regs, 7) -= 2;
 	x_put_word (m68k_areg (regs, 7), regs.sr);
 kludge_me_do:
-	newpc = x_get_long (regs.vbr + 4 * nr);
+	newpc = x_get_long (regs.vbr + 4 * vector_nr);
 	if (newpc & 1) {
 		if (nr == 2 || nr == 3)
 			cpu_halt (2);
@@ -2815,9 +2831,14 @@ static void m68k_reset2(bool hardreset)
 {
 	uae_u32 v;
 
+	regs.halted = 0;
+	gui_data.cpu_halted = 0;
+	gui_led (LED_CPU, 0);
+
 	regs.spcflags = 0;
 	m68k_reset_delay = 0;
 	regs.ipl = regs.ipl_pin = 0;
+
 #ifdef SAVESTATE
 	if (isrestore ()) {
 		m68k_reset_sr();
@@ -2876,10 +2897,6 @@ static void m68k_reset2(bool hardreset)
 		}
 		fake_mmusr_030 = 0;
 	}
-
-	regs.halted = 0;
-	gui_data.cpu_halted = 0;
-	gui_led (LED_CPU, 0);
 
 	/* 68060 FPU is not compatible with 68040,
 	* 68060 accelerators' boot ROM disables the FPU
@@ -2949,7 +2966,7 @@ uae_u32 REGPARAM2 op_illg (uae_u32 opcode)
 
 	if ((opcode & 0xF000) == 0xF000) {
 		if (warned < 20) {
-			write_log (_T("B-Trap %x at %x (%p)\n"), opcode, pc, regs.pc_p);
+			write_log(_T("B-Trap %04X at %08X -> %08X\n"), opcode, pc, get_long_debug(regs.vbr + 0x2c));
 			warned++;
 		}
 		Exception (0xB);
@@ -2958,7 +2975,7 @@ uae_u32 REGPARAM2 op_illg (uae_u32 opcode)
 	}
 	if ((opcode & 0xF000) == 0xA000) {
 		if (warned < 20) {
-			write_log (_T("A-Trap %x at %x (%p)\n"), opcode, pc, regs.pc_p);
+			write_log(_T("A-Trap %04X at %08X -> %08X\n"), opcode, pc, get_long_debug(regs.vbr + 0x28));
 			warned++;
 		}
 		Exception (0xA);
@@ -2966,7 +2983,7 @@ uae_u32 REGPARAM2 op_illg (uae_u32 opcode)
 		return 4;
 	}
 	if (warned < 20) {
-		write_log (_T("Illegal instruction: %04x at %08X -> %08X\n"), opcode, pc, get_long (regs.vbr + 0x10));
+		write_log (_T("Illegal instruction: %04x at %08X -> %08X\n"), opcode, pc, get_long_debug(regs.vbr + 0x10));
 		warned++;
 		//activate_debugger();
 	}
@@ -3592,35 +3609,6 @@ isstopped:
 		}
 #endif
 
-		if (!uae_int_requested && !uaenet_int_requested && currprefs.cpu_idle && currprefs.m68k_speed != 0 && (regs.spcflags & SPCFLAG_STOP)
-#ifdef WITH_PPC
-			&& ppc_state != PPC_STATE_ACTIVE
-#endif			
-		) {
-			/* sleep 1ms if STOP-instruction is executed
-			 * but only if we have free frametime left to prevent slowdown
-			 */
-			{
-				static int sleepcnt, lvpos, zerocnt;
-				if (vpos != lvpos) {
-					lvpos = vpos;
-					frame_time_t rpt = read_processor_time ();
-					if ((int)rpt - (int)vsyncmaxtime < 0) {
-						sleepcnt--;
-#if 0
-						if (pissoff == 0 && currprefs.cachesize && --zerocnt < 0) {
-							sleepcnt = -1;
-							zerocnt = IDLETIME / 4;
-						}
-#endif
-						if (sleepcnt < 0) {
-							sleepcnt = IDLETIME / 2;
-							cpu_sleep_millis(1);
-						}
-					}
-				}
-			}
-		}
 	}
 
 	if (regs.spcflags & SPCFLAG_TRACE)
@@ -4232,6 +4220,7 @@ static void m68k_run_mmu030 (void)
 	struct flag_struct f;
 
 	mmu030_opcode_stageb = -1;
+	mmu030_fake_prefetch = -1;
 retry:
 	TRY (prb) {
 		for (;;) {
@@ -4243,8 +4232,11 @@ insretry:
 
 			mmu030_state[0] = mmu030_state[1] = mmu030_state[2] = 0;
 			mmu030_opcode = -1;
-			if (mmu030_opcode_stageb < 0) {
-				regs.opcode = get_iword_mmu030 (0);
+			if (mmu030_fake_prefetch >= 0) {
+				regs.opcode = mmu030_fake_prefetch;
+				mmu030_fake_prefetch = -1;
+			} else if (mmu030_opcode_stageb < 0) {
+				regs.opcode = x_prefetch (0);
 			} else {
 				regs.opcode = mmu030_opcode_stageb;
 				mmu030_opcode_stageb = -1;
@@ -4260,6 +4252,7 @@ insretry:
 				count_instr (regs.opcode);
 				do_cycles (cpu_cycles);
 				mmu030_retry = false;
+
 				cpu_cycles = (*cpufunctbl[regs.opcode])(regs.opcode);
 				cnt--; // so that we don't get in infinite loop if things go horribly wrong
 				if (!mmu030_retry)
@@ -4378,8 +4371,8 @@ retry:
 		goto retry;
 	} ENDTRY
 }
-/* "cycle exact" 68020/030  */
 
+/* "cycle exact" 68020/030  */
 
 static void m68k_run_2ce (void)
 {
@@ -4755,9 +4748,10 @@ void m68k_go (int may_quit)
 
 		if (regs.halted) {
 			cpu_halt (regs.halted);
-			if (regs.halted < 0)
+			if (regs.halted < 0) {
 				haltloop();
-			continue;
+				continue;
+			}
 		}
 
 #if 0

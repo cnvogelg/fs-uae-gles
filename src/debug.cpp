@@ -1898,7 +1898,11 @@ static int debug_mem_off (uaecptr *addrp)
 	uaecptr addr = *addrp;
 	addrbank *ba;
 	int offset = munge24 (addr) >> 16;
+	if (!debug_mem_banks)
+		return offset;
 	ba = debug_mem_banks[offset];
+	if (!ba)
+		return offset;
 	addr = (addr & ba->mask) | ba->startmask;
 	*addrp = addr;
 	return offset;
@@ -2132,7 +2136,7 @@ static int memwatch_func (uaecptr addr, int rwi, int size, uae_u32 *valp, uae_u3
 
 		if (!m->frozen && m->val_enabled) {
 			int trigger = 0;
-			uae_u32 mask = (1 << (m->size * 8)) - 1;
+			uae_u32 mask = m->size == 4 ? 0xffffffff : (1 << (m->size * 8)) - 1;
 			uae_u32 mval = m->val;
 			int scnt = size;
 			for (;;) {
@@ -2148,6 +2152,8 @@ static int memwatch_func (uaecptr addr, int rwi, int size, uae_u32 *valp, uae_u3
 					mask <<= 16;
 					scnt -= 2;
 					mval <<= 16;
+				} else {
+					scnt -= 4;
 				}
 				if (scnt <= 0)
 					break;
@@ -2480,6 +2486,7 @@ static void memwatch_remap (uaecptr addr)
 		TCHAR tmp[200];
 		_stprintf (tmp, _T("%s [D]"), bank->name);
 		ms->addr = bank;
+		ms->banknr = banknr;
 		newbank = &ms->newbank;
 		memcpy (newbank, bank, sizeof(addrbank));
 		newbank->bget = mode ? mmu_bget : debug_bget;
@@ -2607,6 +2614,17 @@ int debug_bankchange (int mode)
 		memwatch_setup ();
 	}
 	return -1;
+}
+
+addrbank *get_mem_bank_real(uaecptr addr)
+{
+	addrbank *ab = &get_mem_bank(addr);
+	if (!memwatch_enabled)
+		return ab;
+	addrbank *ab2 = debug_mem_banks[addr >> 16];
+	if (ab2)
+		return ab2;
+	return ab;
 }
 
 struct mw_acc
@@ -3529,6 +3547,43 @@ static void show_exec_lists (TCHAR *t)
 		xfree (name);
 		node = get_long_debug (node);
 	}
+}
+
+static void breakfunc(uae_u32 v)
+{
+	write_log(_T("Cycle breakpoint hit\n"));
+	debugging = 1;
+	set_special (SPCFLAG_BRK);
+}
+
+static int cycle_breakpoint(TCHAR **c)
+{
+	TCHAR nc = _totupper((*c)[0]);
+	next_char(c);
+	if (more_params(c)) {
+		int count = readint(c);
+		if (nc == 'L') {
+			if (more_params(c)) {
+				int hp = readint(c);
+				if (count >= vpos) {
+					count = vpos - count;
+				} else {
+					count += maxvpos - vpos;
+				}
+				count *= maxhpos;
+				if (hp >= current_hpos()) {
+					count += hp - current_hpos();
+				} else {
+					count += maxhpos - current_hpos();
+				}
+			} else {
+				count *= maxhpos;
+			}
+		}
+		event2_newevent_x(-1, count, 0, breakfunc);
+		return 1;
+	}
+	return 0;
 }
 
 #if 0
@@ -4528,6 +4583,9 @@ static bool debug_line (TCHAR *input)
 			} else if (inptr[0] == 'p') {
 				inptr++;
 				if (process_breakpoint (&inptr))
+					return true;
+			} else if (inptr[0] == 'c' || inptr[0] == 'l') {
+				if (cycle_breakpoint(&inptr))
 					return true;
 			} else {
 				if (instruction_breakpoint (&inptr))
