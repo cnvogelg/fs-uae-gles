@@ -53,6 +53,8 @@
 #include "uaenative.h"
 #include "tabletlibrary.h"
 #include "luascript.h"
+#include "debuginfo.h"
+#include "segtracker.h"
 #ifdef RETROPLATFORM
 #include "rp.h"
 #endif
@@ -326,6 +328,7 @@ void virtualdevice_init (void)
 #endif
 #ifdef FILESYS
 	rtarea_init ();
+	segtracker_install ();
 	uaeres_install ();
 	hardfile_install ();
 #endif

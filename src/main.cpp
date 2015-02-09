@@ -33,7 +33,6 @@
 #include "savestate.h"
 #include "filesys.h"
 #include "blkdev.h"
-#include "segtracker.h"
 #include "consolehook.h"
 #include "gfxboard.h"
 #include "luascript.h"
@@ -969,69 +968,6 @@ void do_start_program (void)
 #endif
 }
 
-void do_leave_program (void)
-{
-	sampler_free ();
-	graphics_leave ();
-	inputdevice_close ();
-	DISK_free ();
-	close_sound ();
-	dump_counts ();
-#if defined (PARALLEL_PORT)
-	exitparallel ();
-#endif
-#ifdef SERIAL_PORT
-	serial_exit ();
-#endif
-#ifdef CDTV
-	cdtv_free();
-	cdtvcr_free();
-#endif
-#ifdef A2091
-	a2091_free ();
-	a3000scsi_free ();
-#endif
-#ifdef NCR
-	ncr710_free();
-	ncr_free();
-#endif
-#ifdef NCR9X
-	ncr9x_free();
-#endif
-#ifdef CD32
-	akiko_free ();
-	cd32_fmv_free();
-#endif
-	if (! no_gui)
-		gui_exit ();
-#ifdef USE_SDL
-	SDL_Quit ();
-#endif
-#ifdef AUTOCONFIG
-	expansion_cleanup ();
-#endif
-#ifdef FILESYS
-	filesys_cleanup ();
-#endif
-#ifdef BSDSOCKET
-	bsdlib_reset ();
-#endif
-	gayle_free ();
-	device_func_reset ();
-#ifdef WITH_LUA
-	uae_lua_free ();
-#endif
-#ifdef WITH_PPC
-	uae_ppc_free();
-#endif
-	gfxboard_free();
-	savestate_free ();
-	memory_cleanup ();
-	free_shm ();
-	cfgfile_addcfgparam (0);
-	machdep_free ();
-}
-
 void start_program (void)
 {
 	do_start_program ();
@@ -1040,56 +976,6 @@ void start_program (void)
 void leave_program (void)
 {
 	do_leave_program ();
-}
-
-void virtualdevice_init (void)
-{
-#ifdef AUTOCONFIG
-	rtarea_setup ();
-#endif
-#ifdef FILESYS
-	rtarea_init ();
-	segtracker_install ();
-	uaeres_install ();
-	hardfile_install ();
-#endif
-#ifdef SCSIEMU
-	scsi_reset ();
-	scsidev_install ();
-#endif
-#ifdef SANA2
-	netdev_install ();
-#endif
-#ifdef UAESERIAL
-	uaeserialdev_install ();
-#endif
-#ifdef AUTOCONFIG
-	expansion_init ();
-	emulib_install ();
-	uaeexe_install ();
-#endif
-#ifdef FILESYS
-	filesys_install ();
-#endif
-#if defined (BSDSOCKET)
-	bsdlib_install ();
-#endif
-#ifdef WITH_UAENATIVE
-	uaenative_install ();
-#endif
-#ifdef WITH_TABLETLIBRARY
-	tabletlib_install ();
-#endif
-#ifdef NCR
-	ncr710_init();
-	ncr_init();
-#endif
-#ifdef NCR9X
-	ncr9x_init();
-#endif
-#ifdef CDTV
-	cdtvcr_reset();
-#endif
 }
 
 static int real_main2 (int argc, TCHAR **argv)
